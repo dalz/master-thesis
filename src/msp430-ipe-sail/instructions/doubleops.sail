@@ -2,15 +2,15 @@
 
 val move_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=97
-function move_inst(x, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
-  let sourceValue : WordByte =  X(x, sourceRegister, addressingModeSource) in {
+function move_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte =  X(bw, sourceRegister, addressingModeSource) in {
   //dest value has to be got due to addressing modes PC alignment
 
   LastInstructionFetch = match addressingModeDestination {
     INDEXED_MODE => fetch(),
     _ => Word(0x0000)
   };
-  X(x, destinationRegister, addressingModeDestination) = sourceValue}
+  X(bw, destinationRegister, addressingModeDestination) = sourceValue}
 }
 
 //these are split up to make implmenting addc like instrctions simpler
