@@ -30,7 +30,7 @@ mapping RegisterMapping: Register <-> registerAdressBits  = {
         R8    <-> 0b1000,
         R9    <-> 0b1001,
         R10   <-> 0b1010,
-        R11   <-> 0b1011, 
+        R11   <-> 0b1011,
         R12   <-> 0b1100,
         R13   <-> 0b1101,
         R14   <-> 0b1110,
@@ -39,7 +39,7 @@ mapping RegisterMapping: Register <-> registerAdressBits  = {
 
 val init_base_regs: unit -> unit
 function init_base_regs() = {
-    PC_reg     = undefined; /* needs to be the adress located at 0FFFEh */
+    PC_reg     = undefined; /* needs to be the address located at 0FFFEh */
     SP_reg     = undefined; /* needs to be initialized by the user */
     SRCG1_reg  = undefined;
     CG2_reg    = undefined;

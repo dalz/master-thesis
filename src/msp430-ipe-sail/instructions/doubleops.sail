@@ -2,25 +2,25 @@
 
 val move_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=97
-function clause move_inst(WORD_INSTRUCTION, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte =  X(WORD_INSTRUCTION, sourceRegister, adressingModeSource) in {
-  //dest value has to be got due to adressing modes PC alignment
+function clause move_inst(WORD_INSTRUCTION, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte =  X(WORD_INSTRUCTION, sourceRegister, addressingModeSource) in {
+  //dest value has to be got due to addressing modes PC alignment
 
-  LastInstructionFetch = match adressingModeDestination {
+  LastInstructionFetch = match addressingModeDestination {
     INDEXED_MODE => fetch(),
     _ => Word(0x0000)
   };
-  X(WORD_INSTRUCTION, destinationRegister, adressingModeDestination) = sourceValue}
+  X(WORD_INSTRUCTION, destinationRegister, addressingModeDestination) = sourceValue}
 }
 
-function clause move_inst(BYTE_INSTRUCTION, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte =  X(BYTE_INSTRUCTION, sourceRegister, adressingModeSource) in {
-  //dest value has to be got due to adressing modes PC alignment
-  LastInstructionFetch = match adressingModeDestination {
+function clause move_inst(BYTE_INSTRUCTION, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte =  X(BYTE_INSTRUCTION, sourceRegister, addressingModeSource) in {
+  //dest value has to be got due to addressing modes PC alignment
+  LastInstructionFetch = match addressingModeDestination {
     INDEXED_MODE => fetch(),
     _ => Word(0x0000)
   };
-  X(BYTE_INSTRUCTION, destinationRegister, adressingModeDestination) = sourceValue}
+  X(BYTE_INSTRUCTION, destinationRegister, addressingModeDestination) = sourceValue}
 }
 
 //these are split up to make implmenting addc like instrctions simpler
@@ -47,28 +47,28 @@ function addWithStatusRegister(w1, w2) = {
 
 val add_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=66
-function add_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function add_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   //addition will set the needed status bits
   clearStatusRegisters();
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = addWithStatusRegister(sourceValue,destValue) in {
     setResultStatusRegisters(result);
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
 val addc_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=67
-function addc_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+function addc_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let carry : WordByte = BW_zero_extend(getCarryBit()) in {
     //addition will set the needed status bits
     clearStatusRegisters();
     let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue),carry) in {
       setResultStatusRegisters(result);
-      X(bw, destinationRegister, adressingModeDestination) = result
+      X(bw, destinationRegister, addressingModeDestination) = result
     }
   }
 }
@@ -76,40 +76,40 @@ function addc_inst(bw, sourceRegister, adressingModeSource, destinationRegister,
 
 val sub_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=115
-function sub_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function sub_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   //addition will set the needed status bits
   clearStatusRegisters();
-  let sourceValue : WordByte = ~(X(bw, sourceRegister , adressingModeSource)) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), BW_zero_extend(0x1)) in {
     setResultStatusRegisters(result);
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
 val subc_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=116
-function subc_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function subc_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   
-  let sourceValue : WordByte = ~(X(bw, sourceRegister , adressingModeSource)) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let carry : WordByte = BW_zero_extend(getCarryBit()) in {
     //addition will set the needed status bits
     clearStatusRegisters();
     let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), carry) in {
     setResultStatusRegisters(result);
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
   }
 }
 
 val cmp_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=78
-function cmp_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function cmp_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   //addition will set the needed status bits
   clearStatusRegisters();
-  let sourceValue : WordByte = ~(X(bw, sourceRegister , adressingModeSource)) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte   = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), BW_zero_extend(0x1)) in 
     setResultStatusRegisters(result);
 }
@@ -127,12 +127,12 @@ function andWithStatusRegister(w1, w2) = {
 
 val and_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=68
-function and_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function and_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   clearStatusRegisters();
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = andWithStatusRegister(sourceValue,destValue) in {
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
@@ -150,40 +150,40 @@ function xorWithStatusRegister(w1, w2) = {
 
 val xor_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=120
-function xor_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
+function xor_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   clearStatusRegisters();
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = xorWithStatusRegister(sourceValue,destValue) in {
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
 val bic_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=69
-function bic_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte = ~(X(bw, sourceRegister , adressingModeSource)) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+function bic_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = sourceValue & destValue in {
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
 val bis_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=70
-function bis_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in
+function bis_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
   let result : WordByte = sourceValue | destValue in {
-    X(bw, destinationRegister, adressingModeDestination) = result
+    X(bw, destinationRegister, addressingModeDestination) = result
   }
 }
 
 val bit_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=71
-function bit_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : WordByte = X(bw, sourceRegister , adressingModeSource) in
-  let destValue : WordByte   = X(bw, destinationRegister , adressingModeDestination) in {
+function bit_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
+  let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in {
     //only changes the status register no writing needed
     let _ : WordByte   = andWithStatusRegister(sourceValue,destValue);
   }
@@ -205,9 +205,9 @@ function asWordByte(number) = {
 
 val dadd_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=80
-function dadd_inst(bw, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination) = {
-  let sourceValue : int = asDecimal(X(bw, sourceRegister , adressingModeSource)) in
-  let destValue : int   = asDecimal(X(bw, destinationRegister , adressingModeDestination)) in {
+function dadd_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
+  let sourceValue : int = asDecimal(X(bw, sourceRegister , addressingModeSource)) in
+  let destValue : int   = asDecimal(X(bw, destinationRegister , addressingModeDestination)) in {
     //only changes the status register no writing needed
     let res : WordByte   = asWordByte(sourceValue + destValue) in {
       if isNegative(res) then setNegativebit();
@@ -223,7 +223,7 @@ function dadd_inst(bw, sourceRegister, adressingModeSource, destinationRegister,
 
 
 
-//union clause ast = DOUBLEOP : (bits(4), wordbyteInstructionBit, registerAdress, adressingModeSource, registerAdress, adressingModeDestination)
+//union clause ast = DOUBLEOP : (bits(4), wordbyteInstructionBit, registerAddress, addressingModeSource, registerAddress, addressingModeDestination)
 union clause ast = DOUBLEOP : (doubleop, BW, Register, AM, Register, AM)
 val formatAst: (ast) -> string
 function clause formatAst(DOUBLEOP(op, bw, sourceReg, As, destinationReg, Ad)) = {
@@ -249,21 +249,21 @@ mapping encdec_doubleop : doubleop <-> bits(4) = {
 mapping clause encdec = DOUBLEOP(op, bw, sourceReg, As, destinationReg, Ad)
   <-> encdec_doubleop(op) @ RegisterMapping(sourceReg) @ destinationmaping(Ad) @ bitmaping(bw) @ sourcemaping(As) @ RegisterMapping(destinationReg)
 
-function clause execute(DOUBLEOP(op, BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination)) = {
-  logWithVerbosity(2, formatAst(DOUBLEOP(op, BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination)));
+function clause execute(DOUBLEOP(op, BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination)) = {
+  logWithVerbosity(2, formatAst(DOUBLEOP(op, BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination)));
   match op {
-    MOV  => move_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    ADD  => add_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    ADDC => addc_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    SUB  => sub_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    SUBC => subc_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    CMP  => cmp_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    DADD => dadd_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    BIT  => bit_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    BIC  => bic_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    BIS  => bis_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    XOR  => xor_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
-    AND  => and_inst(BW, sourceRegister, adressingModeSource, destinationRegister, adressingModeDestination),
+    MOV  => move_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    ADD  => add_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    ADDC => addc_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    SUB  => sub_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    SUBC => subc_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    CMP  => cmp_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    DADD => dadd_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    BIT  => bit_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    BIC  => bic_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    BIS  => bis_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    XOR  => xor_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
+    AND  => and_inst(BW, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination),
   }
 }
 

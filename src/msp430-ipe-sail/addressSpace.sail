@@ -64,7 +64,7 @@ function incPC() = {
 
 //fetch is used for 2 things:
 // -reading the instructions
-// -reading values for certain adressing modes
+// -reading values for certain addressing modes
 val fetch: unit -> WordByte
 function fetch() = {
   //PC should always be word aligned

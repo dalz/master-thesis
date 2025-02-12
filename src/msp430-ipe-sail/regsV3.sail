@@ -1,6 +1,6 @@
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=49
 //3.3 Addressing Modes
-mapping sourcemaping: AM <-> adressingModeSourceBits = {
+mapping sourcemaping: AM <-> addressingModeSourceBits = {
   REGISTER_MODE <-> 0b00,
   INDEXED_MODE <-> 0b01,
   INDIRECT_REGISTER_MODE <-> 0b10,
@@ -9,12 +9,12 @@ mapping sourcemaping: AM <-> adressingModeSourceBits = {
 
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=49
 //3.3 Addressing Modes
-mapping destinationmaping: AM <-> adressingModeDestinationBits = {
+mapping destinationmaping: AM <-> addressingModeDestinationBits = {
   REGISTER_MODE <-> 0b0,
   INDEXED_MODE <-> 0b1,
 }
 
-register LastInstructionFetch : WordByte = Word(0x0000) /* program counter */
+register LastInstructionFetch : WordByte = Word(undefined) /* program counter */
 
 val readReg: (BW, Register) -> WordByte
 function clause readReg(WORD_INSTRUCTION, reg) = {
@@ -145,8 +145,8 @@ function clause read(bw, reg, INDEXED_MODE) = {
   //3.3.2 Indexed Mode
   let Word(initialAddress) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in {
     LastInstructionFetch = fetch();
-    let Word(addinigAdress) : WordByte = LastInstructionFetch in
-    XmemInstruction(bw,initialAddress + addinigAdress)
+    let Word(addinigAddress) : WordByte = LastInstructionFetch in
+    XmemInstruction(bw,initialAddress + addinigAddress)
   }}
 
 //////////////////////////
