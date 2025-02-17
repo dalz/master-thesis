@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all cleanIntermediate testInt testUnit
+.PHONY: all cleanIntermediate testInt testUnit print-sail-srcs
 .SECONDARY:
 
 CD = _compilation
@@ -20,7 +20,7 @@ C_LIBS  = $(GMP_LIBS) $(ZLIB_LIBS)
 
 #defining the instructions
 MSP430_BASE_INST =  instructions/doubleops.sail
-MSP430_BASE_INST += instructions/singleops.sail 
+MSP430_BASE_INST += instructions/singleops.sail
 MSP430_BASE_INST += instructions/jumps.sail
 MSP430_EXTENDED_INST = $(MSP430_BASE_INST) # add extra files here fore extentions
 MSP430_INST  = instructions/instructionsBegin.sail $(MSP430_EXTENDED_INST) instructions/instructionsEnd.sail
@@ -35,6 +35,7 @@ MSP430_BASE += log.sail
 MSP430_BASE += regfile.sail
 MSP430_BASE += wordBytePrimitives.sail
 MSP430_BASE += statusBits.sail
+MSP430_BASE += mpu.sail
 MSP430_BASE += addressSpace.sail
 MSP430_BASE += regsV3.sail
 
@@ -43,7 +44,7 @@ SAIL_SRCS = $(MSP430_BASE) $(MSP430_INST)
 
 all: msp430
 
-testInt: 
+testInt:
 	$(MAKE) -C tests/integration
 
 testUnit: msp430test
@@ -67,3 +68,6 @@ $(CD)/.f:
 
 cleanIntermediate:
 	rm -rf $(CD)
+
+print-sail-srcs:
+	@echo $(SAIL_SRCS)
