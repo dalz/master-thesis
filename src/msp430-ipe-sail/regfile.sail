@@ -18,12 +18,12 @@ register   R13_reg  : wordBits /* general purpose    */
 register   R14_reg  : wordBits /* general purpose    */
 register   R15_reg  : wordBits /* general purpose    */
 
-mapping RegisterMapping: Register <-> registerAdressBits  = {
-        PC    <-> 0b0000, 
-        SP    <-> 0b0001, 
-        SRCG1 <-> 0b0010, 
-        CG2   <-> 0b0011, 
-        R4    <-> 0b0100, 
+mapping RegisterMapping: Register <-> registerAddressBits  = {
+        PC    <-> 0b0000,
+        SP    <-> 0b0001,
+        SRCG1 <-> 0b0010,
+        CG2   <-> 0b0011,
+        R4    <-> 0b0100,
         R5    <-> 0b0101,
         R6    <-> 0b0110,
         R7    <-> 0b0111,

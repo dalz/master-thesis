@@ -46,7 +46,7 @@ enum Register = {
   R13,
   R14,
   R15,
-} 
+}
 
 enum AM = {
     REGISTER_MODE,
