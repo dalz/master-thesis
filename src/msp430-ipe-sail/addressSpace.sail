@@ -38,7 +38,7 @@ function clause writeMem(BYTE_INSTRUCTION, addr, Word(v)) =
 function clause writeMem(WORD_INSTRUCTION, addr, Word(v)) = {
   // TODO maybe not correct if first write succeeds and the second faults
   writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]));
-  writeMem(BYTE_INSTRUCTION, addr, Byte(v[15 .. 8]))
+  writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]))
 }
 
 function clause writeMem(WORD_INSTRUCTION, addr, Byte(v)) =
