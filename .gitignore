@@ -1,5 +1,6 @@
 ref/
 _*/
 out
-msp430
+src/msp430-ipe-sail/msp430
+src/msp430-ipe-sail/msp430test
 z3_problems
