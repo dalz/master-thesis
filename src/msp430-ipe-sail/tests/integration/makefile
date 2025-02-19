@@ -63,7 +63,7 @@ $(MSPRES)/$(INSTRACE)/$(SELF)/%.out: $(MSPEXEC)/%.c $(simulator_self) $(MSPRES)/
 	- $(simulator_self) -v 0x000002 -e $< > $@
 
 $(MSPEXEC)/%.c: $(MSPC)/%.c $(MSPEXEC)/.f
-	$(compiler) $< -o $@ $(compiler_arg)
+	$(compiler) -L../../../../dep/msp430-gcc-support-files/include/ $< -o $@ $(compiler_arg)
 
 
 $(MSPC)/%.c: $(CSRC)/%.c $(MSPC)/.f

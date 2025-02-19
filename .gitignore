@@ -1,6 +1,10 @@
 ref/
-_*/
-out
+dep/
+
 src/msp430-ipe-sail/msp430
 src/msp430-ipe-sail/msp430test
+src/msp430-ipe-sail/test/integration/res.csv
+
 z3_problems
+_*/
+out
