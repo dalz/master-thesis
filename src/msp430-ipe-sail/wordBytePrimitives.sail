@@ -22,18 +22,12 @@ function clause unsignedWb(Byte(b)) = {
   unsigned(b)
 }
 
-val addBw: (WordByte, WordByte) -> WordByte
-function clause addBw(Byte(b1), Byte(b2)) = {
-  Byte(b1 + b2)
-}
-function clause addBw(Word(w1), Word(w2)) = {
-  Word(w1 + w2)
-}
-function clause addBw(Word(w), Byte(b)) = {
-  Word(w + zero_extend(b))
-}
-function clause addBw(Byte(b), Word(w)) = {
-  Word(w + zero_extend(b))
+val addBw : (WordByte, WordByte) -> WordByte
+function addBw(x, y) = match (x, y) {
+  (Byte(a), Byte(b)) => Byte(a + b),
+  (Word(a), Word(b)) => Word(a + b),
+  (Word(a), Byte(b)) => Word(a + zero_extend(b)),
+  (Byte(a), Word(b)) => Word(b + zero_extend(a)),
 }
 
 overload operator + = {addBw}
