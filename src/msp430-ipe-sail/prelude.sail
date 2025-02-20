@@ -5,11 +5,17 @@ $include <smt.sail> //division modulo and absolute value
 
 
 
+
 // bitshift operator
 val shiftl = pure "shiftl" : forall 'm. (bits('m), int) -> bits('m)
 
 infixl 7 <<
 overload operator << = { shiftl }
+
+val shiftr = "shiftr" : forall 'm. (bits('m), int) -> bits('m)
+
+infixl 7 >>
+overload operator >> = { shiftr }
 
 // adding the division and modulo operators
 overload operator / = {ediv_int}

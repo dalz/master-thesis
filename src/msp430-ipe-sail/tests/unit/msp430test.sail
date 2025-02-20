@@ -1,8 +1,10 @@
 $include "testStatusbits.sail"
 $include "testRegister.sail"
+$include "test-ipe.sail"
 
 function main() : unit -> unit = {
   testStatusbits();
   testRegister();
-   print_endline("Success");
+  test_ipe();
+  print_endline("Success");
 }

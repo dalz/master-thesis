@@ -6,12 +6,12 @@ val write_ram = pure "write_ram" : forall 'n 'm.
 
 val read_mem_aux : (BW, Address, access_mode) -> WordByte
 
-function clause read_mem_aux(BYTE_INSTRUCTION, addr, m) =
-  if check_byte_access(addr, m)
-  then Byte(
-    if is_mpu_reg_addr(addr) then read_mpu_reg_byte(addr)
-    else read_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr))
-  else throw notImplemented("mpu/ipe read fault") // TODO
+function clause read_mem_aux(BYTE_INSTRUCTION, addr, m) = {
+  check_byte_access(addr, m);
+  Byte(if is_mpu_reg_addr(addr)
+       then read_mpu_reg_byte(addr)
+       else read_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr))
+}
 
 function clause read_mem_aux(WORD_INSTRUCTION, addr, m) =
   let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr, m) in
@@ -23,11 +23,12 @@ function readMem(bw, addr) = read_mem_aux(bw, addr, R)
 
 val writeMem : (BW, Address, WordByte) -> unit
 
-function clause writeMem(BYTE_INSTRUCTION, addr, Byte(v)) =
-  if check_byte_access(addr, W)
-  then (if is_mpu_reg_addr(addr) then write_mpu_reg_byte(addr, v)
-        else write_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr, v))
-  else throw notImplemented("mpu/ipe write fault") // TODO
+function clause writeMem(BYTE_INSTRUCTION, addr, Byte(v)) = {
+  check_byte_access(addr, W);
+  if is_mpu_reg_addr(addr)
+  then write_mpu_reg_byte(addr, v)
+  else write_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr, v)
+}
 
 // high bytes go unused when writing byte operations to ram
 // https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48

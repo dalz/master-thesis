@@ -111,20 +111,20 @@ function write_mpu_reg_byte(addr, v) =
   let off : int = unsigned(addr) - unsigned(mpu_reg_base) in
   if off >= 0 & off < 16 then
     let idx = off / 2 in
-    
+
     // prevent writes when password is wrong (except for writing the password itself)
     // TODO word writes with wrong password should be disallowed,
     // now it works if the low byte of the word written is the correct password
     // and the address is that of MPUPW
     if get_mpu_reg(MPUCTL0)[MPUPW] != 0xA5
        & (idx != mpu_register_index(MPUCTL0) | off % 2 == 0)
-    then throw notImplemented("mpu write with wrong password") // TODO PUC
-    
+    then throw power_up_clear()
+
     // prevent write on locked registers
     else if (is_lockable_mpu_reg_idx(idx) & get_mpu_reg(MPUCTL0)[MPULOCK] == 0b1)
           | (is_ipe_reg_idx(idx) & get_mpu_reg(MPUIPC0)[MPUIPLOCK] == 0b1)
-    then throw notImplemented("access to locked register") // TODO what should happen?
-    
+    then () // TODO what should happen?
+
     // read high / low byte of register
     else if off % 2 == 0
     then mpu_registers[idx] = [mpu_registers[idx] with LOW = v]
@@ -168,8 +168,9 @@ function check_ipe_access(addr, m) =
 
 // TODO interrupt vector?
 
-val check_byte_access : (Address, access_mode) -> bool
-function check_byte_access(addr, m) = check_ipe_access(addr, m)
+val check_byte_access : (Address, access_mode) -> unit
+function check_byte_access(addr, m) =
+  if ~(check_ipe_access(addr, m)) then throw ipe_violation(addr)
 
 // TODO brownout reset?
 // doesn't seem to be implemented
