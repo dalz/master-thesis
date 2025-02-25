@@ -4,7 +4,7 @@ let ipe_end : Address = 0x3000
 let pc_out : wordBits = 0x1000
 let pc_in : wordBits = 0x2500
 
-register ctl : mpu_register_data
+register ctl : wordBits
 
 val mpu_reg_addr : (mpu_register_name) -> Address
 function mpu_reg_addr(reg) = mpu_reg_base + 2 * mpu_register_index(reg)
@@ -17,9 +17,9 @@ function setup_ipe() = {
   Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPSEGB1)) = Word(ipe_start >> 4);
   Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPSEGB2)) = Word(ipe_end >> 4);
 
-  ctl.bits = 0x0000;
-  ctl[MPUIPENA] = 0b1;
-  Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) = Word(ctl.bits);
+  ctl = 0x0000;
+  ctl[MPUIPENA_bit] = bitone;
+  Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) = Word(ctl);
 
   print_endline("IPE enabled");
 }
@@ -84,11 +84,11 @@ function test_ipe_lock() = {
 
   print_endline("testing locking of IPE registers");
 
-  ctl.bits = 0x0000;
-  ctl[MPUIPENA] = 0b1;
-  ctl[MPUIPLOCK] = 0b1;
+  ctl = 0x0000;
+  ctl[MPUIPENA_bit] = bitone;
+  ctl[MPUIPLOCK_bit] = bitone;
   Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPSEGB1)) = Word(ipe_start >> 4);
-  Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) = Word(ctl.bits);
+  Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) = Word(ctl);
 
   try {
     Xmem(WORD_INSTRUCTION, add_bits(ipe_start, 0x0010)) = Word(0x0000);
@@ -103,7 +103,7 @@ function test_ipe_lock() = {
   Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPSEGB2)) = Word(0x0000);
   assert(Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPSEGB2)) == Word(ipe_end >> 4));
   Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) = Word(0x0000);
-  assert(Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) == Word(ctl.bits));
+  assert(Xmem(WORD_INSTRUCTION, mpu_reg_addr(MPUIPC0)) == Word(ctl));
 }
 
 val test_boundary_access : (unit) -> unit
@@ -165,7 +165,7 @@ function test_ipe() = {
     test_boundary_access();
   } catch {
     test_fail(msg) => { print_endline("TEST FAILED: " + msg); exit(()) }
-  }
+  };
 
   // TODO ivt, execute access
 }

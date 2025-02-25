@@ -9,7 +9,8 @@ src/musail-gen/base.v
 src/musail-gen/machine.v
 src/musail-gen/*.glob
 
-
 z3_problems
 _*/
 out
+
+todo.org

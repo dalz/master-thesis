@@ -12,7 +12,7 @@ val shiftl = pure "shiftl" : forall 'm. (bits('m), int) -> bits('m)
 infixl 7 <<
 overload operator << = { shiftl }
 
-val shiftr = "shiftr" : forall 'm. (bits('m), int) -> bits('m)
+val shiftr = pure "shiftr" : forall 'm. (bits('m), int) -> bits('m)
 
 infixl 7 >>
 overload operator >> = { shiftr }
