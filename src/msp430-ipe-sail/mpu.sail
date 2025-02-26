@@ -72,18 +72,20 @@ function read_mpu_reg_byte(addr) =
   if off >= 0 & off < 16 then
 
   let w : wordBits = match mpu_register_index(off / 2) {
-    MPUCTL0    => [MPUCTL0_reg with MPUPW_high..MPUPW_low = 0x96], // MPUPW always reads as 0x96
-    MPUCTL1    => MPUCTL1_reg,
+    MPUCTL0    =>
+      // MPUPW always reads as 0x96
+      [MPUCTL0_reg with MPUPW_high..MPUPW_low = 0x96]
+      // mask reserved bits (always read 0)
+      & 0b1111111100010011,
+    MPUCTL1    => MPUCTL1_reg & 0b0000000000011111,
     MPUSEGB2   => MPUSEGB2_reg,
     MPUSEGB1   => MPUSEGB1_reg,
     MPUSAM     => MPUSAM_reg,
-    MPUIPC0    => MPUIPC0_reg,
+    MPUIPC0    => MPUIPC0_reg & 0b0000000011100000,
     MPUIPSEGB2 => MPUIPSEGB2_reg,
     MPUIPSEGB1 => MPUIPSEGB1_reg,
   }
   in if off % 2 == 0 then w[7..0] else w[15..8]
-
-  // TODO reserved bits always read zero (apply a mask if register has reserved bits)
 
   // can't put the guard in the assert (instead of if-else with trivial assert)
   // because sail --katamaran doesn't take that into account for type inference

@@ -14,6 +14,7 @@ function clause read_mem_aux(BYTE_INSTRUCTION, addr, m) = {
 }
 
 function clause read_mem_aux(WORD_INSTRUCTION, addr, m) =
+  let addr = addr & 0xFFFE in // TODO is this right?
   let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr, m) in
   let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1, m) in
   Word(h @ l)
@@ -37,7 +38,7 @@ function clause writeMem(BYTE_INSTRUCTION, addr, Word(v)) =
   writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]))
 
 function clause writeMem(WORD_INSTRUCTION, addr, Word(v)) = {
-  // TODO maybe not correct if first write succeeds and the second faults
+  let addr = addr & 0xFFFE in // TODO is this right?
   writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]));
   writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]))
 }

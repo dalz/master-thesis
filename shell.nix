@@ -29,6 +29,34 @@ pkgs.mkShell {
   '';
 }
 
+# (load "/home/ale/uni/tesi/_opam/.opam-switch/sources/sail/editors/sail-mode.el")
+
+
+# opam switch create .
+# opam repo add coq-released https://coq.inria.fr/opam/released
+# opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
+
+# cd dep/sail
+# (apply patch)
+# opam pin add sail .
+# (if not committed) opam reinstall sail --working-dir
+
+# cd ../sail-backend
+# opam install . --deps-only
+# dune build
+# dune install
+
+# opam install coq-katamaran
+
+
+
+
+
+
+
+
+# OLD
+
 # opam switch create .
 
 # opam repo add coq-released https://coq.inria.fr/opam/released
@@ -60,7 +88,6 @@ pkgs.mkShell {
 # opam install coq-katamaran
 
 
-# (load "/home/ale/uni/tesi/_opam/.opam-switch/sources/sail/editors/sail-mode.el")
 
 
-# opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
+
