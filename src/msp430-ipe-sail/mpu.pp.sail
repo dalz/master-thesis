@@ -1,4 +1,4 @@
-let mpu_reg_base : Address = 0x05A0 // MSP430FR5969
+#include "mpu-constants.h"
 
 enum mpu_register_name = {
   // MPU control registers
@@ -29,29 +29,6 @@ mapping mpu_register_index : mpu_register_name <-> range(0, 7) = {
   MPUIPSEGB1 <-> 7,
 }
 
-// MPU control register 0 (MPUCTL0)
-let MPUPW_high   = 15 // allows writing MPU registers when correct
-let MPUPW_low    = 8
-// let MPUSEGIE_bit = 4
-let MPULOCK_bit  = 1  // if 1 prevents writes on MPU regs, except MPUCTL1 and IPE regs
-// let MPUENA_bit   = 0  // enable MPU
-
-// MPU control register 1 (MPUCTL1)
-// let MPUSEGIPIFG_bit = 4
-// let MPUSEGIIFG_bit  = 3
-// let MPUSEG3IFG_bit  = 2
-// let MPUSEG2IFG_bit  = 1
-// let MPUSEG1IFG_bit  = 0
-
-// MPU segmentation access register (MPUSAM)
-// let MPUSEGIE_bit = 4
-// let MPULOCK_bit = 1
-
-// IPE control register (MPUIPC0)
-let MPUIPLOCK_bit = 7 // if 1, prevents writes on IPE registers
-let MPUIPENA_bit  = 6 // enable IPE
-let MPUIPVS_bit   = 5 // violation select: wether a PUC occurs on IPE violations
-
 register MPUCTL0_reg    : wordBits
 register MPUCTL1_reg    : wordBits
 register MPUSEGB2_reg   : wordBits
@@ -68,13 +45,13 @@ function is_mpu_reg_addr(addr) =
 
 val read_mpu_reg_byte : (Address) -> byteBits
 function read_mpu_reg_byte(addr) =
-  let off : int = unsigned(addr) - unsigned(mpu_reg_base) in
-  if off >= 0 & off < 16 then
+  let idx : int = (unsigned(addr >> 1) - unsigned(mpu_reg_base >> 1)) in
+  if idx >= 0 & idx < 8 then
 
-  let w : wordBits = match mpu_register_index(off / 2) {
-    MPUCTL0    =>
+  let w : wordBits = match mpu_register_index(idx) {
+    MPUCTL0 =>
       // MPUPW always reads as 0x96
-      [MPUCTL0_reg with MPUPW_high..MPUPW_low = 0x96]
+      ((MPUCTL0_reg & 0x00FF) | 0x9600) // [MPUCTL0_reg with MPUPW_high..MPUPW_low = 0x96]
       // mask reserved bits (always read 0)
       & 0b1111111100010011,
     MPUCTL1    => MPUCTL1_reg & 0b0000000000011111,
@@ -85,12 +62,14 @@ function read_mpu_reg_byte(addr) =
     MPUIPSEGB2 => MPUIPSEGB2_reg,
     MPUIPSEGB1 => MPUIPSEGB1_reg,
   }
-  in if off % 2 == 0 then w[7..0] else w[15..8]
+  in match addr[0..0] {
+    0b0 => w[7..0],
+    0b1 => w[15..8]
+  }
 
   // can't put the guard in the assert (instead of if-else with trivial assert)
   // because sail --katamaran doesn't take that into account for type inference
   else { assert(false); 0x00 }
-
 
 // returns true if given index of a register that is locked by the MPULOCK flag
 val is_lockable_mpu_reg : (mpu_register_name) -> bool
@@ -114,45 +93,45 @@ function is_ipe_reg(reg) =
 
 val write_mpu_reg_byte : (Address, byteBits) -> unit
 function write_mpu_reg_byte(addr, v) =
-  let off : int = unsigned(addr) - unsigned(mpu_reg_base) in
-  if off >= 0 & off < 16 then
-    let reg = mpu_register_index(off / 2) in
+  let idx : int = (unsigned(addr >> 1) - unsigned(mpu_reg_base >> 1)) in
+  let low_byte = addr[0..0] == 0b0 in
+  if idx >= 0 & idx < 8 then
+    let reg = mpu_register_index(idx) in
     let reg_is_not_MPUCTL0 : bool = match reg { MPUCTL0 => false, _ => true } in
 
-    // prevent writes when password is wrong (except for writing the password itself)
-    // TODO word writes with wrong password should be disallowed,
-    // now it works if the low byte of the word written is the correct password
-    // and the address is that of MPUPW
-    if MPUCTL0_reg[MPUPW_high..MPUPW_low] != 0xA5
-       & (reg_is_not_MPUCTL0 | off % 2 == 0)
+    // prevent writes when password is wrong,
+    // except for writing the password itself
+    if ~(MPUCTL0_reg[MPUPW_high..MPUPW_low] == 0xA5)
+       & (reg_is_not_MPUCTL0 | low_byte)
     then throw power_up_clear()
 
     // prevent write on locked registers
-    else if (is_lockable_mpu_reg(reg) & MPUCTL0_reg[MPULOCK_bit] == bitone)
-          | (is_ipe_reg(reg) & MPUIPC0_reg[MPUIPLOCK_bit] == bitone)
+    else if (is_lockable_mpu_reg(reg)
+             & MPUCTL0_reg[MPULOCK_bit..MPULOCK_bit] == 0b1)
+          | (is_ipe_reg(reg) & MPUIPC0_reg[MPUIPLOCK_bit..MPUIPLOCK_bit] == 0b1)
     then ()
 
     // write high / low byte of register
-    else if off % 2 == 0
+    else if low_byte
     then match reg {
-        MPUCTL0    => MPUCTL0_reg[7..0] = v,
-        MPUCTL1    => MPUCTL1_reg[7..0] = v,
-        MPUSEGB2   => MPUSEGB2_reg[7..0] = v,
-        MPUSEGB1   => MPUSEGB1_reg[7..0] = v,
-        MPUSAM     => MPUSAM_reg[7..0] = v,
-        MPUIPC0    => MPUIPC0_reg[7..0] = v,
-        MPUIPSEGB2 => MPUIPSEGB2_reg[7..0] = v,
-        MPUIPSEGB1 => MPUIPSEGB1_reg[7..0] = v,
+      MPUCTL0    => MPUCTL0_reg[7..0] = v,
+      MPUCTL1    => MPUCTL1_reg[7..0] = v,
+      MPUSEGB2   => MPUSEGB2_reg[7..0] = v,
+      MPUSEGB1   => MPUSEGB1_reg[7..0] = v,
+      MPUSAM     => MPUSAM_reg[7..0] = v,
+      MPUIPC0    => MPUIPC0_reg[7..0] = v,
+      MPUIPSEGB2 => MPUIPSEGB2_reg[7..0] = v,
+      MPUIPSEGB1 => MPUIPSEGB1_reg[7..0] = v,
     }
     else match reg {
-        MPUCTL0    => MPUCTL0_reg[15..8] = v,
-        MPUCTL1    => MPUCTL1_reg[15..8] = v,
-        MPUSEGB2   => MPUSEGB2_reg[15..8] = v,
-        MPUSEGB1   => MPUSEGB1_reg[15..8] = v,
-        MPUSAM     => MPUSAM_reg[15..8] = v,
-        MPUIPC0    => MPUIPC0_reg[15..8] = v,
-        MPUIPSEGB2 => MPUIPSEGB2_reg[15..8] = v,
-        MPUIPSEGB1 => MPUIPSEGB1_reg[15..8] = v,
+      MPUCTL0    => MPUCTL0_reg[15..8] = v,
+      MPUCTL1    => MPUCTL1_reg[15..8] = v,
+      MPUSEGB2   => MPUSEGB2_reg[15..8] = v,
+      MPUSEGB1   => MPUSEGB1_reg[15..8] = v,
+      MPUSAM     => MPUSAM_reg[15..8] = v,
+      MPUIPC0    => MPUIPC0_reg[15..8] = v,
+      MPUIPSEGB2 => MPUIPSEGB2_reg[15..8] = v,
+      MPUIPSEGB1 => MPUIPSEGB1_reg[15..8] = v,
     }
 
   else assert(false)
@@ -174,7 +153,6 @@ function in_ivt_or_rv(addr) =
   & unsigned(addr) <= unsigned(0xFFFF)
 
 enum access_mode = R | W | X
-
 val is_x : (access_mode) -> bool
 function is_x(m) = match m { X => true, _ => false }
 
@@ -183,8 +161,7 @@ function check_ipe_access(addr, m) =
   let pc = unsigned(PC_reg) in
   // allow access if...
   // ...IPE disabled, or
-  MPUIPC0_reg[MPUIPENA_bit] == bitzero
-  // ...address not protected, or
+  MPUIPC0_reg[MPUIPENA_bit..MPUIPENA_bit] == 0b0
   | ~(in_ipe_segment(addr))
   | (// ...PC in IPE segment except first 8 bytes, and
      (ipe_lower() + 8 <= pc & pc < ipe_higher())

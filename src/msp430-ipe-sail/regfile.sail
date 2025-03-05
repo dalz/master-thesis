@@ -41,20 +41,21 @@ mapping RegisterMapping: Register <-> registerAddressBits  = {
 
 val init_base_regs: unit -> unit
 function init_base_regs() = {
-    PC_reg     = undefined; /* needs to be the address located at 0FFFEh */
-    SP_reg     = undefined; /* needs to be initialized by the user */
-    SRCG1_reg  = undefined;
-    CG2_reg    = undefined;
-    R4_reg     = undefined;
-    R5_reg     = undefined;
-    R6_reg     = undefined;
-    R7_reg     = undefined;
-    R8_reg     = undefined;
-    R9_reg     = undefined;
-    R10_reg    = undefined;
-    R11_reg    = undefined;
-    R12_reg    = undefined;
-    R13_reg    = undefined;
-    R14_reg    = undefined;
-    R15_reg    = undefined;
+    // [previously undefined]
+    PC_reg     = 0x0000; /* needs to be the address located at 0FFFEh */
+    SP_reg     = 0x0000; /* needs to be initialized by the user */
+    SRCG1_reg  = 0x0000;
+    CG2_reg    = 0x0000;
+    R4_reg     = 0x0000;
+    R5_reg     = 0x0000;
+    R6_reg     = 0x0000;
+    R7_reg     = 0x0000;
+    R8_reg     = 0x0000;
+    R9_reg     = 0x0000;
+    R10_reg    = 0x0000;
+    R11_reg    = 0x0000;
+    R12_reg    = 0x0000;
+    R13_reg    = 0x0000;
+    R14_reg    = 0x0000;
+    R15_reg    = 0x0000;
 }

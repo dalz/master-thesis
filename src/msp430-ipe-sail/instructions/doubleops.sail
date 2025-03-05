@@ -53,7 +53,7 @@ val addc_inst : (BW, Register, AM, Register, AM) -> unit
 function addc_inst(bw, sourceRegister, addressingModeSource, destinationRegister, addressingModeDestination) = {
   let sourceValue : WordByte = X(bw, sourceRegister , addressingModeSource) in
   let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
-  let carry : WordByte = BW_zero_extend(getCarryBit()) in {
+  let carry : WordByte = zero_extend_bit_to_byte(getCarryBit()) in {
     //addition will set the needed status bits
     clearStatusRegisters();
     let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue),carry) in {
@@ -71,7 +71,7 @@ function sub_inst(bw, sourceRegister, addressingModeSource, destinationRegister,
   clearStatusRegisters();
   let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
   let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
-  let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), BW_zero_extend(0x1)) in {
+  let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), Byte(0x01)) in {
     setResultStatusRegisters(result);
     X(bw, destinationRegister, addressingModeDestination) = result
   }
@@ -83,7 +83,7 @@ function subc_inst(bw, sourceRegister, addressingModeSource, destinationRegister
 
   let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
   let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
-  let carry : WordByte = BW_zero_extend(getCarryBit()) in {
+  let carry : WordByte = zero_extend_bit_to_byte(getCarryBit()) in {
     //addition will set the needed status bits
     clearStatusRegisters();
     let result : WordByte = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), carry) in {
@@ -100,7 +100,7 @@ function cmp_inst(bw, sourceRegister, addressingModeSource, destinationRegister,
   clearStatusRegisters();
   let sourceValue : WordByte = ~(X(bw, sourceRegister , addressingModeSource)) in
   let destValue : WordByte   = X(bw, destinationRegister , addressingModeDestination) in
-  let result : WordByte   = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), BW_zero_extend(0x1)) in
+  let result : WordByte   = addWithStatusRegister(addWithStatusRegister(sourceValue,destValue), Byte(0x01)) in
     setResultStatusRegisters(result);
 }
 
@@ -189,9 +189,17 @@ function clause asDecimal(Byte(a:bits(4) @ b:bits(4))) = {
 }
 
 val asWordByte : int -> (WordByte)
-function asWordByte(number) = {
-  Word(get_slice_int(4,(number/1000),0) : bits(4) @ get_slice_int(4,(number%1000/100),0) : bits(4) @ get_slice_int(4,(number%100/10),0) : bits(4) @ get_slice_int(4,(number%10),0) : bits(4))
-}
+function asWordByte(number) =
+  throw notImplemented("katamaran doesn't support integer / and %")
+  /*
+  let a : bits(4) = get_slice_int(4, (number        / 1000), 0) in
+  let b : bits(4) = get_slice_int(4, (number % 1000 / 100 ), 0) in
+  let c : bits(4) = get_slice_int(4, (number % 100  / 10  ), 0) in
+  let d : bits(4) = get_slice_int(4, (number % 10         ), 0) in
+  let v : bits(8) = a @ b in
+  let w : bits(8) = c @ d in
+  Word(v @ w)
+  */
 
 val dadd_inst : (BW, Register, AM, Register, AM) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=80

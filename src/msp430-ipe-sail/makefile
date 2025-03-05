@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all cleanIntermediate testInt testUnit print-sail-srcs
+.PHONY: all clean testInt testUnit print-sail-srcs
 .SECONDARY:
 
 CD = _compilation
@@ -35,10 +35,12 @@ MSP430_BASE += log.sail
 MSP430_BASE += regfile.sail
 MSP430_BASE += wordBytePrimitives.sail
 MSP430_BASE += statusBits.sail
-MSP430_BASE += mpu.sail
+MSP430_BASE += $(CD)/mpu.sail
 MSP430_BASE += addressSpace.sail
 MSP430_BASE += regsV3.sail
 
+UNIT_TEST_SRCS  = tests/unit/msp430test.sail tests/unit/testRegister.sail tests/unit/testStatusbits.sail
+UNIT_TEST_SRCS += _compilation/tests/unit/test-ipe.sail
 
 SAIL_SRCS = $(MSP430_BASE) $(MSP430_INST)
 
@@ -59,15 +61,20 @@ $(CD)/%: $(CD)/%.c
 $(CD)/%.c: %.sail $(CD)/.f $(SAIL_SRCS)
 	sail -c $(SAIL_SRCS) $< -o $(basename $@)
 
-$(CD)/%.c: tests/unit/%.sail $(CD)/.f $(SAIL_SRCS) tests/unit/*.sail
+$(CD)/%.c: tests/unit/%.sail $(CD)/.f $(SAIL_SRCS) $(UNIT_TEST_SRCS)
 	sail -c $(SAIL_SRCS) $< -o $(basename $@)
 
 $(CD)/.f:
 	mkdir -p $(dir $@)
 	touch $@
 
-cleanIntermediate:
+clean:
 	rm -rf $(CD)
 
 print-sail-srcs:
 	@echo $(SAIL_SRCS)
+
+$(CD)/%.sail: %.pp.sail
+	mkdir -p $(dir $@)
+	cpp -P $< -o $@
+

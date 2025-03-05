@@ -1,3 +1,5 @@
+#include "mpu-constants.h"
+
 let ipe_start : Address = 0x2000
 let ipe_end : Address = 0x3000
 
@@ -169,3 +171,4 @@ function test_ipe() = {
 
   // TODO ivt, execute access
 }
+I

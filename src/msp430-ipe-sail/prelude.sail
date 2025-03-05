@@ -22,13 +22,10 @@ overload operator / = {ediv_int}
 overload operator % = {emod_int}
 
 // making a funtion that gets the negative value for our
-val neg_vec: forall 'n, 0 < 'n. (bits('n), int('n)) -> bits('n)
-function clause neg_vec(a, n) = {
-  let r = 0b0 in
-  sub_bits(sail_zero_extend(r, n), a)
-}
+val neg_vec4: (bits(4)) -> bits(4)
+function neg_vec4(v) = sub_bits(0x0, v)
 
-overload neg = {neg_vec}
+overload neg = {neg_vec4}
 
 overload operator + = {concat_str}
 

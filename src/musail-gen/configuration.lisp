@@ -32,8 +32,7 @@
                                                       "sail_mask"
                                                       "sail_ones"
                                                       "concat_str_bits"
-                                                      "concat_str_dec"
-                                                      "undefined_real")
+                                                      "concat_str_dec")
                                                       identifier))))
 
 (ignore-type-definition-predicate (lambda (identifier)

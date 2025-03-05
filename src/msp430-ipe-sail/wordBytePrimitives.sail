@@ -32,11 +32,17 @@ function addBw(x, y) = match (x, y) {
 
 overload operator + = {addBw}
 
+val zero_extend_bit_to_byte : (bits(1)) -> WordByte
+function zero_extend_bit_to_byte(b) = Byte(sail_zero_extend(b, 8))
+
+/* [replaced by zero_extend_bit_to_byte]
+
 val W_zero_extend : forall 'n, 8 < 'n & 'n <= 16. (bits('n)) -> WordByte
 function W_zero_extend(b) = {
   let bts:bits(16) = sail_zero_extend(b, 16) in
   Word(bts)
 }
+
 val B_zero_extend : forall 'n, 'n <= 8. (bits('n)) -> WordByte
 function B_zero_extend(b) = {
   let bts:bits(8) = sail_zero_extend(b, 8) in
@@ -44,8 +50,9 @@ function B_zero_extend(b) = {
 }
 
 overload BW_zero_extend = {W_zero_extend, B_zero_extend}
+*/
 
-
+/* [not used]
 val W_sign_extend : forall 'n, 8 < 'n & 'n <= 16. (bits('n)) -> WordByte
 function W_sign_extend(b) = {
   let bts:bits(16) = sail_sign_extend(b, 16) in
@@ -58,82 +65,41 @@ function B_sign_extend(b) = {
 }
 
 overload BW_sign_extend = {W_sign_extend, B_sign_extend}
-
+*/
 
 
 val not_wordByte: (WordByte) -> WordByte
-function clause not_wordByte(Word(w)) = {
-  Word(not_vec(w))
-}
-function clause not_wordByte(Byte(b)) = {
-  Byte(not_vec(b))
-}
+function clause not_wordByte(Word(v)) = Word(not_vec(v))
+function clause not_wordByte(Byte(v)) = Byte(not_vec(v))
+
 overload ~ = {not_bool, not_vec, not_wordByte}
 
-
-val and_wordByte: (WordByte,WordByte) -> WordByte
-function clause and_wordByte(Word(w1), Word(w2)) = {
-  Word(and_vec(w1,w2))
-}
-function clause and_wordByte(Byte(b1), Byte(b2)) = {
-  Byte(and_vec(b1,b2))
+val and_wordByte: (WordByte, WordByte) -> WordByte
+function and_wordByte(x, y) = match (x, y) {
+  (Word(w1), Word(w2)) => Word(and_vec(w1, w2)),
+  (Byte(b1), Byte(b2)) => Byte(and_vec(b1, b2)),
+  (_, _) => throw(notImplemented("not implemented"))
 }
 
-function clause and_wordByte(Word(_), Byte(_)) = {
-  throw(notImplemented("not implemented"))
+val or_wordByte: (WordByte, WordByte) -> WordByte
+function or_wordByte(x, y) = match (x, y) {
+  (Word(w1), Word(w2)) => Word(or_vec(w1, w2)),
+  (Byte(b1), Byte(b2)) => Byte(or_vec(b1, b2)),
+  (_, _) => throw(notImplemented("not implemented"))
 }
 
-function clause and_wordByte(Byte(_), Word(_)) = {
-  throw(notImplemented("not implemented"))
+val xor_wordByte: (WordByte, WordByte) -> WordByte
+function xor_wordByte(x, y) = match (x, y) {
+  (Word(w1), Word(w2)) => Word(xor_vec(w1, w2)),
+  (Byte(b1), Byte(b2)) => Byte(xor_vec(b1, b2)),
+  (_, _) => throw(notImplemented("not implemented"))
 }
 
-val or_wordByte: (WordByte,WordByte) -> WordByte
-function clause or_wordByte(Word(w1), Word(w2)) = {
-  Word(or_vec(w1,w2))
-}
-function clause or_wordByte(Byte(b1), Byte(b2)) = {
-  Byte(or_vec(b1,b2))
-}
-
-function clause or_wordByte(Byte(_), Word(_)) = {
-  throw(notImplemented("not implemented"))
-}
-
-function clause or_wordByte(Word(_), Byte(_)) = {
-  throw(notImplemented("not implemented"))
-}
-
-val xor_wordByte: (WordByte,WordByte) -> WordByte
-function clause xor_wordByte(Word(w1),Word(w2)) = {
-  Word(xor_vec(w1,w2))
-}
-
-function clause xor_wordByte(Byte(b1),Byte(b2)) = {
-  Byte(xor_vec(b1,b2))
-}
-
-function clause xor_wordByte(Word(_), Byte(_)) = {
-  throw(notImplemented("not implemented"))
-}
-
-function clause xor_wordByte(Byte(_), Word(_)) = {
-  throw(notImplemented("not implemented"))
-}
-
-val eq_wordByte: (WordByte,WordByte) -> bool
-function clause eq_wordByte(Byte(b1), Byte(b2)) = {
-  b1 == b2
-}
-function clause eq_wordByte(Word(w1), Word(w2)) = {
-  w1 == w2
-}
-
-function clause eq_wordByte(Byte(_), Word(_)) = {
-  false
-}
-
-function clause eq_wordByte(Word(_), Byte(_)) = {
-  false
+val eq_wordByte: (WordByte, WordByte) -> bool
+function eq_wordByte(x, y) = match (x, y) {
+  (Word(w1), Word(w2)) => w1 == w2,
+  (Byte(b1), Byte(b2)) => b1 == b2,
+  (_, _)               => false
 }
 
 val xor_bool: (bool, bool) -> bool
