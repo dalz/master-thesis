@@ -1,6 +1,6 @@
 $include "testStatusbits.sail"
 $include "testRegister.sail"
-$include "test-ipe.sail"
+$include "../../_compilation/tests/unit/test-ipe.sail"
 
 function main() : unit -> unit = {
   testStatusbits();

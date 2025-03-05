@@ -17,81 +17,68 @@ mapping destinationmaping: AM <-> addressingModeDestinationBits = {
 register LastInstructionFetch : WordByte = Word(undefined) /* program counter */
 
 val readReg: (BW, Register) -> WordByte
-function clause readReg(WORD_INSTRUCTION, reg) = {
-  let value: wordBits = match reg {
-    PC    =>    PC_reg,
-    SP    =>    SP_reg,
-    SRCG1 => SRCG1_reg,
-    CG2   =>   CG2_reg,
-    R4    =>    R4_reg,
-    R5    =>    R5_reg,
-    R6    =>    R6_reg,
-    R7    =>    R7_reg,
-    R8    =>    R8_reg,
-    R9    =>    R9_reg,
-    R10   =>   R10_reg,
-    R11   =>   R11_reg,
-    R12   =>   R12_reg,
-    R13   =>   R13_reg,
-    R14   =>   R14_reg,
-    R15   =>   R15_reg,
-  } in
-  Word(value)
-}
+function readReg(bw, reg) = match bw {
+  WORD_INSTRUCTION =>
+    Word(match reg {
+      PC    =>    PC_reg,
+      SP    =>    SP_reg,
+      SRCG1 => SRCG1_reg,
+      CG2   =>   CG2_reg,
+      R4    =>    R4_reg,
+      R5    =>    R5_reg,
+      R6    =>    R6_reg,
+      R7    =>    R7_reg,
+      R8    =>    R8_reg,
+      R9    =>    R9_reg,
+      R10   =>   R10_reg,
+      R11   =>   R11_reg,
+      R12   =>   R12_reg,
+      R13   =>   R13_reg,
+      R14   =>   R14_reg,
+      R15   =>   R15_reg,
+    }),
 
-function clause readReg(BYTE_INSTRUCTION, reg) = {
-  let Word(value) : WordByte = readReg(WORD_INSTRUCTION, reg) in
-  Byte(value[7 .. 0])
+  BYTE_INSTRUCTION =>
+    let Word(value) : WordByte = readReg(WORD_INSTRUCTION, reg) in
+    Byte(value[7 .. 0])
 }
 
 val writeReg : (BW, Register, WordByte) -> unit
-function clause writeReg(WORD_INSTRUCTION, reg, Word(wb)) = {
-  match reg {
-    PC    =>    PC_reg = wb,
-    SP    =>    SP_reg = wb,
-    SRCG1 => SRCG1_reg = wb,
-    CG2   =>   CG2_reg = wb,
-    R4    =>    R4_reg = wb,
-    R5    =>    R5_reg = wb,
-    R6    =>    R6_reg = wb,
-    R7    =>    R7_reg = wb,
-    R8    =>    R8_reg = wb,
-    R9    =>    R9_reg = wb,
-    R10   =>   R10_reg = wb,
-    R11   =>   R11_reg = wb,
-    R12   =>   R12_reg = wb,
-    R13   =>   R13_reg = wb,
-    R14   =>   R14_reg = wb,
-    R15   =>   R15_reg = wb,
+function writeReg(bw, reg, v) = {
+  let v : wordBits = match v {
+    Word(v) => v,
+    Byte(v) => sail_zero_extend(v, 16)
   }
-}
-function clause writeReg(BYTE_INSTRUCTION, reg, Word(wb)) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
-  //3.2.5 General-Purpose Registers R4 to R15
-  //writing in all modes will override the high byte
-  let wb:bits(16) = sail_zero_extend(wb[7..0], 16);
+  in
+
+  let v : wordBits = match bw {
+    WORD_INSTRUCTION => v,
+    BYTE_INSTRUCTION =>
+      // https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
+      // 3.2.5 General-Purpose Registers R4 to R15
+      // writing in all modes will override the high byte
+      sail_zero_extend(v[7..0], 16),
+  }
+  in
 
   match reg {
-    PC    =>    PC_reg = wb,
-    SP    =>    SP_reg = wb,
-    SRCG1 => SRCG1_reg = wb,
-    CG2   =>   CG2_reg = wb,
-    R4    =>    R4_reg = wb,
-    R5    =>    R5_reg = wb,
-    R6    =>    R6_reg = wb,
-    R7    =>    R7_reg = wb,
-    R8    =>    R8_reg = wb,
-    R9    =>    R9_reg = wb,
-    R10   =>   R10_reg = wb,
-    R11   =>   R11_reg = wb,
-    R12   =>   R12_reg = wb,
-    R13   =>   R13_reg = wb,
-    R14   =>   R14_reg = wb,
-    R15   =>   R15_reg = wb,
+    PC    =>    PC_reg = v,
+    SP    =>    SP_reg = v,
+    SRCG1 => SRCG1_reg = v,
+    CG2   =>   CG2_reg = v,
+    R4    =>    R4_reg = v,
+    R5    =>    R5_reg = v,
+    R6    =>    R6_reg = v,
+    R7    =>    R7_reg = v,
+    R8    =>    R8_reg = v,
+    R9    =>    R9_reg = v,
+    R10   =>   R10_reg = v,
+    R11   =>   R11_reg = v,
+    R12   =>   R12_reg = v,
+    R13   =>   R13_reg = v,
+    R14   =>   R14_reg = v,
+    R15   =>   R15_reg = v,
   }
-}
-function clause writeReg(bw, reg, Byte(bb)) = {
-  writeReg(bw, reg, Word(sail_zero_extend(bb, 16)))
 }
 
 overload Xreg = {readReg, writeReg}
@@ -103,154 +90,176 @@ Todo: separate out the constant generators => readability (maybe)
 val read: (BW, Register, AM) -> WordByte
 val write: (BW, Register, AM, WordByte) -> unit
 
-/////////////////
-//Register mode//
-/////////////////
 
-function clause read(BYTE_INSTRUCTION, SRCG1, REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.3 Status Register (SR)
-  throw(notAllowed("Status register can not be read by byte operations"))}
+function read(bw, reg, am) = match (bw, reg, am) {
 
-function clause read(bw, CG2, REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  match bw {
-    WORD_INSTRUCTION => Word(0x0000),
-    BYTE_INSTRUCTION => Byte(0x00)}}
+  /////////////////
+  //Register mode//
+  /////////////////
 
-function clause read(bw, reg, REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=50
-  //3.3.1 Register Mode
-  Xreg(bw, reg)}
+  (BYTE_INSTRUCTION, SRCG1, REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.3 Status Register (SR)
+    throw(notAllowed("Status register can not be read by byte operations"))
+  },
 
-////////////////
-//Indexed mode//
-////////////////
-function clause read(bw, SRCG1, INDEXED_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  LastInstructionFetch = fetch();
-  let Word(address) : WordByte = LastInstructionFetch in
-    XmemInstruction(bw,address)}
+  (bw, CG2, REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    match bw {
+      WORD_INSTRUCTION => Word(0x0000),
+      BYTE_INSTRUCTION => Byte(0x00)}
+  },
 
-function clause read(bw, CG2, INDEXED_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  match bw {
-    WORD_INSTRUCTION => Word(0x0001),
-    BYTE_INSTRUCTION => Byte(0x01)}}
+  (bw, reg, REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=50
+    //3.3.1 Register Mode
+    Xreg(bw, reg)
+  },
 
-function clause read(bw, reg, INDEXED_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=51
-  //3.3.2 Indexed Mode
-  let Word(initialAddress) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in {
+  ////////////////
+  //Indexed mode//
+  ////////////////
+
+  (bw, SRCG1, INDEXED_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
     LastInstructionFetch = fetch();
-    let Word(addinigAddress) : WordByte = LastInstructionFetch in
-    XmemInstruction(bw,initialAddress + addinigAddress)
-  }}
+    let Word(address) : WordByte = LastInstructionFetch in
+      XmemInstruction(bw,address)
+  },
 
-//////////////////////////
-//Indirect register mode//
-//////////////////////////
+  (bw, CG2, INDEXED_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    match bw {
+      WORD_INSTRUCTION => Word(0x0001),
+      BYTE_INSTRUCTION => Byte(0x01)}
+  },
 
-function clause read(bw, SRCG1, INDIRECT_REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  match bw {
-    WORD_INSTRUCTION => Word(0x0004),
-    BYTE_INSTRUCTION => Byte(0x04)}}
+  (bw, reg, INDEXED_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=51
+    //3.3.2 Indexed Mode
+    let Word(initialAddress) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in {
+      LastInstructionFetch = fetch();
+      let Word(addinigAddress) : WordByte = LastInstructionFetch in
+      XmemInstruction(bw,initialAddress + addinigAddress)
+    }
+  },
 
-function clause read(bw, CG2, INDIRECT_REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  match bw {
-    WORD_INSTRUCTION => Word(0x0002),
-    BYTE_INSTRUCTION => Byte(0x02)}}
+  //////////////////////////
+  //Indirect register mode//
+  //////////////////////////
 
-function clause read(bw, reg, INDIRECT_REGISTER_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=54
-  //3.3.5 Indirect Register Mode
-  let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in
-    XmemInstruction(bw,address)}
+  (bw, SRCG1, INDIRECT_REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    match bw {
+      WORD_INSTRUCTION => Word(0x0004),
+      BYTE_INSTRUCTION => Byte(0x04)}
+  },
 
-///////////////////////////////
-//Indirect Autoincrement Mode//
-///////////////////////////////
+  (bw, CG2, INDIRECT_REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    match bw {
+      WORD_INSTRUCTION => Word(0x0002),
+      BYTE_INSTRUCTION => Byte(0x02)}
+  },
 
-function clause read(bw, SRCG1, INDIRECT_AUTOINCREMENT_MODE) = {match bw {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-    WORD_INSTRUCTION => Word(0x0008),
-    BYTE_INSTRUCTION => Byte(0x08)
-  }}
+  (bw, reg, INDIRECT_REGISTER_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=54
+    //3.3.5 Indirect Register Mode
+    let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in
+      XmemInstruction(bw,address)
+  },
 
-function clause read(bw, CG2, INDIRECT_AUTOINCREMENT_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  match bw {
-    WORD_INSTRUCTION => Word(0xFFFF),
-    BYTE_INSTRUCTION => Byte(0xFF)
-  }}
+  ///////////////////////////////
+  //Indirect Autoincrement Mode//
+  ///////////////////////////////
 
-function clause read(bw, reg, INDIRECT_AUTOINCREMENT_MODE) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=55
-  //3.3.6 Indirect Autoincrement Mode
-  let incVal:bits(16) = match bw {
-    WORD_INSTRUCTION => 0x0002,
-    BYTE_INSTRUCTION => 0x0001
-  };
-  let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in {
-    write(WORD_INSTRUCTION,reg,REGISTER_MODE,Word(address + incVal));
-    XmemInstruction(bw,address)
-  }}
+  (bw, SRCG1, INDIRECT_AUTOINCREMENT_MODE) => {match bw {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+      WORD_INSTRUCTION => Word(0x0008),
+      BYTE_INSTRUCTION => Byte(0x08)
+    }
+  },
 
-/////////////////
-//Register mode//
-/////////////////
+  (bw, CG2, INDIRECT_AUTOINCREMENT_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=47
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    match bw {
+      WORD_INSTRUCTION => Word(0xFFFF),
+      BYTE_INSTRUCTION => Byte(0xFF)
+    }
+  },
 
-function clause write(BYTE_INSTRUCTION, SRCG1, REGISTER_MODE, _) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  throw(notAllowed("Status register can not be writen by byte operations"))}
-
-
-function clause write(bw, SRCG1, INDEXED_MODE, value) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
-  //3.2.4 Constant Generator Registers CG1 and CG2
-  let Word(address) : WordByte = LastInstructionFetch in
-    XmemInstruction(bw,address) = value}
-
-function clause write(bw, CG2 ,_ ,_) = {
-  //texas msp430 specification document page 48????
-  //Todo: See if this happens in real code
-  //ex: writing the reserved bits
-  //throw(undefindedBehavior("CG2 can not do write operations"))
-  //TODO: this is a "problem" since it is ued by NOP instructions
-  Xreg(bw,CG2) = Xreg(bw,CG2)
-  }
-
-function clause write(bw, reg, REGISTER_MODE, value) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=50
-  //3.3.1 Register Mode
-  Xreg(bw,reg) = value
+  (bw, reg, INDIRECT_AUTOINCREMENT_MODE) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=55
+    //3.3.6 Indirect Autoincrement Mode
+    let incVal:bits(16) = match bw {
+      WORD_INSTRUCTION => 0x0002,
+      BYTE_INSTRUCTION => 0x0001
+    };
+    let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) in {
+      write(WORD_INSTRUCTION,reg,REGISTER_MODE,Word(address + incVal));
+      XmemInstruction(bw,address)
+    }
+  },
 }
 
-////////////////
-//Indexed mode//
-////////////////
+function write(bw, reg, am, v) = match (bw, reg, am, v) {
 
-function clause write(bw, reg, INDEXED_MODE, value) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=51
-  //3.3.2 Indexed Mode
-  let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) + LastInstructionFetch in {
-    XmemInstruction(bw,address) = value}
-}
+  /////////////////
+  //Register mode//
+  /////////////////
 
-function clause write(bw, reg, _, value) = {
-  //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=49
-  //3.3 Addressing Modes
-  throw(notAllowed("there should be no way in the specification to write in indirect register, or absolute mode"))
+  (BYTE_INSTRUCTION, SRCG1, REGISTER_MODE, _) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    throw(notAllowed("Status register can not be writen by byte operations"))
+  },
+
+
+  (bw, SRCG1, INDEXED_MODE, value) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
+    //3.2.4 Constant Generator Registers CG1 and CG2
+    let Word(address) : WordByte = LastInstructionFetch in
+      XmemInstruction(bw,address) = value
+  },
+
+  (bw, CG2 ,_ ,_) => {
+    //texas msp430 specification document page 48????
+    //Todo: See if this happens in real code
+    //ex: writing the reserved bits
+    //throw(undefindedBehavior("CG2 can not do write operations"))
+    //TODO: this is a "problem" since it is ued by NOP instructions
+    Xreg(bw,CG2) = Xreg(bw,CG2)
+  },
+
+  (bw, reg, REGISTER_MODE, value) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=50
+    //3.3.1 Register Mode
+    Xreg(bw,reg) = value
+  },
+
+  ////////////////
+  //Indexed mode//
+  ////////////////
+
+  (bw, reg, INDEXED_MODE, value) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=51
+    //3.3.2 Indexed Mode
+    let Word(address) : WordByte = read(WORD_INSTRUCTION,reg,REGISTER_MODE) + LastInstructionFetch in {
+      XmemInstruction(bw,address) = value}
+  },
+
+  (bw, reg, _, value) => {
+    //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=49
+    //3.3 Addressing Modes
+    throw(notAllowed("there should be no way in the specification to write in indirect register, or absolute mode"))
+  },
 }
 
 overload X = {read, write}

@@ -6,45 +6,51 @@ val write_ram = pure "write_ram" : forall 'n 'm.
 
 val read_mem_aux : (BW, Address, access_mode) -> WordByte
 
-function clause read_mem_aux(BYTE_INSTRUCTION, addr, m) = {
-  check_byte_access(addr, m);
-  Byte(if is_mpu_reg_addr(addr)
-       then read_mpu_reg_byte(addr)
-       else read_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr))
-}
+function read_mem_aux(bw, addr, m) = match bw {
+  BYTE_INSTRUCTION => {
+    check_byte_access(addr, m);
+    Byte(if is_mpu_reg_addr(addr)
+         then read_mpu_reg_byte(addr)
+         else read_ram(sizeof(address_size), 1, 0x0000, addr))
+  },
 
-function clause read_mem_aux(WORD_INSTRUCTION, addr, m) =
-  let addr = addr & 0xFFFE in // TODO is this right?
-  let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr, m) in
-  let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1, m) in
-  Word(h @ l)
+  WORD_INSTRUCTION =>
+    let addr = addr & 0xFFFE in // TODO is this right?
+    let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr, m) in
+    let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1, m) in
+    Word(h @ l)
+}
 
 val readMem : (BW, Address) -> WordByte
 function readMem(bw, addr) = read_mem_aux(bw, addr, R)
 
 val writeMem : (BW, Address, WordByte) -> unit
 
-function clause writeMem(BYTE_INSTRUCTION, addr, Byte(v)) = {
-  check_byte_access(addr, W);
-  if is_mpu_reg_addr(addr)
-  then write_mpu_reg_byte(addr, v)
-  else write_ram(sizeof(address_size), 1, sizeof(address_size) ^ 0x0, addr, v)
+function writeMem(bw, addr, v) = match bw {
+  BYTE_INSTRUCTION => match v {
+    Byte(v) => {
+      check_byte_access(addr, W);
+      if is_mpu_reg_addr(addr)
+      then write_mpu_reg_byte(addr, v)
+      else write_ram(sizeof(address_size), 1, 0x0000, addr, v)
+    },
+
+    // high bytes go unused when writing byte operations to ram
+    // https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
+    // 3.2.5 General-Purpose Registers R4 to R15
+    Word(v) => writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]))
+  },
+
+  WORD_INSTRUCTION => match v {
+    Word(v) => {
+      let addr = addr & 0xFFFE in // TODO is this right?
+      writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]));
+      writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]))
+    },
+
+    Byte(v) => writeMem(WORD_INSTRUCTION, addr, Word(sail_zero_extend(v, 16)))
+  }
 }
-
-// high bytes go unused when writing byte operations to ram
-// https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=48
-// 3.2.5 General-Purpose Registers R4 to R15
-function clause writeMem(BYTE_INSTRUCTION, addr, Word(v)) =
-  writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]))
-
-function clause writeMem(WORD_INSTRUCTION, addr, Word(v)) = {
-  let addr = addr & 0xFFFE in // TODO is this right?
-  writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]));
-  writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]))
-}
-
-function clause writeMem(WORD_INSTRUCTION, addr, Byte(v)) =
-  writeMem(WORD_INSTRUCTION, addr, Word(sail_zero_extend(v, 16)))
 
 overload Xmem = {readMem, writeMem}
 

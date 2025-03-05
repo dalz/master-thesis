@@ -29,37 +29,34 @@ function clause rrc_inst(BYTE_INSTRUCTION, addressingMode, reg) = {
   }
 }
 
+// https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=109
 val rra_inst : (BW, AM, Register) -> unit
-//https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=109
-function clause rra_inst(WORD_INSTRUCTION, addressingMode, reg) = {
-  let Word(value) : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in
-  let shift : bits(15) = value[15 .. 1] in {
-    setCarrybit(value[0 .. 0]);
-    let res : WordByte = Word(value[15 .. 15] @ shift) in {
-      setResultStatusRegisters(res);
-      clearOverflowbit();
-      X(WORD_INSTRUCTION, reg, addressingMode) = res
-    }
-  }
-}
+function rra_inst(bw, am, reg) =
+  let Word(value) : WordByte =  X(bw, reg, am) in
+  let res : WordByte =
+    match bw {
+      WORD_INSTRUCTION =>
+        let shift : bits(15) = value[15 .. 1] in
+        { setCarrybit(value[0 .. 0]);
+          let b : bits(1) = value[15 .. 15] in
+          Word(b @ shift) },
 
-function clause rra_inst(BYTE_INSTRUCTION, addressingMode, reg) = {
-  let Word(value) : WordByte =  X(BYTE_INSTRUCTION, reg, addressingMode) in
-  let shift : bits(7) = value[7 .. 1] in {
-    setCarrybit(value[0 .. 0]);
-    let res : WordByte = Byte(value[7 .. 7] @ shift) in {
-      setResultStatusRegisters(res);
-      clearOverflowbit();
-      X(BYTE_INSTRUCTION, reg, addressingMode) = res
+      BYTE_INSTRUCTION =>
+        let shift : bits(7) = value[7 .. 1] in
+        { setCarrybit(value[0 .. 0]);
+          let b : bits(1) = value[7 .. 7] in
+          Byte(b @ shift) }
     }
-  }
-}
+  in
+  { setResultStatusRegisters(res);
+    clearOverflowbit();
+    X(bw, reg, am) = res }
 
 val push_inst : (BW, AM, Register) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=101
 function push_inst(bw, addressingMode, reg) = {
   let sourceValue : WordByte =  X(bw, reg, addressingMode) in {
-    SP_reg = SP_reg + sail_sign_extend(neg(0x2, 4), 16);
+    SP_reg = SP_reg + sail_sign_extend(neg(0x2), 16);
     writeMemInstruction(bw,SP_reg,sourceValue)
   }
 }
@@ -68,7 +65,9 @@ val swpb_inst : (BW, AM, Register) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=117
 function swpb_inst(_, addressingMode, reg) = {
   let Word(value) : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in
-  let res : WordByte = Word(value[7 .. 0] @ value[15 .. 8]) in
+  let a : bits(8) = value[7 .. 0] in
+  let b : bits(8) = value[15 .. 8] in
+  let res : WordByte = Word(a @ b) in
   X(WORD_INSTRUCTION, reg, addressingMode) = res
 }
 
@@ -76,7 +75,7 @@ val call_inst : (BW, AM, Register) -> unit
 //https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=73
 function clause call_inst(WORD_INSTRUCTION, addressingMode, reg) = {
   let dst : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in {
-    SP_reg = SP_reg + sail_sign_extend(neg(0x2, 4), 16);
+    SP_reg = SP_reg + sail_sign_extend(neg(0x2), 16);
     let PCValue = X(WORD_INSTRUCTION, PC, REGISTER_MODE) in
       writeMemInstruction(WORD_INSTRUCTION,SP_reg,PCValue);
     X(WORD_INSTRUCTION, reg, REGISTER_MODE) = dst;
