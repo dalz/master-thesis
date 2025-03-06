@@ -1,32 +1,35 @@
 //TODO :RRA RRC SWPB SXT can not have immidiate mode in the destination field -> unpredictable program operation
 //manual pg 61
 
+// https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=110
 val rrc_inst : (BW, AM, Register) -> unit
-//https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=110
-function clause rrc_inst(WORD_INSTRUCTION, addressingMode, reg) = {
-  let Word(value) : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in
-  let shift : bits(15) = value[15 .. 1] in
-  let carry :bits(1) = getCarryBit() in {
-    setCarrybit(value[0 .. 0]);
-    let res : WordByte = Word(carry @ shift) in {
-      setResultStatusRegisters(res);
-      clearOverflowbit();
-      X(WORD_INSTRUCTION, reg, addressingMode) = res
-    }
-  }
-}
 
-function clause rrc_inst(BYTE_INSTRUCTION, addressingMode, reg) = {
-  let Word(value) : WordByte =  X(BYTE_INSTRUCTION, reg, addressingMode) in
-  let shift : bits(7) = value[7 .. 1] in
-  let carry :bits(1) = getCarryBit() in {
-    setCarrybit(value[0 .. 0]);
-    let res : WordByte = Byte(carry @ shift) in {
-      setResultStatusRegisters(res);
-      clearOverflowbit();
-      X(BYTE_INSTRUCTION, reg, addressingMode) = res
+function rrc_inst(bw, addressingMode, reg) = match bw {
+  WORD_INSTRUCTION => {
+    let Word(value) : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in
+    let shift : bits(15) = value[15 .. 1] in
+    let carry : bits(1) = getCarryBit() in {
+      setCarrybit(value[0 .. 0]);
+      let res : WordByte = Word(carry @ shift) in {
+        setResultStatusRegisters(res);
+        clearOverflowbit();
+        X(WORD_INSTRUCTION, reg, addressingMode) = res
+      }
     }
-  }
+  },
+
+  BYTE_INSTRUCTION => {
+    let Word(value) : WordByte =  X(BYTE_INSTRUCTION, reg, addressingMode) in
+    let shift : bits(7) = value[7 .. 1] in
+    let carry : bits(1) = getCarryBit() in {
+      setCarrybit(value[0 .. 0]);
+      let res : WordByte = Byte(carry @ shift) in {
+        setResultStatusRegisters(res);
+        clearOverflowbit();
+        X(BYTE_INSTRUCTION, reg, addressingMode) = res
+      }
+    }
+  },
 }
 
 // https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=109
@@ -71,19 +74,20 @@ function swpb_inst(_, addressingMode, reg) = {
   X(WORD_INSTRUCTION, reg, addressingMode) = res
 }
 
+// https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=73
 val call_inst : (BW, AM, Register) -> unit
-//https://www.ti.com/lit/ug/slau144k/slau144k.pdf#page=73
-function clause call_inst(WORD_INSTRUCTION, addressingMode, reg) = {
-  let dst : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in {
-    SP_reg = SP_reg + sail_sign_extend(neg(0x2), 16);
-    let PCValue = X(WORD_INSTRUCTION, PC, REGISTER_MODE) in
-      writeMemInstruction(WORD_INSTRUCTION,SP_reg,PCValue);
-    X(WORD_INSTRUCTION, reg, REGISTER_MODE) = dst;
-  }
-}
+function call_inst(bw, addressingMode, reg) = match bw {
+  WORD_INSTRUCTION => {
+    let dst : WordByte =  X(WORD_INSTRUCTION, reg, addressingMode) in {
+      SP_reg = SP_reg + sail_sign_extend(neg(0x2), 16);
+      writeMemInstruction(WORD_INSTRUCTION, SP_reg,
+                          X(WORD_INSTRUCTION, PC, REGISTER_MODE));
+      X(WORD_INSTRUCTION, reg, REGISTER_MODE) = dst;
+    }
+  },
 
-function clause call_inst(BYTE_INSTRUCTION, addressingMode, reg) = {
-  throw(notAllowed("There is no byte version of the call instruction"))
+  BYTE_INSTRUCTION =>
+    throw(notAllowed("There is no byte version of the call instruction"))
 }
 
 val reti_inst : (BW, AM, Register) -> unit

@@ -45,7 +45,7 @@ function is_mpu_reg_addr(addr) =
 
 val read_mpu_reg_byte : (Address) -> byteBits
 function read_mpu_reg_byte(addr) =
-  let idx : int = (unsigned(addr >> 1) - unsigned(mpu_reg_base >> 1)) in
+  let idx : int = unsigned(addr >> 1) - unsigned(mpu_reg_base >> 1) in
   if idx >= 0 & idx < 8 then
 
   let w : wordBits = match mpu_register_index(idx) {

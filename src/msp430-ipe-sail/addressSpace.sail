@@ -87,7 +87,7 @@ function fetch() = {
   // 3.2.1 Program Counter (PC)
 
   // TODO maybe do this check at eatch FDE step so we can also do this for the stack pointer
-  assert(unsigned(PC_reg) % 2 == 0, "PC is not correctly aligned");
+  assert(PC_reg[0..0] == 0b0, "PC is not correctly aligned");
 
   let data = read_mem_aux(WORD_INSTRUCTION, PC_reg, X);
   incPC();
