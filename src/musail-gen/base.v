@@ -781,7 +781,7 @@ End UntitledBase.
 
 
 
-Theorem UNTRANSLATED_DEFINITIONS : False. Qed.
+
 
 (*
 

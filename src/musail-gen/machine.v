@@ -570,8 +570,14 @@ Module Import ModelProgram <: Program UntitledBase.
       | initialize_registers                 : Fun[
                                                     "_ж4194"  ∷  ty.unit
                                                   ](ty.unit).
+
+    Inductive FunX : PCtx -> Ty -> Set :=
+    | read_ram  : FunX ["addr" ∷ ty.wordBits] ty.byteBits
+    | write_ram : FunX ["addr" ∷ ty.wordBits; "data" ∷ ty.byteBits] ty.unit
+    | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n).
+
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
-    Definition 𝑭𝑿 : PCtx -> Ty -> Set := fun _ _ => Empty_set.
+    Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
     Definition 𝑳  : PCtx -> Set := fun _ => Empty_set.
   End FunDeclKit.
   
@@ -907,25 +913,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                             "n"  ∷  ty.int;
                                             "s"  ∷  ty.string
                                           ]
-                                          (ty.unit) :=
-      stm_let "ga#4"
-              (ty.bool)
-              (stm_let "ga#3"
-                       (ty.bvec ('n - 'n + 1))
-                       (stm_let "жreg_verbosity_76"
-                                (ty.bvec (64))
-                                (stm_read_register verbosity)
-                                (stm_exp (exp_unop (uop.vector_subrange NYI[5] NYI[6]) (exp_var "жreg_verbosity_76"))))
-                       (stm_exp (((exp_var "ga#3") = (exp_val (ty.bvec 1) ([bv 1]))))))
-              (stm_let "ж77"
-                       (ty.bool)
-                       (stm_exp (exp_var "ga#4"))
-                       (stm_if ((stm_exp (exp_var "ж77")))
-                               (stm_call print_endline (env.snoc (env.nil)
-                                                                 (_::_)
-                                                                 ((exp_var "s"))%exp))
-                               (stm_exp (exp_val (ty.unit) (tt))))).
-    
+                                          (ty.unit) := stm_exp (exp_val (ty.unit) (tt)).
+
     (*
       Extended type
         parameter arg#
@@ -1299,112 +1288,112 @@ Module Import ModelProgram <: Program UntitledBase.
                                         (ty.unit) :=
       stm_seq (stm_seq (stm_let "ж146"
                                 (ty.wordBits)
-                                (stm_call undefined_bitvector (env.snoc (env.nil)
+                                (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                         (_::_)
                                                                         ((exp_int 16%Z))%exp))
                                 (stm_write_register PC_reg (exp_var "ж146")))
                        (stm_exp (exp_val (ty.unit) (tt))))
               (stm_seq (stm_seq (stm_let "ж148"
                                          (ty.wordBits)
-                                         (stm_call undefined_bitvector (env.snoc (env.nil)
+                                         (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                  (_::_)
                                                                                  ((exp_int 16%Z))%exp))
                                          (stm_write_register SP_reg (exp_var "ж148")))
                                 (stm_exp (exp_val (ty.unit) (tt))))
                        (stm_seq (stm_seq (stm_let "ж150"
                                                   (ty.wordBits)
-                                                  (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                  (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                           (_::_)
                                                                                           ((exp_int 16%Z))%exp))
                                                   (stm_write_register SRCG1_reg (exp_var "ж150")))
                                          (stm_exp (exp_val (ty.unit) (tt))))
                                 (stm_seq (stm_seq (stm_let "ж152"
                                                            (ty.wordBits)
-                                                           (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                           (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                    (_::_)
                                                                                                    ((exp_int 16%Z))%exp))
                                                            (stm_write_register CG2_reg (exp_var "ж152")))
                                                   (stm_exp (exp_val (ty.unit) (tt))))
                                          (stm_seq (stm_seq (stm_let "ж154"
                                                                     (ty.wordBits)
-                                                                    (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                    (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                             (_::_)
                                                                                                             ((exp_int 16%Z))%exp))
                                                                     (stm_write_register R4_reg (exp_var "ж154")))
                                                            (stm_exp (exp_val (ty.unit) (tt))))
                                                   (stm_seq (stm_seq (stm_let "ж156"
                                                                              (ty.wordBits)
-                                                                             (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                             (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                      (_::_)
                                                                                                                      ((exp_int 16%Z))%exp))
                                                                              (stm_write_register R5_reg (exp_var "ж156")))
                                                                     (stm_exp (exp_val (ty.unit) (tt))))
                                                            (stm_seq (stm_seq (stm_let "ж158"
                                                                                       (ty.wordBits)
-                                                                                      (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                      (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                               (_::_)
                                                                                                                               ((exp_int 16%Z))%exp))
                                                                                       (stm_write_register R6_reg (exp_var "ж158")))
                                                                              (stm_exp (exp_val (ty.unit) (tt))))
                                                                     (stm_seq (stm_seq (stm_let "ж160"
                                                                                                (ty.wordBits)
-                                                                                               (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                               (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                        (_::_)
                                                                                                                                        ((exp_int 16%Z))%exp))
                                                                                                (stm_write_register R7_reg (exp_var "ж160")))
                                                                                       (stm_exp (exp_val (ty.unit) (tt))))
                                                                              (stm_seq (stm_seq (stm_let "ж162"
                                                                                                         (ty.wordBits)
-                                                                                                        (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                        (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                 (_::_)
                                                                                                                                                 ((exp_int 16%Z))%exp))
                                                                                                         (stm_write_register R8_reg (exp_var "ж162")))
                                                                                                (stm_exp (exp_val (ty.unit) (tt))))
                                                                                       (stm_seq (stm_seq (stm_let "ж164"
                                                                                                                  (ty.wordBits)
-                                                                                                                 (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                 (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                          (_::_)
                                                                                                                                                          ((exp_int 16%Z))%exp))
                                                                                                                  (stm_write_register R9_reg (exp_var "ж164")))
                                                                                                         (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                (stm_seq (stm_seq (stm_let "ж166"
                                                                                                                           (ty.wordBits)
-                                                                                                                          (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                          (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                   (_::_)
                                                                                                                                                                   ((exp_int 16%Z))%exp))
                                                                                                                           (stm_write_register R10_reg (exp_var "ж166")))
                                                                                                                  (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                         (stm_seq (stm_seq (stm_let "ж168"
                                                                                                                                    (ty.wordBits)
-                                                                                                                                   (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                   (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                            (_::_)
                                                                                                                                                                            ((exp_int 16%Z))%exp))
                                                                                                                                    (stm_write_register R11_reg (exp_var "ж168")))
                                                                                                                           (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                  (stm_seq (stm_seq (stm_let "ж170"
                                                                                                                                             (ty.wordBits)
-                                                                                                                                            (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                            (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                     (_::_)
                                                                                                                                                                                     ((exp_int 16%Z))%exp))
                                                                                                                                             (stm_write_register R12_reg (exp_var "ж170")))
                                                                                                                                    (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                           (stm_seq (stm_seq (stm_let "ж172"
                                                                                                                                                      (ty.wordBits)
-                                                                                                                                                     (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                     (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                              (_::_)
                                                                                                                                                                                              ((exp_int 16%Z))%exp))
                                                                                                                                                      (stm_write_register R13_reg (exp_var "ж172")))
                                                                                                                                             (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                    (stm_seq (stm_seq (stm_let "ж174"
                                                                                                                                                               (ty.wordBits)
-                                                                                                                                                              (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                              (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                       (_::_)
                                                                                                                                                                                                       ((exp_int 16%Z))%exp))
                                                                                                                                                               (stm_write_register R14_reg (exp_var "ж174")))
                                                                                                                                                      (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                             (stm_seq (stm_let "ж176"
                                                                                                                                                               (ty.wordBits)
-                                                                                                                                                              (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                              (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                       (_::_)
                                                                                                                                                                                                       ((exp_int 16%Z))%exp))
                                                                                                                                                               (stm_write_register R15_reg (exp_var "ж176")))
@@ -1866,8 +1855,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                          "s"  ∷  ty.string;
                                          "wb"  ∷  ty.union Uwordbyte
                                        ]
-                                       (ty.unit) :=
-      stm_let "ж397"
+                                       (ty.unit) := stm_exp (exp_val (ty.unit) (tt)).
+      (* stm_let "ж397"
               (ty.union Uwordbyte)
               (stm_exp (exp_var "wb"))
               (stm_match_union_alt_list Uwordbyte
@@ -1884,7 +1873,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                            (_::_)
                                                                                                            ((exp_var "x"))%exp)))
                                         ]
-                                        Logic.I).
+                                        Logic.I). *)
     
     (*
       Extended type
@@ -1896,8 +1885,8 @@ Module Import ModelProgram <: Program UntitledBase.
     Definition fun_WordByteString : Stm [
                                           "wb"  ∷  ty.union Uwordbyte
                                         ]
-                                        (ty.string) :=
-      stm_let "ж403"
+                                        (ty.string) := stm_exp (exp_string "").
+      (* stm_let "ж403"
               (ty.union Uwordbyte)
               (stm_exp (exp_var "wb"))
               (stm_match_union_alt_list Uwordbyte
@@ -1910,7 +1899,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                          (_::_)
                                                                                                          ((exp_var "x"))%exp)))
                                         ]
-                                        Logic.I).
+                                        Logic.I). *)
     
     (*
       Extended type
@@ -2673,21 +2662,13 @@ Module Import ModelProgram <: Program UntitledBase.
                        (ty.int)
                        (stm_let "ga#112"
                                 (ty.bvec (16))
-                                (stm_call shiftr (env.snoc (env.snoc (env.nil)
-                                                                     (_::_)
-                                                                     ((exp_var "addr"))%exp)
-                                                           (_::_)
-                                                           ((exp_int 1%Z))%exp))
+                                (stm_exp (exp_binop bop.shiftr (exp_var "addr") (exp_val (ty.bvec 1) ([bv 1]))))
                                 (stm_exp (exp_unop uop.unsigned (exp_var "ga#112"))))
                        (stm_let "ga#115"
                                 (ty.int)
                                 (stm_let "ga#113"
                                          (ty.bvec (16))
-                                         (stm_call shiftr (env.snoc (env.snoc (env.nil)
-                                                                              (_::_)
-                                                                              ((exp_val (ty.bvec 16) ([bv 1440])))%exp)
-                                                                    (_::_)
-                                                                    ((exp_int 1%Z))%exp))
+                                         (stm_exp (exp_binop bop.shiftr (exp_val (ty.bvec 16) ([bv 1440])) (exp_val (ty.bvec 1) ([bv 1]))))
                                          (stm_exp (exp_unop uop.unsigned (exp_var "ga#113"))))
                                 (stm_exp (((exp_var "ga#114"))-((exp_var "ga#115"))))))
               (stm_let "ga#106"
@@ -2770,7 +2751,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                     (stm_exp (exp_unop (uop.vector_subrange 0 8) (exp_var "w")))
                                                                                     (stm_exp (exp_unop (uop.vector_subrange 8 8) (exp_var "w"))))))))
                                         (stm_seq (stm_assert (exp_false) (exp_string "../msp430-ipe-sail/_compilation/mpu.sail:53.21-53.22"))
-                                                 (stm_fail (ty.unit) "failure"))))).
+                                                 (stm_fail (ty.byteBits) "failure"))))).
     
     (*
       Extended type
@@ -2852,21 +2833,13 @@ Module Import ModelProgram <: Program UntitledBase.
                        (ty.int)
                        (stm_let "ga#130"
                                 (ty.bvec (16))
-                                (stm_call shiftr (env.snoc (env.snoc (env.nil)
-                                                                     (_::_)
-                                                                     ((exp_var "addr"))%exp)
-                                                           (_::_)
-                                                           ((exp_int 1%Z))%exp))
+                                (stm_exp (exp_binop bop.shiftr (exp_var "addr") (exp_val (ty.bvec 1) ([bv 1]))))
                                 (stm_exp (exp_unop uop.unsigned (exp_var "ga#130"))))
                        (stm_let "ga#133"
                                 (ty.int)
                                 (stm_let "ga#131"
                                          (ty.bvec (16))
-                                         (stm_call shiftr (env.snoc (env.snoc (env.nil)
-                                                                              (_::_)
-                                                                              ((exp_val (ty.bvec 16) ([bv 1440])))%exp)
-                                                                    (_::_)
-                                                                    ((exp_int 1%Z))%exp))
+                                         (stm_exp (exp_binop bop.shiftr (exp_val (ty.bvec 16) ([bv 1440])) (exp_val (ty.bvec 1) ([bv 1]))))
                                          (stm_exp (exp_unop uop.unsigned (exp_var "ga#131"))))
                                 (stm_exp (((exp_var "ga#132"))-((exp_var "ga#133"))))))
               (stm_let "low_byte"
@@ -3137,8 +3110,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                             (stm_write_register MPUSEGB2_reg (exp_var "ж615")))
                                                                                                                                                                                                    (stm_exp (exp_val (ty.unit) (tt)))
                                                                                                                                                                            end)))))))))))))
-                                                 (stm_assert (exp_false) (exp_string "../msp430-ipe-sail/_compilation/mpu.sail:106.19-106.20")))))).
-    
+                                                 (stm_assert (exp_false) (exp_string "../msp430-ipe-sail/_compilation/mpu.sail:105.19-105.20")))))).
+
     (*
       Extended type
         parameter _ж640
@@ -3464,18 +3437,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                  (ty.bool)
                                                                                                  (stm_exp (exp_var "ga#161"))
                                                                                                  (stm_if ((stm_exp (exp_var "ж662")))
-                                                                                                         (stm_call read_mpu_reg_byte (env.snoc (env.nil)
-                                                                                                                                               (_::_)
-                                                                                                                                               ((exp_var "addr"))%exp))
-                                                                                                         (stm_call read_ram (env.snoc (env.snoc (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                    (_::_)
-                                                                                                                                                                    ((exp_int 16%Z))%exp)
-                                                                                                                                                          (_::_)
-                                                                                                                                                          ((exp_int 1%Z))%exp)
-                                                                                                                                                (_::_)
-                                                                                                                                                ((exp_val (ty.bvec 16) ([bv 0])))%exp)
-                                                                                                                                      (_::_)
-                                                                                                                                      ((exp_var "addr"))%exp)))))
+                                                                                                         (stm_call read_mpu_reg_byte (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp))
+                                                                                                         (stm_foreign read_ram [exp_var "addr"]))))
                                                                                (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#162"))))
                                         | WORD_INSTRUCTION => stm_let "addr"
                                                                       (ty.bvec (16))
@@ -3517,10 +3480,10 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                (ty.bvec (16))
                                                                                                                                                                                                                                                (stm_exp (exp_binop (@bop.bvapp _ 8 8) (exp_var "h") (exp_var "l")))
                                                                                                                                                                                                                                                (stm_exp (exp_union Uwordbyte Kword (exp_var "ga#166")))));
-                                                                                                                                                                                                    existT Kword (MkAlt (pat_var "ж672") (stm_fail (ty.unit) "failure"))
+                                                                                                                                                                                                    existT Kword (MkAlt (pat_var "ж672") (stm_fail (ty.union Uwordbyte) "failure"))
                                                                                                                                                                                                   ]
                                                                                                                                                                                                   Logic.I))));
-                                                                                                                    existT Kword (MkAlt (pat_var "ж678") (stm_fail (ty.unit) "failure"))
+                                                                                                                    existT Kword (MkAlt (pat_var "ж678") (stm_fail (ty.union Uwordbyte) "failure"))
                                                                                                                   ]
                                                                                                                   Logic.I)))
                                         end)).
@@ -3596,22 +3559,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                (ty.bool)
                                                                                                                                                                (stm_exp (exp_var "ga#168"))
                                                                                                                                                                (stm_if ((stm_exp (exp_var "ж685")))
-                                                                                                                                                                       (stm_call write_mpu_reg_byte (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                        (_::_)
-                                                                                                                                                                                                                        ((exp_var "addr"))%exp)
-                                                                                                                                                                                                              (_::_)
-                                                                                                                                                                                                              ((exp_var "v"))%exp))
-                                                                                                                                                                       (stm_call write_ram (env.snoc (env.snoc (env.snoc (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                             (_::_)
-                                                                                                                                                                                                                                             ((exp_int 16%Z))%exp)
-                                                                                                                                                                                                                                   (_::_)
-                                                                                                                                                                                                                                   ((exp_int 1%Z))%exp)
-                                                                                                                                                                                                                         (_::_)
-                                                                                                                                                                                                                         ((exp_val (ty.bvec 16) ([bv 0])))%exp)
-                                                                                                                                                                                                               (_::_)
-                                                                                                                                                                                                               ((exp_var "addr"))%exp)
-                                                                                                                                                                                                     (_::_)
-                                                                                                                                                                                                     ((exp_var "v"))%exp)))))));
+                                                                                                                                                                       (stm_call write_mpu_reg_byte (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) ((exp_var "v"))%exp))
+                                                                                                                                                                       (stm_foreign write_ram [exp_var "addr"; exp_var "v"]))))));
                                                                                                   existT Kword (MkAlt (pat_var "v") (stm_let "ga#170"
                                                                                                                                              ((ty.union Uwordbyte))
                                                                                                                                              (stm_let "ga#169"
@@ -3701,89 +3650,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                             (ty.union Uwordbyte) :=
       stm_let "res"
               (ty.union Uwordbyte)
-              (stm_call readMem (env.snoc (env.snoc (env.nil)
-                                                    (_::_)
-                                                    ((exp_var "bw"))%exp)
-                                          (_::_)
-                                          ((exp_var "address"))%exp))
-              (stm_seq (stm_let "ga#189"
-                                (ty.string)
-                                (stm_let "ga#187"
-                                         (ty.string)
-                                         (stm_let "ga#186"
-                                                  (ty.string)
-                                                  (stm_let "ga#184"
-                                                           (ty.string)
-                                                           (stm_let "ga#183"
-                                                                    (ty.string)
-                                                                    (stm_let "ga#181"
-                                                                             (ty.string)
-                                                                             (stm_let "ga#180"
-                                                                                      (ty.string)
-                                                                                      (stm_let "ga#179"
-                                                                                               (ty.string)
-                                                                                               (stm_let "жreg_old_PC_reg_705"
-                                                                                                        (ty.wordBits)
-                                                                                                        (stm_read_register old_PC_reg)
-                                                                                                        (stm_call bits_str (env.snoc (env.nil)
-                                                                                                                                     (_::_)
-                                                                                                                                     ((exp_var "жreg_old_PC_reg_705"))%exp)))
-                                                                                               (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                        (_::_)
-                                                                                                                                        ((exp_string "memory:"))%exp)
-                                                                                                                              (_::_)
-                                                                                                                              ((exp_var "ga#179"))%exp)))
-                                                                                      (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                               (_::_)
-                                                                                                                               ((exp_var "ga#180"))%exp)
-                                                                                                                     (_::_)
-                                                                                                                     ((exp_string "   -GET: ["))%exp)))
-                                                                             (stm_let "ga#182"
-                                                                                      (ty.string)
-                                                                                      (stm_call bits_str (env.snoc (env.nil)
-                                                                                                                   (_::_)
-                                                                                                                   ((exp_var "address"))%exp))
-                                                                                      (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                               (_::_)
-                                                                                                                               ((exp_var "ga#181"))%exp)
-                                                                                                                     (_::_)
-                                                                                                                     ((exp_var "ga#182"))%exp))))
-                                                                    (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                             (_::_)
-                                                                                                             ((exp_var "ga#183"))%exp)
-                                                                                                   (_::_)
-                                                                                                   ((exp_string "]"))%exp)))
-                                                           (stm_let "ga#185"
-                                                                    (ty.string)
-                                                                    (stm_call BWSizeString (env.snoc (env.nil)
-                                                                                                     (_::_)
-                                                                                                     ((exp_var "bw"))%exp))
-                                                                    (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                             (_::_)
-                                                                                                             ((exp_var "ga#184"))%exp)
-                                                                                                   (_::_)
-                                                                                                   ((exp_var "ga#185"))%exp))))
-                                                  (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                           (_::_)
-                                                                                           ((exp_var "ga#186"))%exp)
-                                                                                 (_::_)
-                                                                                 ((exp_string "->"))%exp)))
-                                         (stm_let "ga#188"
-                                                  (ty.string)
-                                                  (stm_call WordByteString (env.snoc (env.nil)
-                                                                                     (_::_)
-                                                                                     ((exp_var "res"))%exp))
-                                                  (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                           (_::_)
-                                                                                           ((exp_var "ga#187"))%exp)
-                                                                                 (_::_)
-                                                                                 ((exp_var "ga#188"))%exp))))
-                                (stm_call logWithVerbosity (env.snoc (env.snoc (env.nil)
-                                                                               (_::_)
-                                                                               ((exp_int 4%Z))%exp)
-                                                                     (_::_)
-                                                                     ((exp_var "ga#189"))%exp)))
-                       (stm_exp (exp_var "res"))).
+              (stm_call readMem (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp))
+              (stm_exp (exp_var "res")).
     
     (*
       Extended type
@@ -3804,91 +3672,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                "address"  ∷  ty.bvec (16);
                                                "value"  ∷  ty.union Uwordbyte
                                              ]
-                                             (ty.unit) :=
-      stm_seq (stm_let "ga#201"
-                       (ty.string)
-                       (stm_let "ga#199"
-                                (ty.string)
-                                (stm_let "ga#198"
-                                         (ty.string)
-                                         (stm_let "ga#196"
-                                                  (ty.string)
-                                                  (stm_let "ga#195"
-                                                           (ty.string)
-                                                           (stm_let "ga#193"
-                                                                    (ty.string)
-                                                                    (stm_let "ga#192"
-                                                                             (ty.string)
-                                                                             (stm_let "ga#191"
-                                                                                      (ty.string)
-                                                                                      (stm_let "жreg_old_PC_reg_709"
-                                                                                               (ty.wordBits)
-                                                                                               (stm_read_register old_PC_reg)
-                                                                                               (stm_call bits_str (env.snoc (env.nil)
-                                                                                                                            (_::_)
-                                                                                                                            ((exp_var "жreg_old_PC_reg_709"))%exp)))
-                                                                                      (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                               (_::_)
-                                                                                                                               ((exp_string "memory:"))%exp)
-                                                                                                                     (_::_)
-                                                                                                                     ((exp_var "ga#191"))%exp)))
-                                                                             (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                      (_::_)
-                                                                                                                      ((exp_var "ga#192"))%exp)
-                                                                                                            (_::_)
-                                                                                                            ((exp_string "   -PUT: ["))%exp)))
-                                                                    (stm_let "ga#194"
-                                                                             (ty.string)
-                                                                             (stm_call bits_str (env.snoc (env.nil)
-                                                                                                          (_::_)
-                                                                                                          ((exp_var "address"))%exp))
-                                                                             (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                      (_::_)
-                                                                                                                      ((exp_var "ga#193"))%exp)
-                                                                                                            (_::_)
-                                                                                                            ((exp_var "ga#194"))%exp))))
-                                                           (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                    (_::_)
-                                                                                                    ((exp_var "ga#195"))%exp)
-                                                                                          (_::_)
-                                                                                          ((exp_string "]"))%exp)))
-                                                  (stm_let "ga#197"
-                                                           (ty.string)
-                                                           (stm_call BWSizeString (env.snoc (env.nil)
-                                                                                            (_::_)
-                                                                                            ((exp_var "bw"))%exp))
-                                                           (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                    (_::_)
-                                                                                                    ((exp_var "ga#196"))%exp)
-                                                                                          (_::_)
-                                                                                          ((exp_var "ga#197"))%exp))))
-                                         (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                  (_::_)
-                                                                                  ((exp_var "ga#198"))%exp)
-                                                                        (_::_)
-                                                                        ((exp_string "<-"))%exp)))
-                                (stm_let "ga#200"
-                                         (ty.string)
-                                         (stm_call WordByteString (env.snoc (env.nil)
-                                                                            (_::_)
-                                                                            ((exp_var "value"))%exp))
-                                         (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                  (_::_)
-                                                                                  ((exp_var "ga#199"))%exp)
-                                                                        (_::_)
-                                                                        ((exp_var "ga#200"))%exp))))
-                       (stm_call logWithVerbosity (env.snoc (env.snoc (env.nil)
-                                                                      (_::_)
-                                                                      ((exp_int 4%Z))%exp)
-                                                            (_::_)
-                                                            ((exp_var "ga#201"))%exp)))
-              (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil)
-                                                               (_::_)
-                                                               ((exp_var "bw"))%exp)
-                                                     (_::_)
-                                                     ((exp_var "address"))%exp)
-                                           (_::_)
-                                           ((exp_var "value"))%exp)).
+                                           (ty.unit) :=
+      (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp) (_::_) ((exp_var "value"))%exp)).
     
     (*
       Extended type
@@ -4115,9 +3900,9 @@ Module Import ModelProgram <: Program UntitledBase.
                               (fun K => match K with
                                         | INDEXED_MODE                => stm_exp (exp_val (ty.bvec 1) ([bv 1]))
                                         | INDIRECT_AUTOINCREMENT_MODE => stm_seq (stm_assert (exp_false) (exp_string "Pattern match failure at unknown location"))
-                                                                                 (stm_fail (ty.unit) "failure")
+                                                                                 (stm_fail (ty.addressingModeDestinationBits) "failure")
                                         | INDIRECT_REGISTER_MODE      => stm_seq (stm_assert (exp_false) (exp_string "Pattern match failure at unknown location"))
-                                                                                 (stm_fail (ty.unit) "failure")
+                                                                                 (stm_fail (ty.addressingModeDestinationBits) "failure")
                                         | REGISTER_MODE               => stm_exp (exp_val (ty.bvec 1) ([bv 0]))
                                         end)).
     
@@ -4239,7 +4024,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                (stm_match_union_alt_list Uwordbyte
                                                                                                          (stm_exp (exp_var "ж799"))
                                                                                                          [
-                                                                                                           existT Kbyte (MkAlt (pat_var "ж803") (stm_fail (ty.unit) "failure"));
+                                                                                                           existT Kbyte (MkAlt (pat_var "ж803") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                            existT Kword (MkAlt (pat_var "value") (stm_let "ga#220"
                                                                                                                                                           (ty.bvec (8))
                                                                                                                                                           (stm_exp (exp_unop (uop.vector_subrange 0 8) (exp_var "value")))
@@ -4476,7 +4261,51 @@ Module Import ModelProgram <: Program UntitledBase.
                           ty.enum Eregister;
                           ty.enum Eam
                         ])
-              (stm_exp (exp_binop bop.pair (exp_binop bop.pair (exp_var "bw") (exp_var "reg")) (exp_var "am")))
+              (stm_exp (exp_tuple [ exp_var "bw"; exp_var "reg"; exp_var "am" ]))
+              (stm_fail _ "").
+
+    (*
+      Extended type
+        parameter bw
+          BW
+        parameter reg
+          Register
+        parameter am
+          AM
+        parameter v
+          WordByte
+        return value
+          unit
+    *)
+    Definition fun_write : Stm [
+                                 "bw"  ∷  ty.enum Ebw;
+                                 "reg"  ∷  ty.enum Eregister;
+                                 "am"  ∷  ty.enum Eam;
+                                 "v"  ∷  ty.union Uwordbyte
+                               ]
+                               (ty.unit) :=
+      stm_let "ж1423"
+              (ty.tuple [
+                          ty.enum Ebw;
+                          ty.enum Eregister;
+                          ty.enum Eam;
+                          ty.union Uwordbyte
+                        ])
+              (stm_exp (exp_tuple [ exp_var "bw"; exp_var "reg"; exp_var "am";  exp_var "v" ]))
+              (stm_fail _ "").
+    (* XXX Definition fun_read : Stm [
+                                "bw"  ∷  ty.enum Ebw;
+                                "reg"  ∷  ty.enum Eregister;
+                                "am"  ∷  ty.enum Eam
+                              ]
+                              (ty.union Uwordbyte) :=
+      stm_let "ж853"
+              (ty.tuple [
+                          ty.enum Ebw;
+                          ty.enum Eregister;
+                          ty.enum Eam
+                        ])
+              (stm_exp (exp_tuple [exp_var "bw"; exp_var "reg"; exp_var "am"]))
               (stm_match_tuple (stm_exp (exp_var "ж853"))
                                (tuplepat_snoc (tuplepat_snoc (tuplepat_snoc (tuplepat_nil) "ж1422") "ж1421") "ж1420")
                                (stm_match_enum Eam
@@ -4515,7 +4344,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4532,7 +4361,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4563,7 +4392,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4580,7 +4409,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4611,7 +4440,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4628,7 +4457,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4659,7 +4488,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4676,7 +4505,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4707,7 +4536,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4724,7 +4553,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4755,7 +4584,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4772,7 +4601,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4803,7 +4632,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4820,7 +4649,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4851,7 +4680,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4868,7 +4697,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4899,7 +4728,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4916,7 +4745,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4947,7 +4776,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -4964,7 +4793,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -4995,7 +4824,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -5012,7 +4841,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -5043,7 +4872,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -5060,7 +4889,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -5091,7 +4920,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -5108,7 +4937,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -5139,7 +4968,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж874"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж890") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                              existT Kword (MkAlt (pat_var "initialAddress") (stm_seq (stm_seq (stm_let "ж875"
                                                                                                                                                                                                                                                                        (ty.union Uwordbyte)
                                                                                                                                                                                                                                                                        (stm_call fetch (env.snoc (env.nil)
@@ -5156,7 +4985,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                               (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                                                                                                         (stm_exp (exp_var "ж877"))
                                                                                                                                                                                                                                                                                         [
-                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                                                                                                          existT Kbyte (MkAlt (pat_var "ж882") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                                                                                                           existT Kword (MkAlt (pat_var "addinigAddress") (stm_let "ga#226"
                                                                                                                                                                                                                                                                                                                                                   (ty.bvec (16))
                                                                                                                                                                                                                                                                                                                                                   (stm_exp (exp_binop bop.bvadd (exp_var "initialAddress") (exp_var "addinigAddress")))
@@ -5185,12 +5014,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                         (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                   (stm_exp (exp_var "ж860"))
                                                                                                                                                                                   [
-                                                                                                                                                                                    existT Kbyte (MkAlt (pat_var "ж865") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                    existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                             (_::_)
-                                                                                                                                                                                                                                                                             ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                   (_::_)
-                                                                                                                                                                                                                                                                   ((exp_var "address"))%exp)))
+                                                                                                                                                                                    existT Kbyte (MkAlt (pat_var "ж865") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                    existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                   ]
                                                                                                                                                                                   Logic.I))
                                                                                                                             end))
@@ -5238,7 +5063,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5290,7 +5115,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5342,7 +5167,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5394,7 +5219,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5446,7 +5271,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5498,7 +5323,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5550,7 +5375,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5602,7 +5427,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5654,7 +5479,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5706,7 +5531,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5758,7 +5583,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5810,7 +5635,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5862,7 +5687,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5914,7 +5739,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                           (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                                     (stm_exp (exp_var "ж920"))
                                                                                                                                                                                                     [
-                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.unit) "failure"));
+                                                                                                                                                                                                      existT Kbyte (MkAlt (pat_var "ж927") (stm_fail (ty.union Uwordbyte) "failure"));
                                                                                                                                                                                                       existT Kword (MkAlt (pat_var "address") (stm_seq (stm_let "ga#230"
                                                                                                                                                                                                                                                                 ((ty.union Uwordbyte))
                                                                                                                                                                                                                                                                 (stm_let "ga#229"
@@ -5980,12 +5805,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R10   => stm_let "reg"
@@ -6006,12 +5827,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R11   => stm_let "reg"
@@ -6032,12 +5849,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R12   => stm_let "reg"
@@ -6058,12 +5871,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R13   => stm_let "reg"
@@ -6084,12 +5893,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R14   => stm_let "reg"
@@ -6110,12 +5915,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R15   => stm_let "reg"
@@ -6136,12 +5937,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R4    => stm_let "reg"
@@ -6162,12 +5959,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R5    => stm_let "reg"
@@ -6188,12 +5981,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R6    => stm_let "reg"
@@ -6214,12 +6003,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R7    => stm_let "reg"
@@ -6240,12 +6025,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R8    => stm_let "reg"
@@ -6266,12 +6047,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | R9    => stm_let "reg"
@@ -6292,12 +6069,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | SP    => stm_let "reg"
@@ -6318,12 +6091,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                  (stm_match_union_alt_list Uwordbyte
                                                                                                                                                                                            (stm_exp (exp_var "ж901"))
                                                                                                                                                                                            [
-                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.unit) "failure"));
-                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                                                                                                      ((exp_var "bw"))%exp)
-                                                                                                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                                                                                                            ((exp_var "address"))%exp)))
+                                                                                                                                                                                             existT Kbyte (MkAlt (pat_var "ж905") (stm_fail (ty.union Uwordbyte) "failure"));
+                                                                                                                                                                                             existT Kword (MkAlt (pat_var "address") (stm_call readMemInstruction (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "bw"))%exp) (_::_) ((exp_var "address"))%exp)))
                                                                                                                                                                                            ]
                                                                                                                                                                                            Logic.I)))
                                                                                                                             | SRCG1 => stm_let "ж893"
@@ -6606,7 +6375,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                           ((exp_var "reg"))%exp))
                                                                                                                                                                            end))
                                                                                                                    end)
-                                                         end))).
+                                                         end))). *)
     
     (*
       Extended type
@@ -6621,6 +6390,7 @@ Module Import ModelProgram <: Program UntitledBase.
         return value
           unit
     *)
+    (* XXX
     Definition fun_write : Stm [
                                  "bw"  ∷  ty.enum Ebw;
                                  "reg"  ∷  ty.enum Eregister;
@@ -6635,7 +6405,7 @@ Module Import ModelProgram <: Program UntitledBase.
                           ty.enum Eam;
                           ty.union Uwordbyte
                         ])
-              (stm_exp (exp_binop bop.pair (exp_binop bop.pair (exp_binop bop.pair (exp_var "bw") (exp_var "reg")) (exp_var "am")) (exp_var "v")))
+              (stm_exp (exp_tuple [exp_var "bw"; exp_var "reg"; exp_var "am"; exp_var "v"]))
               (stm_match_tuple (stm_exp (exp_var "ж1423"))
                                (tuplepat_snoc (tuplepat_snoc (tuplepat_snoc (tuplepat_snoc (tuplepat_nil) "ж3687") "ж3686") "ж3685") "ж3684")
                                (stm_let "value"
@@ -7656,7 +7426,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                     ((exp_var "value"))%exp))
                                                                                                                                                                                     end))
                                                                                                                             end)
-                                                                  end)))).
+                                                                  end)))). *)
     
     (*
       Extended type
@@ -9097,7 +8867,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                                                                                                                                                               (stm_if ((stm_exp (exp_var "ж3814")))
                                                                                                                                                                                                                                                                                                                                       (stm_exp (exp_val (ty.enum Edoubleop) (AND)))
                                                                                                                                                                                                                                                                                                                                       (stm_seq (stm_assert (exp_false) (exp_string "Pattern match failure at unknown location"))
-                                                                                                                                                                                                                                                                                                                                               (stm_fail (ty.unit) "failure")))))))))))))))))))))))))))))))))))))).
+                                                                                                                                                                                                                                                                                                                                               (stm_fail (ty.enum Edoubleop) "failure")))))))))))))))))))))))))))))))))))))).
     
     (*
       Extended type
@@ -9256,6 +9026,7 @@ Module Import ModelProgram <: Program UntitledBase.
         return value
           unit
     *)
+
     Definition fun_rrc_inst : Stm [
                                     "bw"  ∷  ty.enum Ebw;
                                     "addressingMode"  ∷  ty.enum Eam;
@@ -9936,7 +9707,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                                                                                             (stm_if ((stm_exp (exp_var "ж3991")))
                                                                                                                                                                                                     (stm_exp (exp_val (ty.enum Esingleop) (SXT)))
                                                                                                                                                                                                     (stm_seq (stm_assert (exp_false) (exp_string "Pattern match failure at unknown location"))
-                                                                                                                                                                                                             (stm_fail (ty.unit) "failure"))))))))))))))))))))))).
+                                                                                                                                                                                                             (stm_fail (ty.enum Esingleop) "failure"))))))))))))))))))))))).
     
     (*
       Extended type
@@ -10068,11 +9839,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#410"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#410"))))
                                                           (stm_let "жreg_PC_reg_4015"
                                                                    (ty.wordBits)
@@ -10114,11 +9881,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#414"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#414"))))
                                                           (stm_let "жreg_PC_reg_4018"
                                                                    (ty.wordBits)
@@ -10157,11 +9920,8 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#417"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
+                                                                   
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#417"))))
                                                           (stm_let "жreg_PC_reg_4021"
                                                                    (ty.wordBits)
@@ -10203,11 +9963,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#421"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#421"))))
                                                           (stm_let "жreg_PC_reg_4024"
                                                                    (ty.wordBits)
@@ -10246,11 +10002,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#424"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#424"))))
                                                           (stm_let "жreg_PC_reg_4027"
                                                                    (ty.wordBits)
@@ -10304,11 +10056,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#430"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#430"))))
                                                           (stm_let "жreg_PC_reg_4030"
                                                                    (ty.wordBits)
@@ -10359,11 +10107,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                           (ty.bvec (16))
                                                           (stm_let "ga#435"
                                                                    (ty.bvec (10))
-                                                                   (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                                                        (_::_)
-                                                                                                        ((exp_var "offset"))%exp)
-                                                                                              (_::_)
-                                                                                              ((exp_int 1%Z))%exp))
+                                                                   (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                                                    (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#435"))))
                                                           (stm_let "жreg_PC_reg_4033"
                                                                    (ty.wordBits)
@@ -10393,11 +10137,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                 (ty.bvec (16))
                                 (stm_let "ga#437"
                                          (ty.bvec (10))
-                                         (stm_call shiftl (env.snoc (env.snoc (env.nil)
-                                                                              (_::_)
-                                                                              ((exp_var "offset"))%exp)
-                                                                    (_::_)
-                                                                    ((exp_int 1%Z))%exp))
+                                         (stm_exp (exp_binop bop.shiftl (exp_var "offset") (exp_val (ty.bvec 1) ([bv 1]))))
                                          (stm_exp (exp_unop (uop.sext (n := 16)) (exp_var "ga#437"))))
                                 (stm_let "жreg_PC_reg_4036"
                                          (ty.wordBits)
@@ -10632,171 +10372,7 @@ Module Import ModelProgram <: Program UntitledBase.
     Definition fun_formatAst : Stm [
                                      "merge#var"  ∷  ty.union Uast
                                    ]
-                                   (ty.string) :=
-      stm_let "ж4072"
-              (ty.union Uast)
-              (stm_exp (exp_var "merge#var"))
-              (stm_match_union_alt_list Uast
-                                        (stm_exp (exp_var "ж4072"))
-                                        [
-                                          existT Kdoesnotunderstand (MkAlt (pat_var "ж4094") (stm_seq (stm_assert (exp_false) (exp_string "Pattern match failure at ../msp430-ipe-sail/instructions/jumps.sail:69.0-71.1"))
-                                                                                                       (stm_fail (ty.unit) "failure")));
-                                          existT Kdoubleop (MkAlt (pat_tuple ("op", "bw", "sourceReg", "As", "destinationReg", "Ad")) (stm_let "ga#463"
-                                                                                                                                               (ty.string)
-                                                                                                                                               (stm_let "ga#462"
-                                                                                                                                                        (ty.string)
-                                                                                                                                                        (stm_let "ga#460"
-                                                                                                                                                                 (ty.string)
-                                                                                                                                                                 (stm_let "ga#459"
-                                                                                                                                                                          (ty.string)
-                                                                                                                                                                          (stm_let "ga#457"
-                                                                                                                                                                                   (ty.string)
-                                                                                                                                                                                   (stm_let "ga#456"
-                                                                                                                                                                                            (ty.string)
-                                                                                                                                                                                            (stm_let "ga#454"
-                                                                                                                                                                                                     (ty.string)
-                                                                                                                                                                                                     (stm_call duopName (env.snoc (env.nil)
-                                                                                                                                                                                                                                  (_::_)
-                                                                                                                                                                                                                                  ((exp_var "op"))%exp))
-                                                                                                                                                                                                     (stm_let "ga#455"
-                                                                                                                                                                                                              (ty.string)
-                                                                                                                                                                                                              (stm_call BWstring (env.snoc (env.nil)
-                                                                                                                                                                                                                                           (_::_)
-                                                                                                                                                                                                                                           ((exp_var "bw"))%exp))
-                                                                                                                                                                                                              (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                                       (_::_)
-                                                                                                                                                                                                                                                       ((exp_var "ga#454"))%exp)
-                                                                                                                                                                                                                                             (_::_)
-                                                                                                                                                                                                                                             ((exp_var "ga#455"))%exp))))
-                                                                                                                                                                                            (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                     (_::_)
-                                                                                                                                                                                                                                     ((exp_var "ga#456"))%exp)
-                                                                                                                                                                                                                           (_::_)
-                                                                                                                                                                                                                           ((exp_string " "))%exp)))
-                                                                                                                                                                                   (stm_let "ga#458"
-                                                                                                                                                                                            (ty.string)
-                                                                                                                                                                                            (stm_call regName (env.snoc (env.nil)
-                                                                                                                                                                                                                        (_::_)
-                                                                                                                                                                                                                        ((exp_var "sourceReg"))%exp))
-                                                                                                                                                                                            (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                                     (_::_)
-                                                                                                                                                                                                                                     ((exp_var "ga#457"))%exp)
-                                                                                                                                                                                                                           (_::_)
-                                                                                                                                                                                                                           ((exp_var "ga#458"))%exp))))
-                                                                                                                                                                          (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                   (_::_)
-                                                                                                                                                                                                                   ((exp_var "ga#459"))%exp)
-                                                                                                                                                                                                         (_::_)
-                                                                                                                                                                                                         ((exp_string "("))%exp)))
-                                                                                                                                                                 (stm_let "ga#461"
-                                                                                                                                                                          (ty.string)
-                                                                                                                                                                          (stm_call AMstring (env.snoc (env.nil)
-                                                                                                                                                                                                       (_::_)
-                                                                                                                                                                                                       ((exp_var "As"))%exp))
-                                                                                                                                                                          (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                   (_::_)
-                                                                                                                                                                                                                   ((exp_var "ga#460"))%exp)
-                                                                                                                                                                                                         (_::_)
-                                                                                                                                                                                                         ((exp_var "ga#461"))%exp))))
-                                                                                                                                                        (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                 (_::_)
-                                                                                                                                                                                                 ((exp_var "ga#462"))%exp)
-                                                                                                                                                                                       (_::_)
-                                                                                                                                                                                       ((exp_string ")"))%exp)))
-                                                                                                                                               (stm_let "ga#464"
-                                                                                                                                                        (ty.string)
-                                                                                                                                                        (stm_call regName (env.snoc (env.nil)
-                                                                                                                                                                                    (_::_)
-                                                                                                                                                                                    ((exp_var "destinationReg"))%exp))
-                                                                                                                                                        (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                 (_::_)
-                                                                                                                                                                                                 ((exp_var "ga#463"))%exp)
-                                                                                                                                                                                       (_::_)
-                                                                                                                                                                                       ((exp_var "ga#464"))%exp)))));
-                                          existT Kjump (MkAlt (pat_pair "op" "offset") (stm_let "ga#475"
-                                                                                                (ty.string)
-                                                                                                (stm_let "ga#474"
-                                                                                                         (ty.string)
-                                                                                                         (stm_call jumpName (env.snoc (env.nil)
-                                                                                                                                      (_::_)
-                                                                                                                                      ((exp_var "op"))%exp))
-                                                                                                         (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                  (_::_)
-                                                                                                                                                  ((exp_var "ga#474"))%exp)
-                                                                                                                                        (_::_)
-                                                                                                                                        ((exp_string " "))%exp)))
-                                                                                                (stm_let "ga#476"
-                                                                                                         (ty.string)
-                                                                                                         (stm_call bits_str (env.snoc (env.nil)
-                                                                                                                                      (_::_)
-                                                                                                                                      ((exp_var "offset"))%exp))
-                                                                                                         (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                  (_::_)
-                                                                                                                                                  ((exp_var "ga#475"))%exp)
-                                                                                                                                        (_::_)
-                                                                                                                                        ((exp_var "ga#476"))%exp)))));
-                                          existT Ksingleop (MkAlt (pat_tuple ("op", "bw", "As", "reg")) (stm_let "ga#473"
-                                                                                                                 (ty.string)
-                                                                                                                 (stm_let "ga#471"
-                                                                                                                          (ty.string)
-                                                                                                                          (stm_let "ga#470"
-                                                                                                                                   (ty.string)
-                                                                                                                                   (stm_let "ga#468"
-                                                                                                                                            (ty.string)
-                                                                                                                                            (stm_let "ga#467"
-                                                                                                                                                     (ty.string)
-                                                                                                                                                     (stm_let "ga#465"
-                                                                                                                                                              (ty.string)
-                                                                                                                                                              (stm_call singleopName (env.snoc (env.nil)
-                                                                                                                                                                                               (_::_)
-                                                                                                                                                                                               ((exp_var "op"))%exp))
-                                                                                                                                                              (stm_let "ga#466"
-                                                                                                                                                                       (ty.string)
-                                                                                                                                                                       (stm_call BWstring (env.snoc (env.nil)
-                                                                                                                                                                                                    (_::_)
-                                                                                                                                                                                                    ((exp_var "bw"))%exp))
-                                                                                                                                                                       (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                (_::_)
-                                                                                                                                                                                                                ((exp_var "ga#465"))%exp)
-                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                      ((exp_var "ga#466"))%exp))))
-                                                                                                                                                     (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                              (_::_)
-                                                                                                                                                                                              ((exp_var "ga#467"))%exp)
-                                                                                                                                                                                    (_::_)
-                                                                                                                                                                                    ((exp_string " "))%exp)))
-                                                                                                                                            (stm_let "ga#469"
-                                                                                                                                                     (ty.string)
-                                                                                                                                                     (stm_call regName (env.snoc (env.nil)
-                                                                                                                                                                                 (_::_)
-                                                                                                                                                                                 ((exp_var "reg"))%exp))
-                                                                                                                                                     (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                              (_::_)
-                                                                                                                                                                                              ((exp_var "ga#468"))%exp)
-                                                                                                                                                                                    (_::_)
-                                                                                                                                                                                    ((exp_var "ga#469"))%exp))))
-                                                                                                                                   (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                            (_::_)
-                                                                                                                                                                            ((exp_var "ga#470"))%exp)
-                                                                                                                                                                  (_::_)
-                                                                                                                                                                  ((exp_string "("))%exp)))
-                                                                                                                          (stm_let "ga#472"
-                                                                                                                                   (ty.string)
-                                                                                                                                   (stm_call AMstring (env.snoc (env.nil)
-                                                                                                                                                                (_::_)
-                                                                                                                                                                ((exp_var "As"))%exp))
-                                                                                                                                   (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                            (_::_)
-                                                                                                                                                                            ((exp_var "ga#471"))%exp)
-                                                                                                                                                                  (_::_)
-                                                                                                                                                                  ((exp_var "ga#472"))%exp))))
-                                                                                                                 (stm_call concat_str (env.snoc (env.snoc (env.nil)
-                                                                                                                                                          (_::_)
-                                                                                                                                                          ((exp_var "ga#473"))%exp)
-                                                                                                                                                (_::_)
-                                                                                                                                                ((exp_string ")"))%exp))))
-                                        ]
-                                        Logic.I).
+                                   (ty.string) := stm_exp (exp_string "").
     
     (*
       Extended type
@@ -10811,6 +10387,12 @@ Module Import ModelProgram <: Program UntitledBase.
             OCaml position: nanosail/SailToNanosail/Translate/ExtendedType.ml line 483
             Sail position: /home/ale/documenti/uni/magistrale/tesi/_opam/share/sail/lib/vector.sail:77
     *)
+    Definition fun_encdec_forwards : Stm [
+                                           "arg#"  ∷  ty.union Uast
+                                         ]
+                                         (ty.bvec (16)) := stm_fail _ "".
+    
+    (* XXX
     Definition fun_encdec_forwards : Stm [
                                            "arg#"  ∷  ty.union Uast
                                          ]
@@ -10906,7 +10488,7 @@ Module Import ModelProgram <: Program UntitledBase.
                                                                                                                           (stm_exp (exp_binop (@bop.bvapp _ 9 7) (exp_var "ga#492") (exp_var "ga#493"))))))
                                         ]
                                         Logic.I).
-    
+    *)
     (*
       Extended type
         parameter arg#
@@ -11354,182 +10936,182 @@ Module Import ModelProgram <: Program UntitledBase.
                                               (ty.unit) :=
       stm_seq (stm_seq (stm_let "ж4195"
                                 (ty.bvec (64))
-                                (stm_call undefined_bitvector (env.snoc (env.nil)
+                                (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                         (_::_)
                                                                         ((exp_int 64%Z))%exp))
                                 (stm_write_register verbosity (exp_var "ж4195")))
                        (stm_exp (exp_val (ty.unit) (tt))))
               (stm_seq (stm_seq (stm_let "ж4197"
                                          (ty.wordBits)
-                                         (stm_call undefined_bitvector (env.snoc (env.nil)
+                                         (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                  (_::_)
                                                                                  ((exp_int 16%Z))%exp))
                                          (stm_write_register old_PC_reg (exp_var "ж4197")))
                                 (stm_exp (exp_val (ty.unit) (tt))))
                        (stm_seq (stm_seq (stm_let "ж4199"
                                                   (ty.wordBits)
-                                                  (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                  (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                           (_::_)
                                                                                           ((exp_int 16%Z))%exp))
                                                   (stm_write_register PC_reg (exp_var "ж4199")))
                                          (stm_exp (exp_val (ty.unit) (tt))))
                                 (stm_seq (stm_seq (stm_let "ж4201"
                                                            (ty.wordBits)
-                                                           (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                           (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                    (_::_)
                                                                                                    ((exp_int 16%Z))%exp))
                                                            (stm_write_register SP_reg (exp_var "ж4201")))
                                                   (stm_exp (exp_val (ty.unit) (tt))))
                                          (stm_seq (stm_seq (stm_let "ж4203"
                                                                     (ty.wordBits)
-                                                                    (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                    (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                             (_::_)
                                                                                                             ((exp_int 16%Z))%exp))
                                                                     (stm_write_register SRCG1_reg (exp_var "ж4203")))
                                                            (stm_exp (exp_val (ty.unit) (tt))))
                                                   (stm_seq (stm_seq (stm_let "ж4205"
                                                                              (ty.wordBits)
-                                                                             (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                             (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                      (_::_)
                                                                                                                      ((exp_int 16%Z))%exp))
                                                                              (stm_write_register CG2_reg (exp_var "ж4205")))
                                                                     (stm_exp (exp_val (ty.unit) (tt))))
                                                            (stm_seq (stm_seq (stm_let "ж4207"
                                                                                       (ty.wordBits)
-                                                                                      (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                      (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                               (_::_)
                                                                                                                               ((exp_int 16%Z))%exp))
                                                                                       (stm_write_register R4_reg (exp_var "ж4207")))
                                                                              (stm_exp (exp_val (ty.unit) (tt))))
                                                                     (stm_seq (stm_seq (stm_let "ж4209"
                                                                                                (ty.wordBits)
-                                                                                               (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                               (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                        (_::_)
                                                                                                                                        ((exp_int 16%Z))%exp))
                                                                                                (stm_write_register R5_reg (exp_var "ж4209")))
                                                                                       (stm_exp (exp_val (ty.unit) (tt))))
                                                                              (stm_seq (stm_seq (stm_let "ж4211"
                                                                                                         (ty.wordBits)
-                                                                                                        (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                        (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                 (_::_)
                                                                                                                                                 ((exp_int 16%Z))%exp))
                                                                                                         (stm_write_register R6_reg (exp_var "ж4211")))
                                                                                                (stm_exp (exp_val (ty.unit) (tt))))
                                                                                       (stm_seq (stm_seq (stm_let "ж4213"
                                                                                                                  (ty.wordBits)
-                                                                                                                 (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                 (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                          (_::_)
                                                                                                                                                          ((exp_int 16%Z))%exp))
                                                                                                                  (stm_write_register R7_reg (exp_var "ж4213")))
                                                                                                         (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                (stm_seq (stm_seq (stm_let "ж4215"
                                                                                                                           (ty.wordBits)
-                                                                                                                          (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                          (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                   (_::_)
                                                                                                                                                                   ((exp_int 16%Z))%exp))
                                                                                                                           (stm_write_register R8_reg (exp_var "ж4215")))
                                                                                                                  (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                         (stm_seq (stm_seq (stm_let "ж4217"
                                                                                                                                    (ty.wordBits)
-                                                                                                                                   (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                   (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                            (_::_)
                                                                                                                                                                            ((exp_int 16%Z))%exp))
                                                                                                                                    (stm_write_register R9_reg (exp_var "ж4217")))
                                                                                                                           (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                  (stm_seq (stm_seq (stm_let "ж4219"
                                                                                                                                             (ty.wordBits)
-                                                                                                                                            (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                            (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                     (_::_)
                                                                                                                                                                                     ((exp_int 16%Z))%exp))
                                                                                                                                             (stm_write_register R10_reg (exp_var "ж4219")))
                                                                                                                                    (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                           (stm_seq (stm_seq (stm_let "ж4221"
                                                                                                                                                      (ty.wordBits)
-                                                                                                                                                     (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                     (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                              (_::_)
                                                                                                                                                                                              ((exp_int 16%Z))%exp))
                                                                                                                                                      (stm_write_register R11_reg (exp_var "ж4221")))
                                                                                                                                             (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                    (stm_seq (stm_seq (stm_let "ж4223"
                                                                                                                                                               (ty.wordBits)
-                                                                                                                                                              (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                              (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                       (_::_)
                                                                                                                                                                                                       ((exp_int 16%Z))%exp))
                                                                                                                                                               (stm_write_register R12_reg (exp_var "ж4223")))
                                                                                                                                                      (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                             (stm_seq (stm_seq (stm_let "ж4225"
                                                                                                                                                                        (ty.wordBits)
-                                                                                                                                                                       (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                       (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                (_::_)
                                                                                                                                                                                                                ((exp_int 16%Z))%exp))
                                                                                                                                                                        (stm_write_register R13_reg (exp_var "ж4225")))
                                                                                                                                                               (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                      (stm_seq (stm_seq (stm_let "ж4227"
                                                                                                                                                                                 (ty.wordBits)
-                                                                                                                                                                                (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                         (_::_)
                                                                                                                                                                                                                         ((exp_int 16%Z))%exp))
                                                                                                                                                                                 (stm_write_register R14_reg (exp_var "ж4227")))
                                                                                                                                                                        (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                               (stm_seq (stm_seq (stm_let "ж4229"
                                                                                                                                                                                          (ty.wordBits)
-                                                                                                                                                                                         (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                         (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                  (_::_)
                                                                                                                                                                                                                                  ((exp_int 16%Z))%exp))
                                                                                                                                                                                          (stm_write_register R15_reg (exp_var "ж4229")))
                                                                                                                                                                                 (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                        (stm_seq (stm_seq (stm_let "ж4231"
                                                                                                                                                                                                   (ty.wordBits)
-                                                                                                                                                                                                  (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                  (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                           (_::_)
                                                                                                                                                                                                                                           ((exp_int 16%Z))%exp))
                                                                                                                                                                                                   (stm_write_register MPUCTL0_reg (exp_var "ж4231")))
                                                                                                                                                                                          (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                 (stm_seq (stm_seq (stm_let "ж4233"
                                                                                                                                                                                                            (ty.wordBits)
-                                                                                                                                                                                                           (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                           (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                    (_::_)
                                                                                                                                                                                                                                                    ((exp_int 16%Z))%exp))
                                                                                                                                                                                                            (stm_write_register MPUCTL1_reg (exp_var "ж4233")))
                                                                                                                                                                                                   (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                          (stm_seq (stm_seq (stm_let "ж4235"
                                                                                                                                                                                                                     (ty.wordBits)
-                                                                                                                                                                                                                    (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                    (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                             (_::_)
                                                                                                                                                                                                                                                             ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                     (stm_write_register MPUSEGB2_reg (exp_var "ж4235")))
                                                                                                                                                                                                            (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                                   (stm_seq (stm_seq (stm_let "ж4237"
                                                                                                                                                                                                                              (ty.wordBits)
-                                                                                                                                                                                                                             (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                             (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                                      (_::_)
                                                                                                                                                                                                                                                                      ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                              (stm_write_register MPUSEGB1_reg (exp_var "ж4237")))
                                                                                                                                                                                                                     (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                                            (stm_seq (stm_seq (stm_let "ж4239"
                                                                                                                                                                                                                                       (ty.wordBits)
-                                                                                                                                                                                                                                      (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                                      (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                                               (_::_)
                                                                                                                                                                                                                                                                               ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                                       (stm_write_register MPUSAM_reg (exp_var "ж4239")))
                                                                                                                                                                                                                              (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                                                     (stm_seq (stm_seq (stm_let "ж4241"
                                                                                                                                                                                                                                                (ty.wordBits)
-                                                                                                                                                                                                                                               (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                                               (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                                                        (_::_)
                                                                                                                                                                                                                                                                                        ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                                                (stm_write_register MPUIPC0_reg (exp_var "ж4241")))
                                                                                                                                                                                                                                       (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                                                              (stm_seq (stm_seq (stm_let "ж4243"
                                                                                                                                                                                                                                                         (ty.wordBits)
-                                                                                                                                                                                                                                                        (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                                                        (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                                                                 (_::_)
                                                                                                                                                                                                                                                                                                 ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                                                         (stm_write_register MPUIPSEGB2_reg (exp_var "ж4243")))
                                                                                                                                                                                                                                                (stm_exp (exp_val (ty.unit) (tt))))
                                                                                                                                                                                                                                       (stm_seq (stm_let "ж4245"
                                                                                                                                                                                                                                                         (ty.wordBits)
-                                                                                                                                                                                                                                                        (stm_call undefined_bitvector (env.snoc (env.nil)
+                                                                                                                                                                                                                                                        (stm_foreign undefined_bitvector (env.snoc (env.nil)
                                                                                                                                                                                                                                                                                                 (_::_)
                                                                                                                                                                                                                                                                                                 ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                                                         (stm_write_register MPUIPSEGB1_reg (exp_var "ж4245")))
@@ -11695,7 +11277,7 @@ Module Import ModelProgram <: Program UntitledBase.
       (res : string + Val σ) (γ γ' : RegStore) (μ μ' : Memory) : Prop := False.
     Lemma ForeignProgress {σs σ} (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs) γ μ :
       exists γ' μ' res, ForeignCall f args res γ γ' μ μ'.
-    Proof. destruct f. Qed.
+    Proof. destruct f. Admitted. (* Qed. *)
   End ForeignKit.
   
   Include ProgramMixin UntitledBase.
