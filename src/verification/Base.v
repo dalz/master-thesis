@@ -467,7 +467,7 @@ Section Finite.
             ]|}.
 End Finite.
 
-Module Export UntitledBase <: Base.
+Module Export MSP430Base <: Base.
   Import ctx.notations.
   Import ctx.resolution.
   Import env.notations.
@@ -777,7 +777,7 @@ Module Export UntitledBase <: Base.
   End MemoryModel.
   
   Include BaseMixin.
-End UntitledBase.
+End MSP430Base.
 
 
 

@@ -168,8 +168,6 @@ function check_ipe_access(addr, m) =
      // not execute access in IVT or RV (9.4.1)
      & ~(is_x(m) & in_ivt_or_rv(addr)))
 
-// TODO interrupt vector?
-
 val check_byte_access : (Address, access_mode) -> unit
 function check_byte_access(addr, m) =
   if ~(check_ipe_access(addr, m)) then throw ipe_violation(addr)

@@ -1,4 +1,4 @@
-Require Export base.
+Require Export Base.
 
 From Coq Require Import Lists.List
                         Classes.EquivDec
@@ -22,9 +22,9 @@ Import ctx.notations
 Local Open Scope string_scope.
 Local Open Scope list_scope.
 
-Import UntitledBase.
+Import MSP430Base.
 
-Module Import ModelProgram <: Program UntitledBase.
+Module Import MSP430Program <: Program MSP430Base.
   Section FunDeclKit.
     Inductive Fun : PCtx -> Ty -> Set :=
       | neg_vec4                             : Fun[
@@ -581,7 +581,7 @@ Module Import ModelProgram <: Program UntitledBase.
     Definition 𝑳  : PCtx -> Set := fun _ => Empty_set.
   End FunDeclKit.
   
-  Include FunDeclMixin UntitledBase.
+  Include FunDeclMixin MSP430Base.
   
   Section FunDefKit.
     (*
@@ -11270,7 +11270,7 @@ Module Import ModelProgram <: Program UntitledBase.
       end.
   End FunDefKit.
   
-  Include DefaultRegStoreKit UntitledBase.
+  Include DefaultRegStoreKit MSP430Base.
   
   Section ForeignKit.
     Definition ForeignCall {σs σ} (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs)
@@ -11280,5 +11280,5 @@ Module Import ModelProgram <: Program UntitledBase.
     Proof. destruct f. Admitted. (* Qed. *)
   End ForeignKit.
   
-  Include ProgramMixin UntitledBase.
-End ModelProgram.
+  Include ProgramMixin MSP430Base.
+End MSP430Program.
