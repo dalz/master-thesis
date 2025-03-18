@@ -12,5 +12,6 @@ out
 *.vok
 *.vos
 *.glob
+.lia.cache
 
-todo.org
+misc/

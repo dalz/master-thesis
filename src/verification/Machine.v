@@ -576,9 +576,13 @@ Module Import MSP430Program <: Program MSP430Base.
     | write_ram : FunX ["addr" ∷ ty.wordBits; "data" ∷ ty.byteBits] ty.unit
     | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n).
 
+    Inductive Lem : PCtx -> Set :=
+    | open_ipe_ctl  : Lem ctx.nil
+    | close_ipe_ctl : Lem ctx.nil.
+
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
     Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
-    Definition 𝑳  : PCtx -> Set := fun _ => Empty_set.
+    Definition 𝑳  : PCtx -> Set := Lem.
   End FunDeclKit.
   
   Include FunDeclMixin MSP430Base.
@@ -3131,8 +3135,12 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_MPUIPSEGB1_reg_641"
                        (ty.wordBits)
-                       (stm_read_register MPUIPSEGB1_reg)
-                       (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB1_reg_641"))))
+                       (stm_seq
+                          (stm_lemma open_ipe_ctl env.nil)
+                          (stm_read_register MPUIPSEGB1_reg))
+                       (stm_seq
+                          (stm_lemma close_ipe_ctl env.nil)
+                          (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB1_reg_641")))))
               (stm_exp (((exp_var "ga#134"))*((exp_int 16%Z)))).
     
     (*
@@ -3154,8 +3162,12 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_MPUIPSEGB2_reg_643"
                        (ty.wordBits)
-                       (stm_read_register MPUIPSEGB2_reg)
-                       (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB2_reg_643"))))
+                       (stm_seq
+                          (stm_lemma open_ipe_ctl env.nil)
+                          (stm_read_register MPUIPSEGB2_reg))
+                       (stm_seq
+                          (stm_lemma close_ipe_ctl env.nil)
+                          (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB2_reg_643")))))
               (stm_exp (((exp_var "ga#135"))*((exp_int 16%Z)))).
     
     (*
@@ -3176,7 +3188,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                           "addr"  ∷  ty.bvec (16)
                                         ]
                                         (ty.bool) :=
-      stm_let "ga#140"
+      (stm_let "ga#140"
               (ty.bool)
               (stm_let "ga#136"
                        (ty.int)
@@ -3200,7 +3212,8 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                 (_::_)
                                                                                 ((exp_val (ty.unit) (tt)))%exp))
                                                  (stm_exp (((exp_var "ga#138"))<((exp_var "ga#139"))))))
-                               (stm_exp (exp_false)))).
+                               (stm_exp (exp_false))))
+       ).
     
     (*
       Extended type
@@ -3285,7 +3298,9 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_PC_reg_652"
                        (ty.wordBits)
-                       (stm_read_register PC_reg)
+                       (stm_seq
+                          (stm_lemma open_ipe_ctl env.nil)
+                          (stm_read_register PC_reg))
                        (stm_exp (exp_unop uop.unsigned (exp_var "жreg_PC_reg_652"))))
               (stm_let "ga#156"
                        (ty.bool)
@@ -3294,7 +3309,9 @@ Module Import MSP430Program <: Program MSP430Base.
                                 (stm_let "жreg_MPUIPC0_reg_653"
                                          (ty.wordBits)
                                          (stm_read_register MPUIPC0_reg)
-                                         (stm_exp (exp_unop (uop.vector_subrange 6 1) (exp_var "жreg_MPUIPC0_reg_653"))))
+                                         (stm_seq
+                                            (stm_lemma close_ipe_ctl env.nil)
+                                            (stm_exp (exp_unop (uop.vector_subrange 6 1) (exp_var "жreg_MPUIPC0_reg_653")))))
                                 (stm_exp (((exp_var "ga#146") = (exp_val (ty.bvec 1) ([bv 0]))))))
                        (stm_let "ж658"
                                 (ty.bool)
@@ -3305,9 +3322,10 @@ Module Import MSP430Program <: Program MSP430Base.
                                                  (ty.bool)
                                                  (stm_let "ga#147"
                                                           (ty.bool)
-                                                          (stm_call in_ipe_segment (env.snoc (env.nil)
-                                                                                             (_::_)
-                                                                                             ((exp_var "addr"))%exp))
+                                                          (* (stm_exp (exp_false)) *)
+                                                          (stm_debugk (stm_call in_ipe_segment (env.snoc (env.nil) (* XXX *)
+                                                                                      (_::_)
+                                                                                      ((exp_var "addr"))%exp)))
                                                           (stm_exp (exp_unop uop.not (exp_var "ga#147"))))
                                                  (stm_let "ж657"
                                                           (ty.bool)
@@ -11273,12 +11291,32 @@ Module Import MSP430Program <: Program MSP430Base.
   Include DefaultRegStoreKit MSP430Base.
   
   Section ForeignKit.
-    Definition ForeignCall {σs σ} (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs)
-      (res : string + Val σ) (γ γ' : RegStore) (μ μ' : Memory) : Prop := False.
+    Definition fun_read_ram (μ : Memory) (addr : Val ty.Address) : Val ty.byteBits
+      := μ addr.
+
+    Definition fun_write_ram
+      (μ : Memory) (addr : Val ty.Address) (val : Val ty.byteBits) : Memory
+    := fun addr' => if bv.eqb addr addr' then val else μ addr'.
+
+    Equations ForeignCall {σs σ}
+      (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs)
+      (res : string + Val σ) (γ γ' : RegStore) (μ μ' : Memory) : Prop :=
+    ForeignCall undefined_bitvector [_] res γ γ' μ μ' =>
+      ∃ v, (γ' , μ' , res) = (γ, μ, inr v);
+    ForeignCall read_ram [addr] res γ γ' μ μ' =>
+      (γ' , μ' , res) = (γ , μ , inr (fun_read_ram μ addr));
+    ForeignCall write_ram [addr; val] res γ γ' μ μ' =>
+      (γ' , μ' , res) = (γ , fun_write_ram μ addr val , inr tt).
+
     Lemma ForeignProgress {σs σ} (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs) γ μ :
       exists γ' μ' res, ForeignCall f args res γ γ' μ μ'.
-    Proof. destruct f. Admitted. (* Qed. *)
+    Proof.
+      destruct f; env.destroy args; repeat econstructor.
+      Unshelve.
+      exact (bv.of_Z 0).
+    Qed.
+
   End ForeignKit.
-  
+
   Include ProgramMixin MSP430Base.
 End MSP430Program.
