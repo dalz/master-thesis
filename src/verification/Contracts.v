@@ -60,22 +60,31 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
                     | WORD_INSTRUCTION => w
                     end)).
 
-    Local Notation asn_ipe_ctl x := (asn.chunk (chunk_user ipe_ctl [term_var x])).
-    Local Notation asn_ipe_ctl_record x := (asn.chunk (chunk_user ipe_ctl [x])).
+    Local Notation asn_accessible_addresses pc ipectl segb1 segb2 :=
+      (asn.chunk (chunk_user accessible_addresses
+                    [ term_var pc
+                    ; term_var ipectl
+                    ; term_var segb1
+                    ; term_var segb2 ])).
 
-    Local Notation asn_accessible_addresses ctl :=
-      (asn.chunk (chunk_user accessible_addresses [term_var ctl])).
+    Local Notation asn_mpu_pwd_correct mpuctl0 := (asn.formula (formula_user mpu_pwd_correct_p [term_var mpuctl0])).
+    Local Notation asn_ipe_enabled ipectl := (asn.formula (formula_user ipe_enabled_p [term_var ipectl])).
+    Local Notation asn_ipe_locked ipectl := (asn.formula (formula_user ipe_locked_p [term_var ipectl])).
+    Local Notation asn_ipe_unlocked ipectl := (asn.formula (formula_user ipe_unlocked_p [term_var ipectl])).
 
-    Local Notation asn_mpu_pwd_correct ctl := (asn.formula (formula_user mpu_pwd_correct_p [term_var ctl])).
-    Local Notation asn_mpu_pwd_incorrect ctl := (asn.formula (formula_user mpu_pwd_incorrect_p [term_var ctl])).
-    Local Notation asn_ipe_enabled ctl := (asn.formula (formula_user ipe_enabled_p [term_var ctl])).
-    Local Notation asn_ipe_locked ctl := (asn.formula (formula_user ipe_locked_p [term_var ctl])).
-    Local Notation asn_ipe_unlocked ctl := (asn.formula (formula_user ipe_unlocked_p [term_var ctl])).
-
-    Local Notation asn_access_allowed ctl am pc addr :=
+    Local Notation asn_access_allowed ipectl segb1 segb2 am pc addr :=
       (asn.formula
          (formula_user access_allowed_p
-            [term_var ctl; term_enum Eaccess_mode am; term_var pc; addr])).
+            [ term_var ipectl; term_var segb1; term_var segb2
+            ; term_enum Eaccess_mode am; term_var pc; addr])).
+
+    Local Notation asn_ipe_entry_point segb1 addr :=
+      (asn.formula (formula_user ipe_entry_point_p [term_var segb1; term_var addr])).
+
+    Local Notation asn_in_ipe_segment segb1 segb2 addr :=
+      (asn.formula (formula_user in_ipe_segment_p [term_var segb1; term_var segb2; addr])).
+    Local Notation asn_not_in_ipe_segment segb1 segb2 addr :=
+      (asn.formula (formula_user not_in_ipe_segment_p [term_var segb1; term_var segb2; addr])).
 
     (* Foreign function contracts *)
 
@@ -120,20 +129,24 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       SepContractFun check_ipe_access :=
       {|
         sep_contract_logic_variables :=
-          [ "addr"    :: ty.Address
-          ; "m"       :: ty.enum Eaccess_mode
-          ; "ipe_ctl" :: ty.record Ripe_ctl
-          ; "pc"      :: ty.wordBits          ];
+          [ "addr"     :: ty.Address
+          ; "m"        :: ty.enum Eaccess_mode
+          ; "ipectl"   :: ty.wordBits
+          ; "segb1" :: ty.wordBits
+          ; "segb2" :: ty.wordBits
+          ; "pc"       :: ty.wordBits          ];
 
         sep_contract_localstore := [term_var "addr"; term_var "m"];
 
         sep_contract_precondition :=
-            PC_reg ↦ term_var "pc"
-          ∗ asn_ipe_ctl "ipe_ctl"
-          ∗ asn_access_allowed "ipe_ctl" R "pc" (term_var "addr");
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+          ∗ asn_access_allowed "ipectl" "segb1" "segb2" R "pc" (term_var "addr");
 
         sep_contract_result        := "v";
-        sep_contract_postcondition := ⊤ (* term_var "v" = term_val ty.bool true *);
+        sep_contract_postcondition := ⊤ (* term_var "v" = term_val ty.bool true  XXX *);
       |}.
 
     Definition sep_contract_read_mem_aux :
@@ -141,8 +154,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       {|
         sep_contract_logic_variables :=
           ["bw" :: ty.enum Ebw; "addr" :: ty.Address; "m" :: ty.enum Eaccess_mode;
-           "ipe_ctl" :: ty.record Ripe_ctl; "pc" :: ty.wordBits;
-           "vl" :: ty.byteBits; "vh" :: ty.byteBits];
+           "ipectl"   :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits;
+           "pc" :: ty.wordBits; "vl" :: ty.byteBits; "vh" :: ty.byteBits];
 
         sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "m"];
 
@@ -150,12 +163,14 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           term_var "m" = term_enum Eaccess_mode R ∗ (* XXX *)
             term_var "addr" m↦ term_var "vl"
           ∗ PC_reg ↦ term_var "pc"
-          ∗ asn_ipe_ctl "ipe_ctl"
-          ∗ asn_access_allowed "ipe_ctl" R "pc" (term_var "addr")
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+          ∗ asn_access_allowed "ipectl" "segb1" "segb2" R "pc" (term_var "addr")
           ∗ match_bw (term_var "bw")
               ⊤
               (inc "addr" m↦ term_var "vh"
-               ∗ asn_access_allowed "ipe_ctl" R "pc" (inc "addr"));
+               ∗ asn_access_allowed "ipectl" "segb1" "segb2" R "pc" (inc "addr"));
 
         sep_contract_result          := "w";
         sep_contract_postcondition   := ⊤;
@@ -172,105 +187,57 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       SepContractFun execute :=
       {|
         sep_contract_logic_variables :=
-          [ "ipe_ctl" :: ty.record Ripe_ctl; "pc" :: ty.wordBits
+          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
+          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc" :: ty.wordBits
           ; "instr" :: ty.union Uast ];
 
         sep_contract_localstore := [term_var "instr"];
 
         sep_contract_precondition :=
             PC_reg ↦ term_var "pc"
-          ∗ asn_ipe_ctl "ipe_ctl"
-          ∗ asn_accessible_addresses "ipe_ctl";
+          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+          ∗ asn_accessible_addresses "pc" "ipectl" "segb1" "segb2";
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
             term_var "u" = term_val ty.unit tt
-          ∗ asn_accessible_addresses "ipe_ctl"
-          ∗ PC_reg ↦ term_var "pc"
-          ∗ (* IPE control registers can change if the password is correct
-               and they are not locked TODO and they are not protected by IPE? *)
-            (asn_mpu_pwd_correct "ipe_ctl" ∗ asn_ipe_unlocked "ipe_ctl"
-             ∗ ∃ "new_ctl", asn_ipe_ctl "new_ctl"
-             ∨ (* otherwise they must stay the same *)
-               asn_ipe_ctl "ipe_ctl");
-      |}.
 
-    (* lemmas *)
+            (* TODO if password is wrong then only it is allowed to change *)
+          ∗ (∃ "mpuctl0_new", MPUCTL0_reg ↦ term_var "mpuctl0_new")
 
-    Definition lemma_open_ipe_ctl : SepLemma open_ipe_ctl :=
-      {|
-        lemma_logic_variables := ["ipe_ctl" :: ty.record Ripe_ctl];
-        lemma_patterns        := env.nil;
-        lemma_precondition    := asn_ipe_ctl "ipe_ctl";
-        lemma_postcondition   :=
-          ∃ "mpuctl0", ∃ "ipectl", ∃ "segb1", ∃ "segb2",
-          ( MPUCTL0_reg ↦ term_var "mpuctl0"
-          ∗ MPUIPC0_reg ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ term_var "ipe_ctl" =
-              term_record Ripe_ctl
-                [env]
-                .["mpu_pwd_correct" ∷ ty.bool ↦
-                    term_binop (bop.relop bop.eq)
-                      (term_unop (uop.vector_subrange 8 8) (term_var "mpuctl0"))
-                      (term_val (ty.bvec 8) [bv 0x96])]
-                .["ipe_enabled"     ∷ ty.bool ↦
-                    term_binop (bop.relop bop.eq)
-                      (term_unop (uop.vector_subrange 6 1) (term_var "ipectl"))
-                      (term_val (ty.bvec 1) [bv 1])]
-                .["ipe_locked"      ∷ ty.bool ↦
-                    term_binop (bop.relop bop.eq)
-                      (term_unop (uop.vector_subrange 7 1) (term_var "ipectl"))
-                      (term_val (ty.bvec 1) [bv 1])]
-                .["ipe_low_bound"   ∷ ty.int  ↦
-                    term_binop bop.times
-                      (term_unop uop.unsigned (term_var "segb1"))
-                      (term_val ty.int 16)]
-                .["ipe_high_bound"  ∷ ty.int  ↦
-                    term_binop bop.times
-                      (term_unop uop.unsigned (term_var "segb2"))
-                      (term_val ty.int 16)]
-          );
-      |}.
+          ∗ ∃ "ipectl_new", ∃ "segb1_new", ∃ "segb2_new", ∃ "pc_new",
+            ( MPUIPC0_reg    ↦ term_var "ipectl_new"
+            ∗ MPUIPSEGB1_reg ↦ term_var "segb1_new"
+            ∗ MPUIPSEGB2_reg ↦ term_var "segb2_new"
 
-    Definition lemma_close_ipe_ctl : SepLemma open_ipe_ctl :=
-      {|
-        lemma_logic_variables := [ "mpuctl0" :: ty.wordBits
-                                 ; "ipectl"  :: ty.wordBits
-                                 ; "segb1"   :: ty.wordBits
-                                 ; "segb2"   :: ty.wordBits ];
-        lemma_patterns        := env.nil;
-        lemma_precondition    :=
-            MPUCTL0_reg    ↦ term_var "mpuctl0"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2";
+              (* IPE control registers can change if the password is correct
+                 and they are not locked TODO and they are not protected by IPE? *)
+            ∗ (   asn_mpu_pwd_correct "mpuctl0"
+                ∗ asn_ipe_unlocked "ipectl"
 
-        lemma_postcondition   :=
-          asn_ipe_ctl_record
-            (term_record Ripe_ctl
-               [env]
-             .["mpu_pwd_correct" ∷ ty.bool ↦
-                 term_binop (bop.relop bop.eq)
-                 (term_unop (uop.vector_subrange 8 8) (term_var "mpuctl0"))
-                 (term_val (ty.bvec 8) [bv 0x96])]
-             .["ipe_enabled"     ∷ ty.bool ↦
-                 term_binop (bop.relop bop.eq)
-                 (term_unop (uop.vector_subrange 6 1) (term_var "ipectl"))
-                 (term_val (ty.bvec 1) [bv 1])]
-             .["ipe_locked"      ∷ ty.bool ↦
-                 term_binop (bop.relop bop.eq)
-                 (term_unop (uop.vector_subrange 7 1) (term_var "ipectl"))
-                 (term_val (ty.bvec 1) [bv 1])]
-             .["ipe_low_bound"   ∷ ty.int  ↦
-                 term_binop bop.times
-                 (term_unop uop.unsigned (term_var "segb1"))
-                 (term_val ty.int 16)]
-             .["ipe_high_bound"  ∷ ty.int  ↦
-                 term_binop bop.times
-                 (term_unop uop.unsigned (term_var "segb2"))
-                 (term_val ty.int 16)]);
+              ∨ (* otherwise they must stay the same *)
+                  term_var "ipectl_new" = term_var "ipectl"
+                ∗ term_var "segb1_new"  = term_var "segb1"
+                ∗ term_var "segb2_new"  = term_var "segb2"
+              )
+
+            ∗ PC_reg ↦ term_var "pc_new"
+
+            ∗ (* jumps to untrusted sections are always allowed *)
+              ( asn_not_in_ipe_segment "segb1" "segb2" (term_var "pc_new")
+
+                (* arbitrary jumps into the IPE segment are allowed only from the IPE segment *)
+              ∨ asn_access_allowed "ipectl_new" "segb1_new" "segb2_new" X "pc" (term_var "pc_new")
+
+                (* untrusted code can only jump to the entry point *)
+              ∨ asn_ipe_entry_point "segb1_new" "pc_new"
+              )
+
+            ∗ asn_accessible_addresses "pc_new" "ipectl" "segb1_new" "segb2_new");
       |}.
 
     (* The following maps μSail function names to their contracts. *)
@@ -294,8 +261,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     Definition LEnv : LemmaEnv :=
       fun Δ l =>
         match l with
-        | open_ipe_ctl => lemma_open_ipe_ctl
-        | close_ipe_ctl => lemma_close_ipe_ctl
         end.
   End ContractDefKit.
 End MSP430Specification.
@@ -312,21 +277,25 @@ Import MSP430Executor.
 Import MSP430Executor.Symbolic.
 
 Ltac symbolic_simpl :=
+  apply validcontract_reflect_sound;
+  compute;
+  constructor;
+  cbn.
+
+Ltac symbolic_simpl_with_fuel :=
+  apply validcontract_reflect_fuel_sound;
+  compute;
+  constructor;
+  cbn.
+
+Ltac symbolic_simpl_with_erasure :=
   apply validcontract_with_erasure_sound;
   compute;
   constructor;
   cbn.
 
-Lemma valid_contract_check_ipe_access : Symbolic.ValidContract sep_contract_check_ipe_access fun_check_ipe_access.
-Proof.
-  apply validcontract_with_erasure_sound.
-  compute.
-
-  symbolic_simpl.
-  (* unfold access_allowed_inst.
-  unfold ipe_enabled.
-   *)
-  (* intros. *)
+Lemma valid_contract_check_ipe_access : Symbolic.ValidContractWithFuel 2 sep_contract_check_ipe_access fun_check_ipe_access.
+Proof. symbolic_simpl_with_fuel. Qed.
 
 Lemma valid_contract_read_mem_aux : Symbolic.ValidContract sep_contract_read_mem_aux fun_read_mem_aux.
 Proof.

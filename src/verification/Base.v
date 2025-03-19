@@ -268,14 +268,7 @@ Inductive Unions : Set :=
   | Uwordbyte 
   | Uast      .
 
-Record IPEctl : Set := mkIPEctl
-  { mpu_pwd_correct : bool
-  ; ipe_enabled     : bool
-  ; ipe_locked      : bool
-  ; ipe_low_bound   : Z
-  ; ipe_high_bound  : Z }.
-
-Inductive Records : Set := Ripe_ctl.
+Inductive Records : Set := .
 
 Section TransparentObligations.
   Local Set Transparent Obligations.
@@ -298,7 +291,6 @@ Section TransparentObligations.
   Derive NoConfusion for Unions.
   Derive NoConfusion for Records.
   Derive NoConfusion for RegName.
-  Derive NoConfusion for IPEctl.
 End TransparentObligations.
 
 Derive EqDec for exception.
@@ -319,7 +311,6 @@ Derive EqDec for Enums.
 Derive EqDec for Unions.
 Derive EqDec for Records.
 Derive EqDec for RegName.
-Derive EqDec for IPEctl.
 
 Section Finite.
   Import stdpp.finite.
@@ -521,7 +512,6 @@ Module Export MSP430Base <: Base.
   
   Definition record_denote (r : Records) : Set :=
     match r with
-    | Ripe_ctl => IPEctl
     end.
   
   #[export] Instance typedenotekit : TypeDenoteKit typedeclkit :=
@@ -634,25 +624,12 @@ Module Export MSP430Base <: Base.
 
   Definition record_field_type (R : recordi) : NCtx string Ty :=
     match R with
-    | Ripe_ctl => [ "mpu_pwd_correct" :: ty.bool
-                  ; "ipe_enabled"     :: ty.bool
-                  ; "ipe_locked"      :: ty.bool
-                  ; "ipe_low_bound"   :: ty.int
-                  ; "ipe_high_bound"  :: ty.int ]
     end.
 
-   Equations record_fold (R : recordi) : NamedEnv Val (record_field_type R) -> recordt R :=
-   | Ripe_ctl , [pwd; en; lk; lo; hi]%env := mkIPEctl pwd en lk lo hi.
+   Equations record_fold (R : recordi) : NamedEnv Val (record_field_type R) -> recordt R := .
 
-   Equations record_unfold (R : recordi) : recordt R -> NamedEnv Val (record_field_type R) :=
-   | Ripe_ctl , r =>
-       env.nil
-         ► ("mpu_pwd_correct" :: ty.bool ↦ mpu_pwd_correct r)
-         ► ("ipe_enabled"     :: ty.bool ↦ ipe_enabled     r)
-         ► ("ipe_locked"      :: ty.bool ↦ ipe_locked      r)
-         ► ("ipe_low_bound"   :: ty.int  ↦ ipe_low_bound   r)
-         ► ("ipe_high_bound"  :: ty.int  ↦ ipe_high_bound  r).
-  
+   Equations record_unfold (R : recordi) : recordt R -> NamedEnv Val (record_field_type R) := .
+
   #[export,refine] Instance typedefkit : TypeDefKit typedenotekit :=
     {| unionk           := union_constructor;
        unionk_ty        := union_constructor_type;

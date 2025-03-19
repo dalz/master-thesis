@@ -576,9 +576,7 @@ Module Import MSP430Program <: Program MSP430Base.
     | write_ram : FunX ["addr" ∷ ty.wordBits; "data" ∷ ty.byteBits] ty.unit
     | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n).
 
-    Inductive Lem : PCtx -> Set :=
-    | open_ipe_ctl  : Lem ctx.nil
-    | close_ipe_ctl : Lem ctx.nil.
+    Inductive Lem : PCtx -> Set := .
 
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
     Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
@@ -3135,12 +3133,8 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_MPUIPSEGB1_reg_641"
                        (ty.wordBits)
-                       (stm_seq
-                          (stm_lemma open_ipe_ctl env.nil)
-                          (stm_read_register MPUIPSEGB1_reg))
-                       (stm_seq
-                          (stm_lemma close_ipe_ctl env.nil)
-                          (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB1_reg_641")))))
+                       (stm_read_register MPUIPSEGB1_reg)
+                       (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB1_reg_641"))))
               (stm_exp (((exp_var "ga#134"))*((exp_int 16%Z)))).
     
     (*
@@ -3162,12 +3156,8 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_MPUIPSEGB2_reg_643"
                        (ty.wordBits)
-                       (stm_seq
-                          (stm_lemma open_ipe_ctl env.nil)
-                          (stm_read_register MPUIPSEGB2_reg))
-                       (stm_seq
-                          (stm_lemma close_ipe_ctl env.nil)
-                          (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB2_reg_643")))))
+                       (stm_read_register MPUIPSEGB2_reg)
+                       (stm_exp (exp_unop uop.unsigned (exp_var "жreg_MPUIPSEGB2_reg_643"))))
               (stm_exp (((exp_var "ga#135"))*((exp_int 16%Z)))).
     
     (*
@@ -3288,7 +3278,8 @@ Module Import MSP430Program <: Program MSP430Base.
       
       [0] : OCaml position: Pos(nanosail/SailToNanosail/Translate/ExtendedType.ml:230:7887:7914)
             Sail position: /home/ale/documenti/uni/magistrale/tesi/_opam/share/sail/lib/vector.sail:77
-    *)
+     *)
+    
     Definition fun_check_ipe_access : Stm [
                                             "addr"  ∷  ty.bvec (16);
                                             "m"  ∷  ty.enum Eaccess_mode
@@ -3298,9 +3289,7 @@ Module Import MSP430Program <: Program MSP430Base.
               (ty.int)
               (stm_let "жreg_PC_reg_652"
                        (ty.wordBits)
-                       (stm_seq
-                          (stm_lemma open_ipe_ctl env.nil)
-                          (stm_read_register PC_reg))
+                       (stm_read_register PC_reg)
                        (stm_exp (exp_unop uop.unsigned (exp_var "жreg_PC_reg_652"))))
               (stm_let "ga#156"
                        (ty.bool)
@@ -3309,9 +3298,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                 (stm_let "жreg_MPUIPC0_reg_653"
                                          (ty.wordBits)
                                          (stm_read_register MPUIPC0_reg)
-                                         (stm_seq
-                                            (stm_lemma close_ipe_ctl env.nil)
-                                            (stm_exp (exp_unop (uop.vector_subrange 6 1) (exp_var "жreg_MPUIPC0_reg_653")))))
+                                         (stm_exp (exp_unop (uop.vector_subrange 6 1) (exp_var "жreg_MPUIPC0_reg_653"))))
                                 (stm_exp (((exp_var "ga#146") = (exp_val (ty.bvec 1) ([bv 0]))))))
                        (stm_let "ж658"
                                 (ty.bool)
@@ -3322,10 +3309,9 @@ Module Import MSP430Program <: Program MSP430Base.
                                                  (ty.bool)
                                                  (stm_let "ga#147"
                                                           (ty.bool)
-                                                          (* (stm_exp (exp_false)) *)
-                                                          (stm_debugk (stm_call in_ipe_segment (env.snoc (env.nil) (* XXX *)
+                                                          (stm_call in_ipe_segment (env.snoc (env.nil)
                                                                                       (_::_)
-                                                                                      ((exp_var "addr"))%exp)))
+                                                                                      ((exp_var "addr"))%exp))
                                                           (stm_exp (exp_unop uop.not (exp_var "ga#147"))))
                                                  (stm_let "ж657"
                                                           (ty.bool)

@@ -25,15 +25,16 @@ Open Scope Z_scope.
 
 Inductive PurePredicate : Set :=
 | mpu_pwd_correct_p
-| mpu_pwd_incorrect_p
 | ipe_enabled_p
 | ipe_locked_p
 | ipe_unlocked_p
-| access_allowed_p.
+| access_allowed_p
+| in_ipe_segment_p
+| not_in_ipe_segment_p
+| ipe_entry_point_p.
 
 Inductive Predicate :=
 | ptstomem
-| ipe_ctl
 | accessible_addresses.
 
 Section TransparentObligations.
@@ -53,26 +54,42 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Local Definition get_bit {n} (v : bv n) (i : nat) {p : IsTrue (Nat.leb (i + 1) n)}: bool :=
       bv.msb (@bv.vector_subrange n i 1 p v).
 
+    (*
     Definition mpu_pwd_correct_inst (ctl : Val (ty.record Ripe_ctl)) := mpu_pwd_correct ctl = true.
     Definition mpu_pwd_incorrect_inst (ctl : Val (ty.record Ripe_ctl)) := mpu_pwd_correct ctl = false.
     Definition ipe_enabled_inst (ctl : Val (ty.record Ripe_ctl)) := ipe_enabled ctl = true.
     Definition ipe_locked_inst (ctl : Val (ty.record Ripe_ctl)) := ipe_locked ctl = true.
     Definition ipe_unlocked_inst (ctl : Val (ty.record Ripe_ctl)) := ipe_locked ctl = false.
+    *)
+
+    Definition mpu_pwd_correct_inst (mpuctl0 : Val ty.wordBits) : Prop :=
+      bv.eqb (bv.vector_subrange 8 8 mpuctl0) (bv.of_Z 0x96) = true.
+
+    Definition ipe_enabled_inst (ipectl : Val ty.wordBits) : Prop :=
+      bv.eqb (bv.vector_subrange 6 1 ipectl) (bv.of_Z 1) = true.
+
+    Definition ipe_locked_inst (ipectl : Val ty.wordBits) :=
+      bv.eqb (bv.vector_subrange 7 1 ipectl) (bv.of_Z 1) = true.
+
+    Definition ipe_unlocked_inst (ipectl : Val ty.wordBits) :=
+      bv.eqb (bv.vector_subrange 7 1 ipectl) (bv.of_Z 1) = true.
 
     Definition access_allowed_inst
-      (ctl  : Val (ty.record Ripe_ctl))
-      (am   : Val (ty.enum Eaccess_mode))
-      (pc   : Val ty.wordBits)
-      (addr : Val ty.Address)
+      (ipectl   : Val ty.wordBits)
+      (ipesegb1 : Val ty.wordBits)
+      (ipesegb2 : Val ty.wordBits)
+      (am       : Val (ty.enum Eaccess_mode))
+      (pc       : Val ty.wordBits)
+      (addr     : Val ty.Address)
       : Prop
     :=
       let addr := bv.unsigned addr in
       let pc   := bv.unsigned pc in
-      let low  := ipe_low_bound ctl in
-      let high := ipe_high_bound ctl in
+      let low  := bv.unsigned ipesegb1 * 16 in
+      let high := bv.unsigned ipesegb2 * 16 in
 
       (* IPE disabled *)
-      ipe_enabled ctl = false
+      ipe_enabled_inst ipectl
       (* address not in IPE segment *)
       \/ (Z.lt addr low \/ Z.le high addr)
       \/ ((* PC in IPE segment except first 8 bytes *)
@@ -81,25 +98,37 @@ Module Export MSP430Signature <: Signature MSP430Base.
           /\ ((Z.lt addr 0xFF80 \/ Z.le 0xFFFF addr)
               \/ am <> X)).
 
+    Definition in_ipe_segment_inst (segb1 segb2 addr : Val ty.wordBits) :=
+      bv.unsigned segb1 * 16 <= bv.unsigned addr /\ bv.unsigned addr < bv.unsigned segb2 * 16.
+
+    Definition not_in_ipe_segment_inst (segb1 segb2 addr : Val ty.wordBits) :=
+      bv.unsigned segb1 * 16 > bv.unsigned addr \/ bv.unsigned addr >= bv.unsigned segb2 * 16.
+
+    Definition ipe_entry_point_inst (segb1 addr : Val ty.wordBits) :=
+      bv.unsigned segb1 * 16 + 8 = bv.unsigned addr.
+
     Definition 𝑷 := PurePredicate.
 
     (* Maps each pure predicate to a list of arguments with their types. *)
     Definition 𝑷_Ty (p : 𝑷) : Ctx Ty :=
       match p with
-      | mpu_pwd_correct_p | mpu_pwd_incorrect_p | ipe_enabled_p
-      | ipe_locked_p | ipe_unlocked_p => [ty.record Ripe_ctl]
-      | access_allowed_p => [ty.record Ripe_ctl; ty.enum Eaccess_mode; ty.wordBits; ty.Address]
+      | mpu_pwd_correct_p | ipe_enabled_p | ipe_locked_p | ipe_unlocked_p => [ty.wordBits]
+      | in_ipe_segment_p | not_in_ipe_segment_p => [ty.wordBits; ty.wordBits; ty.Address]
+      | ipe_entry_point_p => [ty.wordBits; ty.Address]
+      | access_allowed_p => [ty.wordBits; ty.wordBits; ty.wordBits; ty.enum Eaccess_mode; ty.wordBits; ty.Address]
       end.
 
     (* Interprets a pure predicate name as a Coq proposition. *)
     Definition 𝑷_inst (p : 𝑷) : env.abstract Val (𝑷_Ty p) Prop :=
       match p with
-      | mpu_pwd_correct_p => mpu_pwd_correct_inst
-      | mpu_pwd_incorrect_p => mpu_pwd_incorrect_inst
-      | ipe_enabled_p => ipe_enabled_inst
-      | ipe_locked_p => ipe_locked_inst
-      | ipe_unlocked_p => ipe_unlocked_inst
-      | access_allowed_p => access_allowed_inst
+      | mpu_pwd_correct_p    => mpu_pwd_correct_inst
+      | ipe_enabled_p        => ipe_enabled_inst
+      | ipe_locked_p         => ipe_locked_inst
+      | ipe_unlocked_p       => ipe_unlocked_inst
+      | access_allowed_p     => access_allowed_inst
+      | in_ipe_segment_p     => in_ipe_segment_inst
+      | not_in_ipe_segment_p => not_in_ipe_segment_inst
+      | ipe_entry_point_p    => ipe_entry_point_inst
       end.
 
     Instance 𝑷_eq_dec : EqDec 𝑷 := PurePredicate_eqdec.
@@ -110,8 +139,7 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Definition 𝑯_Ty (p : 𝑯) : Ctx Ty :=
       match p with
       | ptstomem => [ty.Address; ty.byteBits]
-      | ipe_ctl => [ty.record Ripe_ctl]
-      | accessible_addresses => [ty.record Ripe_ctl]
+      | accessible_addresses => [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits]
       end.
 
     (* 𝑯_is_dup specifies which predicates are duplicable. A spatial predicate can
@@ -130,8 +158,8 @@ Module Export MSP430Signature <: Signature MSP430Base.
      about the input and output parameters of a predicate. *)
     Definition 𝑯_precise (p : 𝑯) : option (Precise 𝑯_Ty p) :=
       match p with
-      | ipe_ctl => Some (MkPrecise ε [ty.record Ripe_ctl] eq_refl)
-      | _ => None
+      | ptstomem => Some (MkPrecise [ty.Address] [ty.byteBits] eq_refl)
+      | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits] ε eq_refl)
       end.
 
   End PredicateKit.
@@ -163,3 +191,4 @@ Module Export MSP430Signature <: Signature MSP430Base.
 
   Include SignatureMixin MSP430Base.
 End MSP430Signature.
+
