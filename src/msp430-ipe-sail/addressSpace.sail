@@ -1,3 +1,6 @@
+val writeReg : (BW, Register, WordByte) -> unit
+
+
 // used only to implement readMem/writeMem that check permissions
 val read_ram = pure "read_ram" : forall 'n 'm.
   (atom('m), atom('n), bits('m), bits('m)) -> bits(8 * 'n)
@@ -73,9 +76,10 @@ overload XmemInstruction = {readMemInstruction, writeMemInstruction}
 
 // PC should always be word aligned
 val incPC: unit -> unit
-function incPC() = {
-  PC_reg = PC_reg + 0x0002;
-}
+function incPC() = writeReg(WORD_INSTRUCTION, PC, Word(PC_reg + 0x0002))
+
+val setPC: wordBits -> unit
+function setPC(v) = writeReg(WORD_INSTRUCTION, PC, Word(v))
 
 // fetch is used for 2 things:
 // - reading the instructions

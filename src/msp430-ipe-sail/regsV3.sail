@@ -43,7 +43,6 @@ function readReg(bw, reg) = match bw {
     Byte(value[7 .. 0])
 }
 
-val writeReg : (BW, Register, WordByte) -> unit
 function writeReg(bw, reg, v) = {
   let v : wordBits = match v {
     Word(v) => v,
@@ -62,7 +61,7 @@ function writeReg(bw, reg, v) = {
   in
 
   match reg {
-    PC    =>    PC_reg = v,
+    PC    =>    { check_byte_access(v, X); PC_reg = v },
     SP    =>    SP_reg = v,
     SRCG1 => SRCG1_reg = v,
     CG2   =>   CG2_reg = v,
