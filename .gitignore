@@ -15,3 +15,5 @@ out
 .lia.cache
 
 misc/
+/src/musail-gen/base.v
+/src/musail-gen/machine.v
