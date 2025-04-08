@@ -10,6 +10,9 @@ pkgs.mkShell {
     z3
     ruby
     git
+    autoconf
+    which
+    rsync
 
     ocamlPackages.sail
 

@@ -605,7 +605,9 @@ Module Import MSP430Program <: Program MSP430Base.
     | write_ram : FunX ["addr" ∷ ty.wordBits; "data" ∷ ty.byteBits] ty.unit
     | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n).
 
-    Inductive Lem : PCtx -> Set := .
+    Inductive Lem : PCtx -> Set :=
+    | extract_accessible_ptsto : Lem ["addr" :: ty.Address; "m" :: ty.enum Eaccess_mode]
+    | return_accessible_ptsto : Lem ["addr" :: ty.Address].
 
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
     Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
@@ -3386,9 +3388,10 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                        (ty.bool)
                                                                                                                        (stm_exp (exp_var "ga#152"))
                                                                                                                        (stm_if ((stm_exp (exp_var "ж655")))
-                                                                                                                               (stm_call in_ivt_or_rv (env.snoc (env.nil)
+                                                                                                                               (stm_exp (exp_false))
+                                                                                                                               (* XXX (stm_call in_ivt_or_rv (env.snoc (env.nil)
                                                                                                                                                                 (_::_)
-                                                                                                                                                                ((exp_var "addr"))%exp))
+                                                                                                                                                                ((exp_var "addr"))%exp)) *)
                                                                                                                                (stm_exp (exp_false)))))
                                                                                                      (stm_exp (exp_unop uop.not (exp_var "ga#153"))))
                                                                                             (stm_exp (exp_false))))))))))).
@@ -3471,7 +3474,14 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                  (stm_exp (exp_var "ga#161"))
                                                                                                  (stm_if ((stm_exp (exp_var "ж662")))
                                                                                                          (stm_call read_mpu_reg_byte (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp))
-                                                                                                         (stm_foreign read_ram [exp_var "addr"]))))
+                                                                                                         (stm_seq
+                                                                                                            (stm_lemma extract_accessible_ptsto [exp_var "addr"; exp_var "m"])
+                                                                                                            (stm_let "res"
+                                                                                                               ty.byteBits
+                                                                                                               (stm_foreign read_ram [exp_var "addr"])
+                                                                                                               (stm_seq
+                                                                                                                  (stm_lemma return_accessible_ptsto [exp_var "addr"])
+                                                                                                                  (stm_exp (exp_var "res"))))))))
                                                                                (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#162"))))
                                         | WORD_INSTRUCTION => stm_let "addr"
                                                                       (ty.bvec (16))
@@ -3593,7 +3603,11 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                (stm_exp (exp_var "ga#168"))
                                                                                                                                                                (stm_if ((stm_exp (exp_var "ж685")))
                                                                                                                                                                        (stm_call write_mpu_reg_byte (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) ((exp_var "v"))%exp))
-                                                                                                                                                                       (stm_foreign write_ram [exp_var "addr"; exp_var "v"]))))));
+                                                                                                                                                                       (stm_seq
+                                                                                                                                                                          (stm_lemma extract_accessible_ptsto [exp_var "addr"; exp_val (ty.enum Eaccess_mode) W])
+                                                                                                                                                                          (stm_seq
+                                                                                                                                                                             (stm_foreign write_ram [exp_var "addr"; exp_var "v"])
+                                                                                                                                                                             (stm_lemma return_accessible_ptsto [exp_var "addr"]))))))));
                                                                                                   existT Kword (MkAlt (pat_var "v") (stm_let "ga#170"
                                                                                                                                              ((ty.union Uwordbyte))
                                                                                                                                              (stm_let "ga#169"
