@@ -608,7 +608,7 @@ Module Import MSP430Program <: Program MSP430Base.
     Inductive Lem : PCtx -> Set :=
     | extract_accessible_ptsto : Lem ["addr" :: ty.Address; "m" :: ty.enum Eaccess_mode]
     | return_accessible_ptsto : Lem ["addr" :: ty.Address]
-    | change_accessible_pc : Lem [(* "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits; *) "pc_old" :: ty.wordBits(* ; "pc_new" :: ty.wordBits *)].
+    (* | change_accessible_pc : Lem ["pc_old" :: ty.wordBits] *).
 
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
     Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
@@ -3734,25 +3734,22 @@ Module Import MSP430Program <: Program MSP430Base.
                                  "_ж713"  ∷  ty.unit
                                ]
                                (ty.unit) :=
-      stm_let "pc_old" ty.wordBits (stm_read_register PC_reg)
-        (stm_seq
-          (stm_let "ga#204"
-                  ((ty.union Uwordbyte))
-                  (stm_let "ga#203"
-                           (ty.bvec (16))
-                           (stm_let "жreg_PC_reg_714"
-                                    (ty.wordBits)
-                                    (stm_read_register PC_reg)
-                                    (stm_exp (exp_binop bop.bvadd (exp_var "жreg_PC_reg_714") (exp_val (ty.bvec 16) ([bv 2])))))
-                           (stm_exp (exp_union Uwordbyte Kword (exp_var "ga#203"))))
-                  (stm_call writeReg (env.snoc (env.snoc (env.snoc (env.nil)
-                                                                   (_::_)
-                                                                   ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
-                                                         (_::_)
-                                                         ((exp_val (ty.enum Eregister) (PC)))%exp)
-                                               (_::_)
-                                               ((exp_var "ga#204"))%exp)))
-          (stm_lemma change_accessible_pc [exp_var "pc_old"])).
+      (stm_let "ga#204"
+              ((ty.union Uwordbyte))
+              (stm_let "ga#203"
+                       (ty.bvec (16))
+                       (stm_let "жreg_PC_reg_714"
+                                (ty.wordBits)
+                                (stm_read_register PC_reg)
+                                (stm_exp (exp_binop bop.bvadd (exp_var "жreg_PC_reg_714") (exp_val (ty.bvec 16) ([bv 2])))))
+                       (stm_exp (exp_union Uwordbyte Kword (exp_var "ga#203"))))
+              (stm_call writeReg (env.snoc (env.snoc (env.snoc (env.nil)
+                                                               (_::_)
+                                                               ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
+                                                     (_::_)
+                                                     ((exp_val (ty.enum Eregister) (PC)))%exp)
+                                           (_::_)
+                                           ((exp_var "ga#204"))%exp))).
 
     (*
       Extended type
@@ -3805,7 +3802,6 @@ Module Import MSP430Program <: Program MSP430Base.
                        (stm_let "жreg_PC_reg_719"
                                 (ty.wordBits)
                                 (stm_read_register PC_reg)
-                                (* (stm_exp (exp_union Uwordbyte Kword (exp_val ty.wordBits [bv 0]))) *)
                                 (stm_call read_mem_aux (env.snoc (env.snoc (env.snoc (env.nil)
                                                                                      (_::_)
                                                                                      ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
@@ -3814,26 +3810,11 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                  (_::_)
                                                                  ((exp_val (ty.enum Eaccess_mode) (X)))%exp)))
 
-
-
-
-                       (* (stm_let "ipectl" ty.wordBits (stm_read_register MPUIPC0_reg) *)
-                       (* (stm_let "segb1" ty.wordBits (stm_read_register MPUSEGB1_reg) *)
-                       (* (stm_let "segb2" ty.wordBits (stm_read_register MPUSEGB2_reg) *)
-
-                       (stm_let "pc_old" ty.wordBits (stm_read_register PC_reg)
                           (stm_seq
                              (stm_call incPC (env.snoc (env.nil)
                                                 (_::_)
                                                 ((exp_val (ty.unit) (tt)))%exp))
-(* (stm_let "pc_new" ty.wordBits (stm_read_register PC_reg) *)
-                             (stm_seq
-
-                                (stm_lemma change_accessible_pc [(* exp_var "ipectl"; exp_var "segb1"; exp_var "segb2"; *) exp_var "pc_old"(* ; exp_var "pc_new" *)])
-                                (stm_debugk (stm_exp (exp_var "data")))))))
-
-(* )))) *)
-                        .
+                             (stm_exp (exp_var "data")))).
     
     (*
       Extended type

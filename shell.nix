@@ -49,6 +49,9 @@ pkgs.mkShell {
 # dune build
 # dune install
 
+# katamaran not compatible with later commits as of 2025-02-24
+# opam pin add -k version coq-iris dev.2025-03-25.0.79d33e24
+
 # opam install coq-katamaran
 
 
