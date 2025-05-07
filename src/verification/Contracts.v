@@ -1,7 +1,8 @@
 From Coq Require Import
   Lists.List
   Strings.String
-  ZArith.
+  ZArith
+  Lia.
 
 From Katamaran Require Import
      Notations
@@ -46,34 +47,24 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     Local Notation "x ++ y" := (term_binop (@bop.bvapp _ 8 8) x y).
 
     Local Notation "r m↦ v" := (asn.chunk (chunk_user ptstomem [r; v])) (at level 70).
+    Local Notation "x <> y" := (asn.formula (formula_relop bop.neq x y)) : asn_scope.
+    (* Local Notation "x <> y" := (term_binop (bop.relop bop.neq) x y) : asn_scope. *)
 
-    Local Notation inc x :=
-      (term_unop uop.get_slice_int
-         (term_binop bop.plus
-            (term_unop uop.unsigned (term_var x))
-            (term_val ty.int 1))).
+    (* Definition match_bw {Σ} x b w : Assertion Σ := *)
+    (*   (asn.match_enum Ebw x *)
+    (*      (fun bw => match bw with *)
+    (*                 | BYTE_INSTRUCTION => b *)
+    (*                 | WORD_INSTRUCTION => w *)
+    (*                 end)). *)
 
-    Local Notation match_bw x b w :=
-      (asn.match_enum Ebw x
-         (fun bw => match bw with
-                    | BYTE_INSTRUCTION => b
-                    | WORD_INSTRUCTION => w
-                    end)).
+    (* need to be angelic otherwise read_mem_aux contract gives an error - why? *)
+    Local Notation asn_accessible_addresses segb1 segb2 :=
+      (asn.chunk_angelic (chunk_user accessible_addresses
+                            [term_var segb1; term_var segb2])).
 
-    Local Notation asn_accessible_addresses pc ipectl segb1 segb2 :=
-      (asn.chunk (chunk_user accessible_addresses
-                    [ term_var pc
-                    ; term_var ipectl
-                    ; term_var segb1
-                    ; term_var segb2 ])).
-
-    Local Notation asn_accessible_addresses_without pc ipectl segb1 segb2 addr :=
-      (asn.chunk (chunk_user accessible_addresses_without
-                    [ term_var pc
-                    ; term_var ipectl
-                    ; term_var segb1
-                    ; term_var segb2
-                    ; term_var addr])).
+    Local Notation asn_accessible_addresses_without segb1 segb2 addr :=
+      (asn.chunk_angelic (chunk_user accessible_addresses_without
+                            [term_var segb1; term_var segb2; term_var addr])).
 
     (* Predicates *)
 
@@ -97,8 +88,9 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     Definition term_plus {Σ} (m : Z) (n : Term Σ ty.int) : Term Σ ty.int :=
       (term_binop bop.plus n (term_val ty.int m)).
 
-    Definition term_word_plus {Σ} (m : Z) (n : Term Σ ty.int) : Term Σ ty.Address :=
-      term_get_slice_int (term_plus m n).
+    Definition term_word_plus {Σ} (m : bv 16) (n : Term Σ ty.wordBits) : Term Σ ty.wordBits :=
+      term_binop bop.bvadd n (term_val ty.wordBits m)
+      (* term_get_slice_int (term_plus m n) *).
 
     Definition asn_ipe_entry_point {Σ}
       (segb1 addr : Term Σ ty.wordBits)
@@ -109,97 +101,71 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
            (term_plus 8 (word_times_16 segb1))
            (term_unsigned addr)).
 
-    Definition asn_not_in_ipe_segment {Σ}
-      (segb1 segb2 addr : Term Σ ty.wordBits)
+    Definition asn_untrusted {Σ}
+      (segb1 segb2 pc : Term Σ ty.wordBits)
       : Assertion Σ
     :=
-      asn.formula (formula_relop bop.lt
-                     (term_unsigned addr)
-                     (word_times_16 segb1))
+      asn.formula
+        (* PC outside IPE segment except first 8 bytes
+           or execute read in IVT or RV (9.4.1) (TODO) *)
+        (formula_or
+           (formula_relop bop.lt
+              (term_unsigned pc)
+              (* (term_plus 8  *)(word_times_16 segb1))(* ) *)
+           (formula_relop bop.le
+              (word_times_16 segb2)
+              (term_unsigned pc))).
+      (*     (* not execute access in IVT or RV (9.4.1) *) *)
+      (*     /\ ((Z.lt addr 0xFF80 \/ Z.le 0xFFFF addr) *)
+      (*         \/ am <> X)) *)
+
+    Definition asn_untrusted_or_entry_point {Σ}
+      (segb1 segb2 pc : Term Σ ty.wordBits) : Assertion Σ
+      := asn_ipe_entry_point segb1 pc ∨ asn_untrusted segb1 segb2 pc.
+
+    Definition asn_unprotected {Σ}
+      (segb1 segb2 : Term Σ ty.wordBits)
+      (am : Term Σ (ty.enum Eaccess_mode))
+      (addr : Term Σ ty.Address)
+      : Assertion Σ
+    :=
+        asn.formula (formula_relop bop.lt
+                       (term_unsigned addr)
+                       (word_times_16 segb1))
       ∨ asn.formula (formula_relop bop.le
                        (word_times_16 segb2)
-                       (term_unsigned addr)).
+                       (term_unsigned addr))
 
-    Definition asn_trusted {Σ}
-      (ipectl segb1 segb2 pc : Term Σ ty.wordBits)
-      : Assertion Σ
-    :=
-      asn.formula
-        (formula_or
+      ∨ ( am = term_enum Eaccess_mode X
+        ∗ asn_ipe_entry_point segb1 addr).
 
-           (* either IPE disabled... *)
-           (formula_relop bop.eq
-              (term_vector_subrange 6 1 ipectl)
-              (term_val (ty.bvec 1) [bv 0x0]))
-
-           (* ...or PC in IPE segment except first 8 bytes
-              and not an execute read in IVT or RV (9.4.1) (TODO) *)
-           (formula_and
-              (formula_relop bop.le
-                 (term_plus 8 (word_times_16 segb1))
-                 (term_unsigned pc))
-              (formula_relop bop.lt
-                 (term_unsigned pc)
-                 (word_times_16 segb2)))).
-      (*     (* not execute access in IVT or RV (9.4.1) *) *)
-      (*     /\ ((Z.lt addr 0xFF80 \/ Z.le 0xFFFF addr) *)
-      (*         \/ am <> X)) *)
-
-    Definition asn_untrusted {Σ}
-      (ipectl segb1 segb2 pc : Term Σ ty.wordBits)
-      : Assertion Σ
-    :=
-      asn.formula
-        (formula_and
-
-           (* IPE enabled *)
-           (formula_relop bop.eq
-              (term_vector_subrange 6 1 ipectl)
-              (term_val (ty.bvec 1) [bv 0x1]))
-
-           (* PC outside IPE segment except first 8 bytes
-              or execute read in IVT or RV (9.4.1) (TODO) *)
-           (formula_or
-              (formula_relop bop.lt
-                 (term_unsigned pc)
-                 (term_plus 8 (word_times_16 segb1)))
-              (formula_relop bop.le
-                 (word_times_16 segb2)
-                 (term_unsigned pc)))).
-      (*     (* not execute access in IVT or RV (9.4.1) *) *)
-      (*     /\ ((Z.lt addr 0xFF80 \/ Z.le 0xFFFF addr) *)
-      (*         \/ am <> X)) *)
-
-    Definition asn_access_allowed {Σ}
-      (ipectl segb1 segb2 : Term Σ ty.wordBits)
-      (am : Term Σ (ty.enum Eaccess_mode))
-      (pc addr : Term Σ ty.wordBits)
-      : Assertion Σ
-    :=
-      asn_not_in_ipe_segment segb1 segb2 addr
-
-      ∨ (am = term_enum Eaccess_mode X
-         ∗ asn_ipe_entry_point segb1 addr)
-
-      ∨ (am = term_enum Eaccess_mode X
+      (* ∨ (am = term_enum Eaccess_mode X
          ∗ asn.formula (formula_relop bop.lt
                           (term_unsigned pc)
                           (term_plus 8 (word_times_16 segb1)))
-         ∗ pc = addr)
+         ∗ pc = addr) *)
 
-      (* XXX ∨ asn_trusted ipectl segb1 segb2 pc *).
+    Definition asn_ipe_configured {Σ} (ipectl : Term Σ ty.wordBits) :=
+      asn.formula
+        (formula_and
+           (* enabled *)
+           (formula_relop bop.eq
+              (term_vector_subrange 6 1 ipectl)
+              (term_val (ty.bvec 1) [bv 0x1]))
+           (* locked *)
+           (formula_relop bop.eq
+              (term_vector_subrange 7 1 ipectl)
+              (term_val (ty.bvec 1) [bv 0x1]))).
 
-    Definition asn_exist_mpu_registers {Σ} : Assertion Σ :=
+    Definition asn_mpu_registers {Σ} : Assertion Σ :=
         ∃ "MPUCTL0_reg"    , MPUCTL0_reg    ↦ term_var "MPUCTL0_reg"
       ∗ ∃ "MPUCTL1_reg"    , MPUCTL1_reg    ↦ term_var "MPUCTL1_reg"
       ∗ ∃ "MPUSEGB2_reg"   , MPUSEGB2_reg   ↦ term_var "MPUSEGB2_reg"
       ∗ ∃ "MPUSEGB1_reg"   , MPUSEGB1_reg   ↦ term_var "MPUSEGB1_reg"
-      ∗ ∃ "MPUSAM_reg"     , MPUSAM_reg     ↦ term_var "MPUSAM_reg"
-      ∗ ∃ "MPUIPC0_reg"    , MPUIPC0_reg    ↦ term_var "MPUIPC0_reg"
-      ∗ ∃ "MPUIPSEGB2_reg" , MPUIPSEGB2_reg ↦ term_var "MPUIPSEGB2_reg"
-      ∗ ∃ "MPUIPSEGB1_reg" , MPUIPSEGB1_reg ↦ term_var "MPUIPSEGB1_reg".
+      ∗ ∃ "MPUSAM_reg"     , MPUSAM_reg     ↦ term_var "MPUSAM_reg".
 
-    Definition asn_exist_registers {Σ} : Assertion Σ :=
+    (*
+    Definition asn_own_sample_regs {Σ} : Assertion Σ :=
         ∃ "SP"    , SP_reg               ↦ term_var "SP"
       ∗ ∃ "SRCG1" , SRCG1_reg            ↦ term_var "SRCG1"
       ∗ ∃ "CG2"   , CG2_reg              ↦ term_var "CG2"
@@ -216,89 +182,61 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       ∗ ∃ "R14"   , R14_reg              ↦ term_var "R14"
       ∗ ∃ "R15"   , R15_reg              ↦ term_var "R15"
       ∗ ∃ "LIF"   , LastInstructionFetch ↦ term_var "LIF".
+    *)
+
+    Definition asn_own_sample_regs {Σ} : Assertion Σ :=
+      (* actual sample registers (except PC) *)
+        ∃ "SRCG1" , SRCG1_reg            ↦ term_var "SRCG1"
+      ∗ ∃ "R4"    , R4_reg               ↦ term_var "R4"
+
+      (* often needed *)
+      ∗ ∃ "SP"    , SP_reg               ↦ term_var "SP"
+      ∗ ∃ "LIF"   , LastInstructionFetch ↦ term_var "LIF".
+
+    Definition asn_is_sample_reg {Σ} (reg : Term Σ (ty.enum Eregister)) : Assertion Σ :=
+        reg = term_val (ty.enum Eregister) PC
+      ∨ reg = term_val (ty.enum Eregister) SRCG1
+      ∨ reg = term_val (ty.enum Eregister) R4.
 
     (* Lemmas *)
 
     Definition lemma_extract_accessible_ptsto : SepLemma extract_accessible_ptsto :=
       {| lemma_logic_variables :=
           [ "addr" :: ty.Address; "m" :: ty.enum Eaccess_mode
-          ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc" :: ty.wordBits
+          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
           ];
 
         lemma_patterns := [term_var "addr"; term_var "m"];
 
         lemma_precondition :=
-            PC_reg         ↦ term_var "pc"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+            MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc" "ipectl" "segb1" "segb2"
-          ∗ asn_access_allowed
-              (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "pc") (term_var "addr");
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_unprotected
+              (term_var "segb1") (term_var "segb2")
+              (term_var "m") (term_var "addr");
 
         lemma_postcondition :=
-            PC_reg         ↦ term_var "pc"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+            MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses_without "pc" "ipectl" "segb1" "segb2" "addr"
-          ∗ ∃ "v", asn.chunk (chunk_user ptstomem [term_var "addr"; term_var "v"]);
+          ∗ asn_accessible_addresses_without "segb1" "segb2" "addr"
+          ∗ ∃ "v", term_var "addr" m↦ term_var "v";
       |}.
 
     Definition lemma_return_accessible_ptsto : SepLemma return_accessible_ptsto :=
       {| lemma_logic_variables :=
-          [ "addr" :: ty.Address
-          ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc" :: ty.wordBits
-          ];
+          [ "addr" :: ty.Address; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ];
 
         lemma_patterns := [term_var "addr"];
 
         lemma_precondition :=
-            asn_accessible_addresses_without "pc" "ipectl" "segb1" "segb2" "addr"
-          ∗ ∃ "v", asn.chunk (chunk_user ptstomem [term_var "addr"; term_var "v"]);
+            asn_accessible_addresses_without "segb1" "segb2" "addr"
+          ∗ ∃ "v", term_var "addr" m↦ term_var "v";
 
-        lemma_postcondition :=
-          asn_accessible_addresses "pc" "ipectl" "segb1" "segb2";
+        lemma_postcondition := asn_accessible_addresses "segb1" "segb2";
       |}.
-
-    (*
-    Definition lemma_change_accessible_pc : SepLemma change_accessible_pc :=
-      {| lemma_logic_variables :=
-          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
-          ];
-
-        lemma_patterns := [term_var "pc_old"];
-
-        lemma_precondition :=
-            PC_reg         ↦ term_var "pc_new"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-
-           (* ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2" *)
-
-          (* ∗ asn_access_allowed *)
-          (*     (term_var "ipectl") (term_var "segb1") (term_var "segb2") *)
-      (*     (term_enum Eaccess_mode X) (term_var "pc_old") (term_var "pc_new") *)
-
-      ;
-
-
-        lemma_postcondition :=
-            PC_reg         ↦ term_var "pc_new"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-
-          ∗ asn_accessible_addresses "pc_new" "ipectl" "segb1" "segb2";
-      |}.
-     *)
 
     (* Foreign function contracts *)
 
@@ -339,39 +277,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
 
     (* μSail function contracts *)
 
-    (*
-    Definition sep_contract_check_ipe_access :
-      SepContractFun check_ipe_access :=
-      {|
-        sep_contract_logic_variables :=
-          [ "addr"   :: ty.Address
-          ; "m"      :: ty.enum Eaccess_mode
-          ; "ipectl" :: ty.wordBits
-          ; "segb1"  :: ty.wordBits
-          ; "segb2"  :: ty.wordBits
-          ; "pc"     :: ty.wordBits          ];
-
-        sep_contract_localstore := [term_var "addr"; term_var "m"];
-
-        sep_contract_precondition :=
-            PC_reg         ↦ term_var "pc"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-
-        sep_contract_result        := "v";
-        sep_contract_postcondition :=
-            PC_reg         ↦ term_var "pc"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ (asn_access_allowed
-              (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "pc") (term_var "addr")
-             ∗ term_var "v" = term_val ty.bool true
-             ∨ term_var "v" = term_val ty.bool false); (* XXX maybe needs asn_not_access_allowed? *)
-      |}. *)
-
     Definition sep_contract_check_byte_access :
       SepContractFun check_byte_access :=
       {|
@@ -381,7 +286,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ; "ipectl" :: ty.wordBits
           ; "segb1"  :: ty.wordBits
           ; "segb2"  :: ty.wordBits
-          ; "pc"     :: ty.wordBits          ];
+          ; "pc"     :: ty.wordBits
+          ];
 
         sep_contract_localstore := [term_var "addr"; term_var "m"];
 
@@ -389,17 +295,24 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
             PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2";
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc");
 
         sep_contract_result        := "v";
         sep_contract_postcondition :=
-            PC_reg         ↦ term_var "pc"
+            term_var "v" = term_val ty.unit tt
+
+          ∗ PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ asn_access_allowed
-              (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "pc") (term_var "addr");
+
+          ∗ asn_unprotected
+              (term_var "segb1") (term_var "segb2")
+              (term_var "m") (term_var "addr");
+
       |}.
 
     Definition sep_contract_read_mem_aux :
@@ -413,75 +326,125 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
 
         sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "m"];
 
-        sep_contract_precondition := ⊤;
-            (* PC_reg         ↦ term_var "pc" *)
-          (* ∗ MPUIPC0_reg    ↦ term_var "ipectl" *)
-          (* ∗ MPUIPSEGB1_reg ↦ term_var "segb1" *)
-          (* ∗ MPUIPSEGB2_reg ↦ term_var "segb2" *)
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          (* ∗ asn_accessible_addresses "pc" "ipectl" "segb1" "segb2"; *)
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
 
         sep_contract_result        := "v";
         sep_contract_postcondition :=
-            ∃ "u", term_var "v" = term_var "u"
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
+      |}.
+
+    Definition sep_contract_write_mpu_reg_byte :
+      SepContractFun write_mpu_reg_byte :=
+      {|
+        sep_contract_logic_variables :=
+          [ "addr" :: ty.Address; "v" :: ty.byteBits
+          ; "ipectl" :: ty.wordBits];
+
+        sep_contract_localstore := [term_var "addr"; term_var "v"];
+
+        sep_contract_precondition :=
+            MPUIPC0_reg ↦ term_var "ipectl"
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_mpu_registers;
+
+        sep_contract_result := "u";
+        sep_contract_postcondition :=
+            term_var "u" = term_val ty.unit tt
+          ∗ MPUIPC0_reg ↦ term_var "ipectl"
+          ∗ asn_mpu_registers;
+      |}.
+
+    Definition sep_contract_writeMem :
+      SepContractFun writeMem :=
+      {|
+        sep_contract_logic_variables :=
+          [ "bw" :: ty.enum Ebw; "addr" :: ty.Address; "v" :: ty.union Uwordbyte
+          ; "ipectl" :: ty.wordBits; "segb1"  :: ty.wordBits; "segb2"  :: ty.wordBits
+          ; "pc" :: ty.wordBits
+          ];
+
+        sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "v"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
+
+        sep_contract_result        := "v";
+        sep_contract_postcondition :=
+            term_var "v" = term_val ty.unit tt
 
           ∗ PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_access_allowed
-              (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "pc") (term_var "addr")
-
-          ∗ asn_accessible_addresses "pc" "ipectl" "segb1" "segb2";
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
       |}.
 
-    Definition sep_contract_set_pc :
+    Definition sep_contract_setPC :
       SepContractFun setPC :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc" :: ty.wordBits; "pc_new" :: ty.wordBits ];
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits ];
 
         sep_contract_localstore := [term_var "pc_new"];
 
         sep_contract_precondition :=
-            PC_reg         ↦ term_var "pc"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc_old"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
+          ∗ asn_ipe_configured (term_var "ipectl")
           ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc");
+              (term_var "segb1") (term_var "segb2") (term_var "pc_old");
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
             term_var "u" = term_val ty.unit tt
 
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ ∃ "pc_new",
-            ( PC_reg ↦ term_var "pc_new"
-
-            ∗ asn_access_allowed
-                (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-                (term_enum Eaccess_mode X) (term_var "pc") (term_var "pc_new"));
+          ∗ PC_reg ↦ term_var "pc_new"
+          ∗ ( asn_untrusted
+                (term_var "segb1") (term_var "segb2") (term_var "pc_new")
+            ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new"));
       |}.
 
-    Definition sep_contract_inc_pc :
+    Definition sep_contract_incPC :
       SepContractFun incPC :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits
           ; "u" :: ty.unit ];
 
         sep_contract_localstore := [ term_var "u" ];
@@ -492,198 +455,336 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
+          ∗ asn_ipe_configured (term_var "ipectl")
           ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc_old");
+              (term_var "segb1") (term_var "segb2") (term_var "pc_old");
 
-        sep_contract_result          := "u";
+        sep_contract_result          := "v";
         sep_contract_postcondition   :=
-            term_var "u" = term_val ty.unit tt
+            term_var "v" = term_val ty.unit tt
 
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ ∃ "pc_new",
-            ( term_var "pc_new" = term_word_plus 2 (term_unsigned (term_var "pc_old"))
-
+            ( term_var "pc_new" = term_word_plus [bv 2] (term_var "pc_old")
             ∗ PC_reg ↦ term_var "pc_new"
-
-          (*   (* TODO useful? *)
-          (*   ∗ asn_access_allowed *)
-          (*       (term_var "ipectl") (term_var "segb1") (term_var "segb2") *)
-          (*       (term_enum Eaccess_mode X) (term_var "pc_old") (term_var "pc_new")) *) *));
+            ∗ asn_untrusted
+                (term_var "segb1") (term_var "segb2") (term_var "pc_new"));
       |}.
 
     Definition sep_contract_fetch :
     SepContractFun fetch :=
     {|
       sep_contract_logic_variables :=
-        [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-        ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-        ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
+        [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+        ; "pc_old" :: ty.wordBits
         ; "u" :: ty.unit ];
 
       sep_contract_localstore := [ term_var "u" ];
 
       sep_contract_precondition :=
           PC_reg         ↦ term_var "pc_old"
-        ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
         ∗ MPUIPC0_reg    ↦ term_var "ipectl"
         ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
         ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
+        ∗ asn_ipe_configured  (term_var "ipectl")
         ∗ asn_untrusted
-            (term_var "ipectl") (term_var "segb1")
-            (term_var "segb2") (term_var "pc_old")
+            (term_var "segb1") (term_var "segb2") (term_var "pc_old")
 
-        ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2";
+        ∗ asn_accessible_addresses "segb1" "segb2"
+        ∗ asn_mpu_registers;
 
       sep_contract_result          := "v";
       sep_contract_postcondition   :=
-          MPUCTL0_reg    ↦ term_var "mpuctl0"
-        ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          MPUIPC0_reg    ↦ term_var "ipectl"
         ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
         ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-        ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2"
+        ∗ asn_accessible_addresses "segb1" "segb2"
+        ∗ asn_mpu_registers
 
         ∗ ∃ "pc_new",
-          ( term_var "pc_new" = term_word_plus 2 (term_unsigned (term_var "pc_old"))
-
-          ∗ PC_reg ↦ term_var "pc_new"
-
-          (* TODO useful? *)
-          (* ∗ asn_access_allowed *)
-          (*     (term_var "ipectl") (term_var "segb1") (term_var "segb2") *)
-          (*     (term_enum Eaccess_mode X) (term_var "pc") (term_var "pc_new") *)
-
-          );
+          ( term_var "pc_new" = term_word_plus [bv 2] (term_var "pc_old")
+            ∗ PC_reg ↦ term_var "pc_new"
+            ∗ asn_untrusted
+                (term_var "segb1") (term_var "segb2") (term_var "pc_new"));
     |}.
+
+    Definition sep_contract_read_register : SepContractFun read_am_register :=
+      {|
+        sep_contract_logic_variables :=
+          [ "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister; "pc" :: ty.wordBits];
+
+        sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+        sep_contract_precondition :=
+            PC_reg ↦ term_var "pc"
+          ∗ asn_own_sample_regs
+          ∗ asn_is_sample_reg (term_var "reg");
+
+        sep_contract_result          := "v";
+        sep_contract_postcondition   :=
+            (  ∃ "b", (term_var "v" = term_union Uwordbyte Kbyte (term_var "b"))
+             ∨ ∃ "w", (term_var "v" = term_union Uwordbyte Kword (term_var "w")
+                       ∗ (term_var "w" = term_var "pc"
+                          ∨ (term_var "reg" <> term_enum Eregister PC))))
+
+          ∗ PC_reg ↦ term_var "pc"
+          ∗ asn_own_sample_regs;
+      |}.
+
+    Definition sep_contract_write_register : SepContractFun write_am_register :=
+      {|
+        sep_contract_logic_variables :=
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits
+          ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister; "v" :: ty.union Uwordbyte
+          ];
+
+        sep_contract_localstore := [term_var "bw"; term_var "reg"; term_var "v"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc_old"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted
+              (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_own_sample_regs;
+
+        sep_contract_result          := "u";
+        sep_contract_postcondition   :=
+            term_var "u" = term_val ty.unit tt
+
+          (* ∗ (PC_reg ↦ term_var "pc_old" *)
+          (*    ∨ term_var "reg" = term_val (ty.enum Eregister) PC *)
+          (*      ∗ ∃ "pc_new", *)
+          (*        (PC_reg ↦ term_var "pc_new" *)
+          (*         ∗ (term_var "v" = term_union Uwordbyte Kword (term_var "pc_new") *)
+          (*            ∨ ∃ "b", *)
+          (*              (term_var "v" = term_union Uwordbyte Kword (term_var "b") *)
+          (*               ∗ term_var "pc_new" = (term_unop uop.zext (term_var "b")))) *)
+          (*         ∗ asn_untrusted_or_entry_point *)
+          (*             (term_var "segb1") (term_var "segb2") (term_var "pc_new"))) *)
+
+          ∗ (PC_reg ↦ term_var "pc_old"
+             ∨ (term_var "reg" = term_val (ty.enum Eregister) PC
+                ∗ ∃ "pc_new",
+                  (PC_reg ↦ term_var "pc_new"
+                   ∗ asn_untrusted_or_entry_point
+                       (term_var "segb1") (term_var "segb2") (term_var "pc_new")
+
+                   (* special case for the write in read_autoincrement,
+                      we want to know the value of pc_new *)
+                   ∗ (term_var "bw" = term_enum Ebw WORD_INSTRUCTION
+                      ∗ (term_var "v" = term_union Uwordbyte Kword (term_var "pc_new")
+                         ∨ ∃ "b", term_var "v" = term_union Uwordbyte Kbyte (term_var "b"))
+
+                      (* don't care *)
+                      ∨ term_var "bw" = term_enum Ebw BYTE_INSTRUCTION))))
+
+
+          (* ∗ ∃ "pc_new", *)
+          (*   (PC_reg ↦ term_var "pc_new" *)
+          (*      ∗ asn_untrusted_or_entry_point *)
+          (*          (term_var "segb1") (term_var "segb2") (term_var "pc_new")) *)
+
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_own_sample_regs;
+      |}.
 
     Definition sep_contract_read_indexed : SepContractFun read_indexed :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits
           ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister
           ];
 
         sep_contract_localstore := [term_var "bw"; term_var "reg"];
 
         sep_contract_precondition :=
-            asn_exist_registers
-
-          ∗ PC_reg         ↦ term_var "pc_old"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc_old"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2"
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
 
-          ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc_old");
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
 
         sep_contract_result          := "v";
         sep_contract_postcondition   :=
-            asn_exist_registers
-
             (* pc_old + 2 except when reading from CG2 *)
-          ∗ (∃ "pc_new", PC_reg ↦ term_var "pc_new")
+            ∃ "pc_new",
+              ( PC_reg ↦ term_var "pc_new"
+              ∗ asn_untrusted
+                  (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
 
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2";
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
       |}.
 
     Definition sep_contract_read_indirect : SepContractFun read_indirect :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
+          [ "pc" :: ty.wordBits; "ipectl" :: ty.wordBits
           ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
           ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister
           ];
 
         sep_contract_localstore := [term_var "bw"; term_var "reg"];
 
         sep_contract_precondition :=
-            asn_exist_registers
-
-          ∗ PC_reg         ↦ term_var "pc_old"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2"
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
+          ∗ asn_is_sample_reg (term_var "reg")
 
-          ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc_old");
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
 
         sep_contract_result          := "v";
         sep_contract_postcondition   :=
-            asn_exist_registers
-
-          (* always pc_old, but the implementation calls read
-             so would have to make read_indexed's contract more
-             precise to prove that pc_new = pc_old *)
-          ∗ (∃ "pc_new", PC_reg ↦ term_var "pc_new")
-
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2";
+          ∗ asn_accessible_addresses  "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
       |}.
 
-    Definition sep_contract_read_autoincrement : SepContractFun read_autoincrement
-      := sep_contract_read_indirect.
-
-    Definition sep_contract_read_mpu_reg_byte : SepContractFun read_mpu_reg_byte :=
+    Definition sep_contract_read_autoincrement : SepContractFun read_autoincrement :=
       {|
-        sep_contract_logic_variables := ["addr" :: ty.Address];
-        sep_contract_localstore := [term_var "addr"];
-        sep_contract_precondition := asn_exist_mpu_registers;
-        sep_contract_result := "v";
-        sep_contract_postcondition := asn_exist_mpu_registers;
+        sep_contract_logic_variables :=
+          [ "pc_old" :: ty.wordBits
+          ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister
+          ];
+
+        sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc_old"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
+
+        sep_contract_result          := "v";
+        sep_contract_postcondition   :=
+            ∃ "pc_new",
+              (PC_reg ↦ term_var "pc_new"
+               ∗ asn_untrusted
+                   (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses  "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
+      |}.
+
+    Definition sep_contract_write_indexed : SepContractFun write_indexed :=
+      {|
+        sep_contract_logic_variables :=
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc" :: ty.wordBits
+          ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister; "v" :: ty.union Uwordbyte
+          ];
+
+        sep_contract_localstore := [term_var "bw"; term_var "reg"; term_var "v"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
+
+        sep_contract_result          := "u";
+        sep_contract_postcondition   :=
+            term_var "u" = term_val ty.unit tt
+
+            (* PC is changed in move_inst, unlike read_indexed *)
+          ∗ PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
       |}.
 
     Definition sep_contract_execute_move : SepContractFun execute :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc_old" :: ty.wordBits; "pc_new" :: ty.wordBits
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits
           ; "instr" :: ty.union Uast; "bw" :: ty.enum Ebw
           ; "src_reg" :: ty.enum Eregister; "dest_reg" :: ty.enum Eregister
-          ; "src_am" :: ty.enum Eam
+          ; "src_am" :: ty.enum Eam; "dest_am" :: ty.enum Eam
           ];
 
         sep_contract_localstore := [term_var "instr"];
 
         sep_contract_precondition :=
-            asn_exist_registers
-
-          ∗ PC_reg         ↦ term_var "pc_old"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc_old"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2"
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "src_reg")
+          ∗ asn_is_sample_reg (term_var "dest_reg")
 
-          ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc_old")
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs
 
           ∗ term_var "instr" =
               term_union Uast Kdoubleop
@@ -692,71 +793,116 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
                     term_var "bw";
                     term_var "src_reg";
                     term_var "src_am";
-                    (* term_val (ty.enum Eam) INDEXED_MODE; *)
                     term_var "dest_reg";
-                    term_val (ty.enum Eam) REGISTER_MODE]);
+                    term_var "dest_am"]);
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
             term_var "u" = term_val ty.unit tt
 
-          ∗ asn_exist_registers
-
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ (∃ "pc_new", PC_reg ↦ term_var "pc_new")
+          ∗ ∃ "pc_new",
+            (PC_reg ↦ term_var "pc_new"
+               ∗ asn_untrusted_or_entry_point (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
 
-          ∗ asn_accessible_addresses "pc_old" "ipectl" "segb1" "segb2";
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
       |}.
 
     Definition sep_contract_execute_jump :
       SepContractFun execute :=
       {|
         sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc" :: ty.wordBits
-          ; "instr" :: ty.union Uast
-          ; "jump_arg" :: unionk_ty Uast Kjump ];
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc" :: ty.wordBits; "srcg1" :: ty.wordBits
+          ; "instr" :: ty.union Uast; "jump_arg" :: unionk_ty Uast Kjump ];
 
         sep_contract_localstore := [term_var "instr"];
 
         sep_contract_precondition :=
-            asn_exist_registers
-
-          ∗ PC_reg         ↦ term_var "pc"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+            PC_reg         ↦ term_var "pc"
+          ∗ SRCG1_reg      ↦ term_var "srcg1"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
+          ∗ asn_ipe_configured (term_var "ipectl")
           ∗ asn_untrusted
-              (term_var "ipectl") (term_var "segb1")
-              (term_var "segb2") (term_var "pc")
+              (term_var "segb1") (term_var "segb2") (term_var "pc")
 
           ∗ term_var "instr" = term_union Uast Kjump (term_var "jump_arg");
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
             term_var "u" = term_val ty.unit tt
-          ∗ asn_exist_registers
 
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
+          ∗ SRCG1_reg      ↦ term_var "srcg1"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ ∃ "pc_new",
-            ( PC_reg ↦ term_var "pc_new"
-
-            ∗ asn_access_allowed
-                (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-                (term_enum Eaccess_mode X) (term_var "pc") (term_var "pc_new"));
+            (PC_reg ↦ term_var "pc_new"
+             ∗ (asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new")
+                ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new")));
       |}.
 
+    Definition sep_contract_execute_call :
+      SepContractFun execute :=
+      {|
+        sep_contract_logic_variables :=
+          [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+          ; "pc_old" :: ty.wordBits
+          ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister; "am" :: ty.enum Eam
+          ; "instr" :: ty.union Uast ];
+
+        sep_contract_localstore := [term_var "instr"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc_old"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs
+
+          ∗ term_var "instr" =
+              term_union Uast Ksingleop
+                (term_tuple
+                   [ term_val (ty.enum Esingleop) CALL
+                   ; term_var "bw"
+                   ; term_var "am"
+                   ; term_var "reg"]);
+
+        sep_contract_result          := "u";
+        sep_contract_postcondition   :=
+            term_var "u" = term_val ty.unit tt
+
+          ∗ ∃ "pc_new",
+            (PC_reg ↦ term_var "pc_new"
+             ∗ (asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new")
+                ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new")))
+
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs
+      |}.
+
+    (*
     Definition sep_contract_execute :
       SepContractFun execute :=
       {|
@@ -774,7 +920,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ asn_accessible_addresses "pc" "ipectl" "segb1" "segb2";
+          ∗ asn_accessible_addresses "segb1" "segb2";
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
@@ -816,22 +962,25 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
 
             ∗ asn_accessible_addresses "pc_new" "ipectl" "segb1_new" "segb2_new");
       |}.
+     *)
 
     (* The following maps μSail function names to their contracts. *)
     Definition CEnv : SepContractEnv :=
       fun Δ τ f =>
         match f with
-        | read_mem_aux => Some sep_contract_read_mem_aux
-        | read_mpu_reg_byte => Some sep_contract_read_mpu_reg_byte
         | check_byte_access => Some sep_contract_check_byte_access
-        | setPC => Some sep_contract_set_pc
-        | incPC => Some sep_contract_inc_pc
+        | read_mem_aux => Some sep_contract_read_mem_aux
+        | write_mpu_reg_byte => Some sep_contract_write_mpu_reg_byte
+        | writeMem => Some sep_contract_writeMem
+        | setPC => Some sep_contract_setPC
+        | incPC => Some sep_contract_incPC
         | fetch => Some sep_contract_fetch
+        | read_am_register => Some sep_contract_read_register
         | read_indexed => Some sep_contract_read_indexed
         | read_indirect => Some sep_contract_read_indirect
         | read_autoincrement => Some sep_contract_read_autoincrement
-
-          (* | execute => Some sep_contract_execute *)
+        | write_am_register => Some sep_contract_write_register
+        | write_indexed => Some sep_contract_write_indexed
         | _ => None
         end.
 
@@ -867,30 +1016,92 @@ Module MSP430Executor :=
 Import MSP430Executor.
 Import MSP430Executor.Symbolic.
 
-Ltac symbolic_simpl_reflect :=
-  apply validcontract_reflect_sound;
-  compute;
-  constructor;
-  cbn.
+Definition VcGenErasure {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) : Erasure.ESymProp :=
+  Erasure.erase_symprop (postprocess (SPureSpec.replay (postprocess (vcgen default_config 10 c body wnil)))).
 
-Ltac symbolic_simpl_fuel :=
-  apply validcontract_reflect_fuel_sound;
-  compute;
-  constructor;
-  cbn.
+Definition ValidContractWithErasure {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) : Prop :=
+  VerificationConditionWithErasure (VcGenErasure c body).
 
-Ltac symbolic_simpl_erasure :=
+Lemma verification_condition_with_erasure_sound (p : 𝕊 ctx.nil) :
+  VerificationConditionWithErasure (Erasure.erase_symprop p) ->
+  VerificationCondition p.
+Proof. intros [H]. constructor. now rewrite <- Erasure.erase_safe. Qed.
+
+Lemma validcontract_with_erasure_sound {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) :
+  ValidContractWithErasure c body ->
+  ValidContractWithFuel 10 c body.
+Proof. Admitted.
+
+Ltac symbolic_simpl :=
   apply validcontract_with_erasure_sound;
   compute;
   constructor;
-  cbn.
+  cbn [Erasure.inst_symprop Erasure.erase_valuation Erasure.erase_symprop Erasure.erase_formula].
 
-Lemma valid_contract_execute_move : Symbolic.ValidContractWithFuel 100 sep_contract_execute_move fun_execute.
+Lemma valid_contract_read_register : Symbolic.ValidContractWithFuel 10 sep_contract_read_register fun_read_register.
 Proof.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
-  repeat split; intros; exists [bv 0]; split; [assumption|exact I].
+  symbolic_simpl. exact I.
+Qed.
+
+Lemma valid_contract_write_register : Symbolic.ValidContractWithFuel 10 sep_contract_write_register fun_write_register.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+Lemma valid_contract_read_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+Lemma valid_contract_read_indirect : Symbolic.ValidContractWithFuel 10 sep_contract_read_indirect fun_read_indirect.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10 sep_contract_read_autoincrement fun_read_autoincrement.
+Proof.
+  symbolic_simpl.
+  repeat split; try assumption.
+  - exfalso.
+    cbn in H1. cbn in H4. cbn in H5.
+    rewrite H5 in H4.
+    clear - H4 H1.
+    admit. (* TODO add to preconditions *)
+  - cbn in H5. rewrite H5 in H4. assumption.
+  - admit. (* TODO same but with +1 instead of +2 *)
+  - cbn in H5. rewrite H5 in H4. assumption.
+Admitted.
+
+Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+Lemma valid_contract_execute_move : Symbolic.ValidContractWithFuel 10 sep_contract_execute_move fun_execute.
+Proof.
+  symbolic_simpl.
+  repeat split; try assumption;
+    right; (split;
+            [(assumption || cbn; cbn in H10; cbn in H8; rewrite <-H10; assumption)
+            | exact I]).
+Qed.
+
+Lemma valid_contract_execute_jump : Symbolic.ValidContractWithFuel 10 sep_contract_execute_jump fun_execute.
+Proof.
+  symbolic_simpl.
+  repeat split; try assumption;
+    left; (split; [assumption | exact I]).
+Qed.
+
+Lemma valid_contract_execute_call : Symbolic.ValidContractWithFuel 10 sep_contract_execute_call fun_execute.
+Proof.
+  symbolic_simpl.
+  repeat split; try assumption;
+    left; (split; [assumption | exact I]).
 Qed.
 
 
@@ -898,84 +1109,72 @@ Qed.
 
 
 
-Lemma valid_contract_check_byte_access : Symbolic.ValidContractReflect sep_contract_check_byte_access fun_check_byte_access.
-Proof. Admitted.
 
-Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 100 sep_contract_read_mem_aux fun_read_mem_aux.
-Proof. Admitted.
 
-Lemma valid_contract_execute_set_pc : Symbolic.ValidContract sep_contract_set_pc fun_setPC.
-Proof. symbolic_simpl_reflect. Qed.
 
-Lemma valid_contract_execute_inc_pc : Symbolic.ValidContract sep_contract_inc_pc fun_incPC.
+
+
+
+
+(* XXX *)
+Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
 Proof.
-  compute. constructor. cbn [SymProp.safe instprop instprop_formula].
-  intros.
-  repeat split;
-    cbn;
-    rewrite <-bv.of_Z_add, bv.of_Z_unsigned, bv.add_comm;
-    reflexivity.
+  symbolic_simpl.
+  repeat split; intros;
+    rewrite H in H2; try discriminate H2;
+    cbn in H1; cbn in H5; cbn in H6;
+    exfalso; destruct H1; lia.
 Qed.
 
+Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+(* XXX slow *)
+Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
+Proof.
+  symbolic_simpl.
+  repeat split; intros;
+    try (rewrite H0 in H10; exfalso; cbn in H10; apply H10; reflexivity);
+    rewrite H0 in H11; exfalso; cbn in H11; apply H11; reflexivity.
+Qed.
+
+Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
+Proof.
+  symbolic_simpl.
+  repeat split; intros; assumption.
+Qed.
+
+(* XXX slow *)
+Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
+Proof.
+  symbolic_simpl.
+  repeat split; intros; assumption.
+Qed.
+
+Lemma valid_contract_incPC : Symbolic.ValidContract sep_contract_incPC fun_incPC.
+Proof.
+  (* compute. constructor. cbn [SymProp.safe instprop instprop_formula]. *)
+  (* repeat split; intros; try assumption. *)
+  (* exfalso. clear - H1 H2. *)
+  (* cbn in H1. cbn in H2. *)
+  (* destruct H1. *)
+  (* rewrite bv.unsigned_add in H2. *)
+  (* unfold bv.truncz in H2. *)
+  (* cbn in H2. *)
+Admitted. (* TODO *)
+
+(* XXX slow *)
 Lemma valid_contract_fetch : Symbolic.ValidContract sep_contract_fetch fun_fetch.
 Proof.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
-
-  intros.
-  exists v0. exists v1. exists v2. exists v3.
-  intro.
-  repeat split;
-    intros;
-    exists v; exists v4;
-    repeat split; assumption.
+  symbolic_simpl.
+  repeat (intros; repeat exists [bv 0]; split; try assumption).
 Qed.
 
-Lemma valid_contract_read_indexed : Symbolic.ValidContractWithFuel 100 sep_contract_read_indexed fun_read_indexed.
-Proof.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
 
-  intros.
-  repeat split; intros; exists [bv 0];
-    (split; [assumption | intros; repeat exists [bv 0]; exact I]).
-Qed.
 
-Lemma valid_contract_read_indirect : Symbolic.ValidContractWithFuel 100 sep_contract_read_indirect fun_read_indirect.
-Proof.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
-
-  intros. repeat split; assumption.
-Qed.
-
-Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 100 sep_contract_read_autoincrement fun_read_autoincrement.
-Proof.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
-
-  intros. repeat split; assumption.
-Qed.
-
-Lemma valid_contract_execute_jump : Symbolic.ValidContractWithFuel 100 sep_contract_execute_jump fun_execute.
-Proof.
-  apply validcontract_reflect_fuel_sound.
-  compute.
-  constructor.
-  cbn [SymProp.safe instprop instprop_formula].
-  intros until v20.
-  intros _ Hpc;
-    repeat split;
-    try intros _;
-    try apply Hpc;
-    (destruct Hpc as [Hpc | Hpc];
-     [right | left]; right;
-     rewrite rightid_and_true; apply Hpc).
-Qed.
 
 
 (*
@@ -983,4 +1182,5 @@ Qed.
     rewrite Z.add_comm with (n := 8).
     apply Z.add_lt_mono; [assumption | reflexivity].
     rewrite <-bv.of_Z_add, <-bv.of_N_add, bv.of_Z_unsigned, bv.of_N_bin, bv.add_comm;
+
 *)

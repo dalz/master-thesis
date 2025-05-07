@@ -65,8 +65,8 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Definition 𝑯_Ty (p : 𝑯) : Ctx Ty :=
       match p with
       | ptstomem => [ty.Address; ty.byteBits]
-      | accessible_addresses => [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits]
-      | accessible_addresses_without => [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits; ty.Address]
+      | accessible_addresses => [ty.wordBits; ty.wordBits]
+      | accessible_addresses_without => [ty.wordBits; ty.wordBits; ty.Address]
       end.
 
     (* 𝑯_is_dup specifies which predicates are duplicable. A spatial predicate can
@@ -86,8 +86,8 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Definition 𝑯_precise (p : 𝑯) : option (Precise 𝑯_Ty p) :=
       match p with
       | ptstomem => Some (MkPrecise [ty.Address] [ty.byteBits] eq_refl)
-      | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits] ε eq_refl)
-      | accessible_addresses_without => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.wordBits; ty.wordBits; ty.Address] ε eq_refl)
+      | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits] ε eq_refl)
+      | accessible_addresses_without => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.Address] ε eq_refl)
       end.
 
   End PredicateKit.

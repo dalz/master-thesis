@@ -173,8 +173,9 @@ function read_autoincrement(bw, reg) = match (bw, reg) {
   (bw, reg) =>
     let incVal : bits(16) = match bw { WORD_INSTRUCTION => 0x0002, BYTE_INSTRUCTION => 0x0001 } in
     let Word(address) : WordByte = read(WORD_INSTRUCTION, reg, REGISTER_MODE) in
+    let v : WordByte = XmemInstruction(bw,address) in
     { write(WORD_INSTRUCTION, reg, REGISTER_MODE, Word(address + incVal));
-      XmemInstruction(bw,address) }
+      v }
 }
 
 function write(bw, reg, am, v) = match am {
