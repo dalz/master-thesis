@@ -603,12 +603,15 @@ Module Import MSP430Program <: Program MSP430Base.
     Inductive FunX : PCtx -> Ty -> Set :=
     | read_ram  : FunX ["addr" ∷ ty.wordBits] ty.byteBits
     | write_ram : FunX ["addr" ∷ ty.wordBits; "data" ∷ ty.byteBits] ty.unit
-    | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n).
+    | undefined_bitvector {n} : FunX [ "x" ∷ ty.int ] (ty.bvec n)
+    | decode : FunX [ "w" :: ty.union Uwordbyte ] (ty.union Uast). (* could take a bv 16, but this is more convenient since fetch returns a WordByte... *)
 
     Inductive Lem : PCtx -> Set :=
     | extract_accessible_ptsto : Lem ["addr" :: ty.Address; "m" :: ty.enum Eaccess_mode]
     | return_accessible_ptsto : Lem ["addr" :: ty.Address]
-    (* | change_accessible_pc : Lem ["pc_old" :: ty.wordBits] *).
+    | open_ptsto_instr : Lem ["addr" :: ty.Address]
+    | close_ptsto_instr : Lem ["addr" :: ty.Address(* ; "w" :: ty.wordBits *)]
+    .
 
     Definition 𝑭  : PCtx -> Ty -> Set := Fun.
     Definition 𝑭𝑿 : PCtx -> Ty -> Set := FunX.
@@ -12360,6 +12363,8 @@ Module Import MSP430Program <: Program MSP430Base.
   Include DefaultRegStoreKit MSP430Base.
   
   Section ForeignKit.
+    Axiom pure_decode : WordByte -> string + ast.
+
     Definition fun_read_ram (μ : Memory) (addr : Val ty.Address) : Val ty.byteBits
       := μ addr.
 
@@ -12375,7 +12380,9 @@ Module Import MSP430Program <: Program MSP430Base.
     ForeignCall read_ram [addr] res γ γ' μ μ' =>
       (γ' , μ' , res) = (γ , μ , inr (fun_read_ram μ addr));
     ForeignCall write_ram [addr; val] res γ γ' μ μ' =>
-      (γ' , μ' , res) = (γ , fun_write_ram μ addr val , inr tt).
+      (γ' , μ' , res) = (γ , fun_write_ram μ addr val , inr tt);
+    ForeignCall decode [code] res γ γ' μ μ' =>
+      (γ' , μ' , res) = (γ , μ , pure_decode code).
 
     Lemma ForeignProgress {σs σ} (f : 𝑭𝑿 σs σ) (args : NamedEnv Val σs) γ μ :
       exists γ' μ' res, ForeignCall f args res γ γ' μ μ'.

@@ -43,9 +43,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     Lemma Δ.
 
   Section ContractDefKit.
-    (* Local Notation "x + y" := (term_binop bop.plus x y). *)
-    Local Notation "x ++ y" := (term_binop (@bop.bvapp _ 8 8) x y).
-
     Local Notation "r m↦ v" := (asn.chunk (chunk_user ptstomem [r; v])) (at level 70).
     Local Notation "x <> y" := (asn.formula (formula_relop bop.neq x y)) : asn_scope.
     (* Local Notation "x <> y" := (term_binop (bop.relop bop.neq) x y) : asn_scope. *)
@@ -201,7 +198,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     (* Lemmas *)
 
     Definition lemma_extract_accessible_ptsto : SepLemma extract_accessible_ptsto :=
-      {| lemma_logic_variables :=
+      {|
+        lemma_logic_variables :=
           [ "addr" :: ty.Address; "m" :: ty.enum Eaccess_mode
           ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
           ];
@@ -226,7 +224,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       |}.
 
     Definition lemma_return_accessible_ptsto : SepLemma return_accessible_ptsto :=
-      {| lemma_logic_variables :=
+      {|
+        lemma_logic_variables :=
           [ "addr" :: ty.Address; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ];
 
         lemma_patterns := [term_var "addr"];
@@ -236,6 +235,22 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ ∃ "v", term_var "addr" m↦ term_var "v";
 
         lemma_postcondition := asn_accessible_addresses "segb1" "segb2";
+      |}.
+
+    Definition lemma_open_ptsto_instr : SepLemma open_ptsto_instr :=
+      {|
+        lemma_logic_variables := ["addr" :: ty.Address];
+        lemma_patterns        := [term_var "addr"];
+        lemma_precondition    := ⊤;
+        lemma_postcondition   := ⊤;
+      |}.
+
+    Definition lemma_close_ptsto_instr : SepLemma close_ptsto_instr :=
+      {|
+        lemma_logic_variables := ["addr" :: ty.Address; "w" :: ty.wordBits];
+        lemma_patterns        := [term_var "addr"(* ; term_var "w" *)];
+        lemma_precondition    := ⊤;
+        lemma_postcondition   := ⊤;
       |}.
 
     (* Foreign function contracts *)
@@ -273,6 +288,15 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         sep_contract_postcondition   :=
           term_var "addr" m↦ term_var "v"
           ∗ term_var "u" = term_val ty.unit tt;
+      |}.
+
+    Definition sep_contract_decode : SepContractFunX decode :=
+      {|
+        sep_contract_logic_variables := ["w" :: ty.union Uwordbyte];
+        sep_contract_localstore      := [term_var "w"];
+        sep_contract_precondition    := ⊤;
+        sep_contract_result          := "i";
+        sep_contract_postcondition   := ⊤;
       |}.
 
     (* μSail function contracts *)
@@ -999,7 +1023,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         match l with
         | extract_accessible_ptsto => lemma_extract_accessible_ptsto
         | return_accessible_ptsto => lemma_return_accessible_ptsto
-        (* | change_accessible_pc => lemma_change_accessible_pc *)
+        | open_ptsto_instr => lemma_open_ptsto_instr
+        | close_ptsto_instr => lemma_close_ptsto_instr
         end.
   End ContractDefKit.
 End MSP430Specification.
@@ -1151,7 +1176,7 @@ Qed.
 Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
 Proof.
   symbolic_simpl.
-  repeat split; intros; assumption.
+  repeat split; assumption.
 Qed.
 
 Lemma valid_contract_incPC : Symbolic.ValidContract sep_contract_incPC fun_incPC.

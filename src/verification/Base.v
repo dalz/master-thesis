@@ -246,6 +246,12 @@ Inductive astConstructor : Set :=
   | Kjump             
   | Kdoesnotunderstand.
 
+Inductive instr_or_data :=
+| I (i : ast)
+| D (d : bv 16).
+
+Inductive instr_or_data_constructor := Ki | Kd.
+
 Definition OffsetLen :=
   10.
 
@@ -266,7 +272,8 @@ Inductive Enums : Set :=
 Inductive Unions : Set :=
   | Uexception
   | Uwordbyte 
-  | Uast      .
+  | Uast
+  | Uinstr_or_data.
 
 Inductive Records : Set := .
 
@@ -287,6 +294,8 @@ Section TransparentObligations.
   Derive NoConfusion for access_mode.
   Derive NoConfusion for ast.
   Derive NoConfusion for astConstructor.
+  Derive NoConfusion for instr_or_data.
+  Derive NoConfusion for instr_or_data_constructor.
   Derive NoConfusion for Enums.
   Derive NoConfusion for Unions.
   Derive NoConfusion for Records.
@@ -307,6 +316,8 @@ Derive EqDec for mpu_register_name.
 Derive EqDec for access_mode.
 Derive EqDec for ast.
 Derive EqDec for astConstructor.
+Derive EqDec for instr_or_data.
+Derive EqDec for instr_or_data_constructor.
 Derive EqDec for Enums.
 Derive EqDec for Unions.
 Derive EqDec for Records.
@@ -465,6 +476,12 @@ Section Finite.
               Kjump;
               Kdoesnotunderstand
             ]|}.
+
+  #[export,program] Instance instr_or_data_constructor_finite : Finite instr_or_data_constructor :=
+    {|enum:=[
+              Ki;
+              Kd
+            ]|}.
 End Finite.
 
 Module Export MSP430Base <: Base.
@@ -508,7 +525,8 @@ Module Export MSP430Base <: Base.
     | Uexception => exception
     | Uwordbyte  => WordByte
     | Uast       => ast
-    end.
+    | Uinstr_or_data => instr_or_data
+end.
   
   Definition record_denote (r : Records) : Set :=
     match r with
@@ -526,6 +544,7 @@ Module Export MSP430Base <: Base.
     | Uexception => exceptionConstructor
     | Uwordbyte  => WordByteConstructor
     | Uast       => astConstructor
+    | Uinstr_or_data => instr_or_data_constructor
     end.
   
   Definition union_constructor_type (u : Unions) : union_constructor u -> Ty :=
@@ -561,6 +580,11 @@ Module Export MSP430Base <: Base.
                              | Kjump              => ty.prod (ty.enum Ejump) (ty.bvec (10))
                              | Kdoesnotunderstand => ty.bvec (16)
                              end
+
+    | Uinstr_or_data => fun k => match k with
+                                 | Ki => ty.union Uast
+                                 | Kd => ty.wordBits
+                                 end
     end.
   
   #[export] Instance eqdec_enum_denote E : EqDec (enum_denote E) :=
@@ -597,6 +621,10 @@ Module Export MSP430Base <: Base.
                               | existT Kjump (ж1, ж2)                             => JUMP ж1 ж2
                               | existT Kdoesnotunderstand ж1                       => DOESNOTUNDERSTAND ж1
                               end
+    | Uinstr_or_data => fun Kv => match Kv with
+                              | existT Ki i => I i
+                              | existT Kd d => D d
+                              end
     end.
   
   Definition union_unfold (U : unioni) : uniont U -> { K & Val (union_constructor_type U K) } :=
@@ -620,6 +648,10 @@ Module Export MSP430Base <: Base.
                               | JUMP ж1 ж2                     => existT Kjump (ж1, ж2)
                               | DOESNOTUNDERSTAND ж1            => existT Kdoesnotunderstand ж1
                               end
+    | Uinstr_or_data => fun Kv => match Kv with
+                                  | I i => existT Ki i
+                                  | D d => existT Kd d
+                                  end
     end.
 
   Definition record_field_type (R : recordi) : NCtx string Ty :=

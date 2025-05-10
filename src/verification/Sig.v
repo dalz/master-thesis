@@ -27,6 +27,8 @@ Inductive PurePredicate : Set := .
 
 Inductive Predicate :=
 | ptstomem
+| ptstoinstr
+| encodes_instr
 | accessible_addresses
 | accessible_addresses_without.
 
@@ -65,6 +67,8 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Definition 𝑯_Ty (p : 𝑯) : Ctx Ty :=
       match p with
       | ptstomem => [ty.Address; ty.byteBits]
+      | ptstoinstr => [ty.Address; ty.union Uinstr_or_data]
+      | encodes_instr => [ty.wordBits; ty.union Uast]
       | accessible_addresses => [ty.wordBits; ty.wordBits]
       | accessible_addresses_without => [ty.wordBits; ty.wordBits; ty.Address]
       end.
@@ -74,7 +78,7 @@ Module Export MSP430Signature <: Signature MSP430Base.
      using the Iris logic, while pure predicates are defined using standard
      Coq. *)
     Global Instance 𝑯_is_dup : IsDuplicable Predicate := {
-        is_duplicable p := false
+        is_duplicable p := match p with encodes_instr => true | _ => false end
       }.
 
     Instance 𝑯_eq_dec : EqDec 𝑯 := Predicate_eqdec.
@@ -86,6 +90,8 @@ Module Export MSP430Signature <: Signature MSP430Base.
     Definition 𝑯_precise (p : 𝑯) : option (Precise 𝑯_Ty p) :=
       match p with
       | ptstomem => Some (MkPrecise [ty.Address] [ty.byteBits] eq_refl)
+      | ptstoinstr => Some (MkPrecise [ty.Address] [ty.union Uinstr_or_data] eq_refl)
+      | encodes_instr => Some (MkPrecise [ty.wordBits] [ty.union Uast] eq_refl)
       | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits] ε eq_refl)
       | accessible_addresses_without => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.Address] ε eq_refl)
       end.
