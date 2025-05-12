@@ -30,6 +30,8 @@ Import asn.notations.
 
 Import MSP430Program.
 
+Definition I := Logic.I.
+
 Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MSP430Program.
   Include SpecificationMixin MSP430Base MSP430Signature MSP430Program.
 
@@ -1015,6 +1017,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         | @undefined_bitvector n => sep_contract_undefined_bitvector n
         | read_ram => sep_contract_read_ram
         | write_ram => sep_contract_write_ram
+        | decode => sep_contract_decode
         end.
 
     (* And finally a mapping from ghost lemmas to the entailments they encode. *)
@@ -1062,6 +1065,60 @@ Ltac symbolic_simpl :=
   compute;
   constructor;
   cbn [Erasure.inst_symprop Erasure.erase_valuation Erasure.erase_symprop Erasure.erase_formula].
+Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
+Proof.
+  symbolic_simpl.
+  repeat split; intros.
+  1: cbn in H; cbn in H2; rewrite H in H2; discriminate H2.
+  all: cbn in H1; cbn in H5; cbn in H6; exfalso; destruct H1; lia.
+Qed.
+
+Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
+Proof.
+  symbolic_simpl.
+  repeat split; assumption.
+Qed.
+
+(* XXX *)
+Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
+Proof. Admitted.
+(*   symbolic_simpl. *)
+(*   repeat split; intros; *)
+(*     try (rewrite H0 in H10; exfalso; cbn in H10; apply H10; reflexivity); *)
+(*     rewrite H0 in H11; exfalso; cbn in H11; apply H11; reflexivity. *)
+(* Qed. *)
+
+Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
+Proof.
+  symbolic_simpl.
+  repeat split; intros; assumption.
+Qed.
+
+(* XXX *)
+Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
+Proof. Admitted.
+(*   symbolic_simpl. *)
+(*   repeat split; assumption. *)
+(* Qed. *)
+
+Lemma valid_contract_incPC : Symbolic.ValidContract sep_contract_incPC fun_incPC.
+Proof.
+  (* compute. constructor. cbn [SymProp.safe instprop instprop_formula]. *)
+  (* repeat split; intros; try assumption. *)
+  (* exfalso. clear - H1 H2. *)
+  (* cbn in H1. cbn in H2. *)
+  (* destruct H1. *)
+  (* rewrite bv.unsigned_add in H2. *)
+  (* unfold bv.truncz in H2. *)
+  (* cbn in H2. *)
+Admitted. (* TODO probably needs more preconditions *)
+
+(* XXX *)
+Lemma valid_contract_fetch : Symbolic.ValidContract sep_contract_fetch fun_fetch.
+Proof. Admitted.
+(*   symbolic_simpl. *)
+(*   repeat (intros; repeat exists [bv 0]; split; try assumption). *)
+(* Qed. *)
 
 Lemma valid_contract_read_register : Symbolic.ValidContractWithFuel 10 sep_contract_read_register fun_read_register.
 Proof.
@@ -1128,76 +1185,6 @@ Proof.
   repeat split; try assumption;
     left; (split; [assumption | exact I]).
 Qed.
-
-
-
-
-
-
-
-
-
-
-
-
-
-(* XXX *)
-Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
-Proof.
-  symbolic_simpl.
-  repeat split; intros;
-    rewrite H in H2; try discriminate H2;
-    cbn in H1; cbn in H5; cbn in H6;
-    exfalso; destruct H1; lia.
-Qed.
-
-Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
-
-(* XXX slow *)
-Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
-Proof.
-  symbolic_simpl.
-  repeat split; intros;
-    try (rewrite H0 in H10; exfalso; cbn in H10; apply H10; reflexivity);
-    rewrite H0 in H11; exfalso; cbn in H11; apply H11; reflexivity.
-Qed.
-
-Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
-Proof.
-  symbolic_simpl.
-  repeat split; intros; assumption.
-Qed.
-
-(* XXX slow *)
-Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
-
-Lemma valid_contract_incPC : Symbolic.ValidContract sep_contract_incPC fun_incPC.
-Proof.
-  (* compute. constructor. cbn [SymProp.safe instprop instprop_formula]. *)
-  (* repeat split; intros; try assumption. *)
-  (* exfalso. clear - H1 H2. *)
-  (* cbn in H1. cbn in H2. *)
-  (* destruct H1. *)
-  (* rewrite bv.unsigned_add in H2. *)
-  (* unfold bv.truncz in H2. *)
-  (* cbn in H2. *)
-Admitted. (* TODO *)
-
-(* XXX slow *)
-Lemma valid_contract_fetch : Symbolic.ValidContract sep_contract_fetch fun_fetch.
-Proof.
-  symbolic_simpl.
-  repeat (intros; repeat exists [bv 0]; split; try assumption).
-Qed.
-
 
 
 
