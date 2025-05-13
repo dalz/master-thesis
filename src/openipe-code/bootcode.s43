@@ -1,4 +1,9 @@
-.include "pmem_defs.asm"
+; .include "pmem_defs.asm"
+
+.set MPUIPC0,                (0x05AA)
+.set MPUIPSEGB2,             (0x05AC)
+.set MPUIPSEGB1,             (0x05AE)
+.set PMEM_BASE,              (0x4400)
 
     /*
      * "Two IPE signatures, IPE Signature 1 (memory location 0FF88h) and IPE
@@ -10,7 +15,6 @@
 .set IPE_SIG_VALID_SRC,      (0xFF88)
 .set IPE_STRUCT_POINTER_SRC, (0xFF8A)
 .set VALID_FLAG,             (0xAAAA)
-.set RESET_VECTOR,           (0xFFFE)
 
     /*
      * "On bootcode execution, a valid IPE Signature 1 triggers the transfer of
@@ -72,9 +76,15 @@ mass_erase_loop:
     clr &saved_ptr  ; clear saved pointer only after the device has been erased
 
 end:
-    br &RESET_VECTOR
+    jmp trampoline
 
 /* ************************************************************************* */
     ; secured nonvolatile system data area
 saved_ptr:
     .word 0
+
+        /* ------------------  FIRMWARE TRAMPOLINE TO RESET  --------------- */
+
+    .section .fw_trampoline, "a"
+trampoline:
+    br &0xFFFE
