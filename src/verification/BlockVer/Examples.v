@@ -43,29 +43,26 @@ Module Examples.
   Definition minimal_post {Σ} : Assertion Σ := minimal_pre.
 
   Definition VC_triple {Σ}
-    (P : Assertion (Σ ▻ "a" :: ty.Address))
+    (P : Assertion (Σ ▻ "a" :: ty.wordBits))
     (i : list ast_with_args)
-    (Q : Assertion (Σ ▻ "a" :: ty.Address ▻ "an" :: ty.Address))
+    (Q : Assertion (Σ ▻ "a" :: ty.wordBits ▻ "an" :: ty.wordBits))
   :=
-    cblock_verification_condition (minimal_pre ∗ P) i (minimal_post ∗ Q).
-
+    sblock_verification_condition
+      (minimal_pre ∗ P) i (minimal_post ∗ Q) wnil.
 
   Definition Valid_VC {Σ}
     (P : Assertion (Σ ▻ "a" :: ty.Address))
     (i : list ast_with_args)
     (Q : Assertion (Σ ▻ "a" :: ty.Address ▻ "an" :: ty.Address))
   :=
-    VC_triple P i Q
-    (* safeE (postprocess (VC_triple P i Q)) *).
+    safeE (postprocess (VC_triple P i Q)).
 
-  (*
   Definition Debug_VC {Σ}
     (P : Assertion (Σ ▻ "a" :: ty.Address))
     (i : list ast_with_args)
     (Q : Assertion (Σ ▻ "a" :: ty.Address ▻ "an" :: ty.Address))
   :=
     VerificationCondition (postprocess (VC_triple P i Q)).
-   *)
 
   Record BlockVerifierContract {Σ} :=
     MkBlockVerifierContract
@@ -110,7 +107,7 @@ Module Examples.
         ∃ "v", R5_reg ↦ term_var "v"
     }}
 
-    [MOV_WRR R4 R5]
+    [mov_rr R4 R5]
 
     {{
         R4_reg ↦ term_val ty.wordBits [bv 42] ∗
@@ -119,9 +116,8 @@ Module Examples.
 
   Example valid_ex_move_register : ValidBlockVerifierContract ex_mov_register.
   Proof.
-    (* solve_vc. *)
-   vm_compute.
-vm_compute; constructor; cbn; intros; repeat split; try solve_bv; auto
+    solve_vc.
+
   Qed.
 
 End Examples.

@@ -50,7 +50,6 @@ Section BlockVerificationDerived.
   Import MSP430BlockVerifExecutor.
   Import MSP430BlockVerifShalExecutor.
 
-  (*
   Definition safeE {Σ} : 𝕊 Σ -> Prop :=
     fun P => VerificationConditionWithErasure (Erasure.erase_symprop P).
 
@@ -60,7 +59,6 @@ Section BlockVerificationDerived.
     destruct 1 as [H].
     now apply Erasure.erase_safe'.
   Qed.
-  *)
 
   Local Notation "r m↦ v" := (asn.chunk (chunk_user ptstomem [r; v])) (at level 70).
   Local Notation "r i↦ v" := (asn.chunk (chunk_user ptstoinstr [r; v])) (at level 70).
@@ -91,7 +89,6 @@ Section BlockVerificationDerived.
     Import SHeapSpec SHeapSpec.notations.
     Import asn.notations.
 
-
     Definition ptstoinstr_with_args {Σ} addr (i : ast_with_args) : Assertion Σ :=
       addr i↦ term_val (ty.union Uinstr_or_data) (I (instr_without_args i))
       ∗ match i with
@@ -108,16 +105,73 @@ Section BlockVerificationDerived.
         PC_reg ↦ term_var "a"
       ∗ ptstoinstr_with_args (term_var "a") i.
 
-    (* ∃ "an", nextpc ↦ term_var "an" *) (* TODO what is nextpc? *)
-
     Definition exec_instruction_epilogue (i : ast_with_args) :
       Assertion ([ctx] ▻ ("a":: ty.Address) ▻ ("na":: ty.Address))
     :=
         PC_reg ↦ term_var "na"
       ∗ ptstoinstr_with_args (term_var "a") i.
-  
-      (* ∗ nextpc ↦ term_var "na" *)
 
+    Definition sexec_instruction (i : ast_with_args) :
+      ⊢ STerm ty.Address -> SHeapSpec (STerm ty.Address) :=
+      let inline_fuel := 10%nat in
+      fun _ a =>
+        ⟨ θ1 ⟩ _ <- produce
+                      (exec_instruction_prologue i)
+                      [env].["a"∷_ ↦ a] ;;
+
+        ⟨ θ2 ⟩ w <- evalStoreSpec
+                      (sexec default_config inline_fuel (FunDef fetch) _)
+                      [env].["_ж716"∷_ ↦ term_val ty.unit tt] ;;
+        ⟨ θ3 ⟩ d <- sexec_call_foreign decode
+                      [env].["w"∷_ ↦ w] ;;
+        ⟨ θ4 ⟩ _ <- evalStoreSpec
+                      (sexec default_config inline_fuel (FunDef execute) _)
+                      [env].["merge#var"∷_ ↦ d] ;;
+
+
+        ⟨ θ5 ⟩ na <- angelic None _ ;;
+        let a5 := persist__term a (θ1 ∘ θ2 ∘ θ3 ∘ θ4 ∘ θ5) in
+        ⟨ θ6 ⟩ _ <- consume
+                       (exec_instruction_epilogue i)
+                       [env].["a"∷_ ↦ a5].["na"∷_ ↦ na] ;;
+        pure (persist__term na θ6).
+
+
+    Fixpoint sexec_block_addr (b : list ast_with_args) :
+      ⊢ STerm ty.Address -> STerm ty.Address -> SHeapSpec (STerm ty.Address) :=
+      fun _ ainstr apc =>
+        match b with
+        | nil       => pure apc
+        | cons i b' =>
+            ⟨ θ1 ⟩ _    <- assert_formula (fun _ => amsg.empty)
+                             (formula_relop bop.eq ainstr apc) ;;
+            ⟨ θ2 ⟩ apc' <- sexec_instruction i (persist__term apc θ1) ;;
+            sexec_block_addr b'
+              (term_binop bop.bvadd
+                 (persist__term ainstr (θ1 ∘ θ2))
+                 (term_val ty.wordBits (instr_size (instr_without_args i))))
+              apc'
+        end.
+
+    Definition sexec_triple_addr {Σ : LCtx}
+      (req : Assertion (Σ ▻ ("a"::ty.Address))) (b : list ast_with_args)
+      (ens : Assertion (Σ ▻ ("a"::ty.Address) ▻ ("an"::ty.Address))) :
+      ⊢ SHeapSpec Unit :=
+      fun w =>
+        ⟨ θ0 ⟩ δ <- demonic_ctx id Σ ;;
+        ⟨ θ1 ⟩ a <- demonic (Some "a") _ ;;
+        let δ1 := env.snoc (persist ( A:= Sub Σ) δ θ1) _ a in
+        ⟨ θ2 ⟩ _ <- produce req δ1 ;;
+        let a2 := persist__term a θ2 in
+        ⟨ θ3 ⟩ na <- sexec_block_addr b a2 a2 ;;
+        let δ3 := persist δ1 (θ2 ∘ θ3) in
+        consume ens δ3.["an"∷ty.Address ↦ na].
+
+    Definition sblock_verification_condition {Σ : LCtx}
+      (req : Assertion (Σ ▻ "a"∷ty.Address)) (b : list ast_with_args)
+      (ens : Assertion (Σ ▻ "a"∷ty.Address ▻ "an"∷ty.Address)) : ⊢ 𝕊 :=
+      fun w =>
+        SHeapSpec.run (sexec_triple_addr req b ens (w := w)).
   End Symbolic.
 
   Section Shallow.
@@ -155,14 +209,6 @@ Section BlockVerificationDerived.
               (bv.add ainstr (instr_size (instr_without_args i)))
               apc'
         end.
-
-    Definition cexec_double_addr {Σ : LCtx}
-      (req : Assertion (Σ ▻ "a"∷ty.Address)) (b : list ast_with_args) :
-      CHeapSpec (Val ty.Address) :=
-      δ <- demonic_ctx Σ ;;
-      an <- demonic _ ;;
-      _ <- produce req δ.["a"∷ty.Address ↦ an] ;;
-      cexec_block_addr b an an.
 
     Definition cexec_triple_addr {Σ : LCtx}
       (req : Assertion (Σ ▻ "a"∷ty.Address)) (b : list ast_with_args)

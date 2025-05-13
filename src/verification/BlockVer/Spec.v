@@ -43,11 +43,38 @@ Module Assembly.
       I0 i | I1 i _ | I2 i _ _ => i
     end.
 
-  Definition MOV_WRR (rs rd : Register) : ast_with_args :=
+  Definition add_rr rs rd :=
+    I0 (DOUBLEOP ADD WORD_INSTRUCTION rs REGISTER_MODE rd REGISTER_MODE).
+
+  Definition tst_m r :=
+    I0 (DOUBLEOP CMP WORD_INSTRUCTION CG2 REGISTER_MODE r INDIRECT_REGISTER_MODE).
+
+  Definition clr_m r :=
+    I0 (DOUBLEOP MOV WORD_INSTRUCTION CG2 REGISTER_MODE r INDIRECT_REGISTER_MODE).
+
+  Definition cmp_rm rs rd :=
+    I0 (DOUBLEOP CMP WORD_INSTRUCTION rs REGISTER_MODE rd INDIRECT_REGISTER_MODE).
+
+  Definition cmp_mr rs rd :=
+    I0 (DOUBLEOP CMP WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd REGISTER_MODE).
+
+  Definition mov_rr rs rd :=
     I0 (DOUBLEOP MOV WORD_INSTRUCTION rs REGISTER_MODE rd REGISTER_MODE).
 
-  Definition ADD_WRR (rs rd : Register) : ast_with_args :=
-    I0 (DOUBLEOP ADD WORD_INSTRUCTION rs REGISTER_MODE rd REGISTER_MODE).
+  Definition mov_mm rs rd :=
+    I0 (DOUBLEOP MOV WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd INDIRECT_REGISTER_MODE).
+
+  Definition mov_mr rs rd :=
+    I0 (DOUBLEOP MOV WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd REGISTER_MODE).
+
+  Definition mov_im rs i rd :=
+    I1
+      (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd INDIRECT_REGISTER_MODE)
+      i.
+
+  Definition xor_ar rs rd :=
+    I0 (DOUBLEOP XOR WORD_INSTRUCTION rs INDIRECT_AUTOINCREMENT_MODE rd REGISTER_MODE).
+
 End Assembly.
 
 Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Program.
@@ -149,7 +176,7 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
         ( ∃ "i",
             (term_var "id" = term_union Uinstr_or_data Ki (term_var "i")
              ∗ term_var "addr" m↦ term_var "bl"
-             ∗ term_var "addr" m↦ term_var "bh"
+             ∗ term_var "addr" +' 1 m↦ term_var "bh"
              ∗ term_var "bh" @ term_var "bl" ≡ term_var "i")
 
         ∨
@@ -157,7 +184,7 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
          ∃ "d",
            (term_var "id" = term_union Uinstr_or_data Kd (term_var "d")
             ∗ term_var "addr" m↦ term_var "bl"
-            ∗ term_var "addr" m↦ term_var "bh"
+            ∗ term_var "addr" +' 1 m↦ term_var "bh"
             ∗ term_var "bh" @ term_var "bl" = term_var "d"))
     |}.
 
