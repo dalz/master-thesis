@@ -116,17 +116,22 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       (segb1 segb2 pc : Term Σ ty.wordBits) : Assertion Σ
       := asn_ipe_entry_point segb1 pc ∨ asn_untrusted segb1 segb2 pc.
 
-    Definition asn_ipe_configured {Σ} (ipectl : Term Σ ty.wordBits) :=
+    Definition asn_ipe_configured {Σ} (ipectl segb1 segb2 : Term Σ ty.wordBits) :=
       asn.formula
         (formula_and
-           (* enabled *)
-           (formula_relop bop.eq
-              (term_vector_subrange 6 1 ipectl)
-              (term_val (ty.bvec 1) [bv 0x1]))
-           (* locked *)
-           (formula_relop bop.eq
-              (term_vector_subrange 7 1 ipectl)
-              (term_val (ty.bvec 1) [bv 0x1]))).
+          (formula_and
+             (* enabled *)
+             (formula_relop bop.eq
+                (term_vector_subrange 6 1 ipectl)
+                (term_val (ty.bvec 1) [bv 0x1]))
+             (* locked *)
+             (formula_relop bop.eq
+                (term_vector_subrange 7 1 ipectl)
+                (term_val (ty.bvec 1) [bv 0x1])))
+          (* segb1 < segb2 *)
+          (formula_relop bop.lt
+             (term_unsigned segb1)
+             (term_unsigned segb2))).
 
     Definition asn_mpu_registers {Σ} : Assertion Σ :=
         ∃ "MPUCTL0_reg"    , MPUCTL0_reg    ↦ term_var "MPUCTL0_reg"
@@ -291,7 +296,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc");
 
         sep_contract_result        := "v";
@@ -325,7 +330,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
 
           ∗ asn_accessible_addresses "segb1" "segb2"
@@ -347,19 +352,26 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       {|
         sep_contract_logic_variables :=
           [ "addr" :: ty.Address; "v" :: ty.byteBits
-          ; "ipectl" :: ty.wordBits];
+          ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits];
 
         sep_contract_localstore := [term_var "addr"; term_var "v"];
 
         sep_contract_precondition :=
-            MPUIPC0_reg ↦ term_var "ipectl"
-          ∗ asn_ipe_configured (term_var "ipectl")
+            MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_mpu_registers;
 
         sep_contract_result := "u";
         sep_contract_postcondition :=
             term_var "u" = term_val ty.unit tt
+
           ∗ MPUIPC0_reg ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
           ∗ asn_mpu_registers;
       |}.
 
@@ -380,7 +392,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
 
           ∗ asn_accessible_addresses "segb1" "segb2"
@@ -414,9 +426,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
-          ∗ asn_untrusted
-              (term_var "segb1") (term_var "segb2") (term_var "pc_old");
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old");
 
         sep_contract_result          := "u";
         sep_contract_postcondition   :=
@@ -447,9 +458,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
-          ∗ asn_untrusted
-              (term_var "segb1") (term_var "segb2") (term_var "pc_old");
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old");
 
         sep_contract_result          := "v";
         sep_contract_postcondition   :=
@@ -482,9 +492,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
         ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-        ∗ asn_ipe_configured  (term_var "ipectl")
-        ∗ asn_untrusted
-            (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+        ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+        ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
 
         ∗ asn_accessible_addresses "segb1" "segb2"
         ∗ asn_mpu_registers;
@@ -544,9 +553,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
-          ∗ asn_untrusted
-              (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
           ∗ asn_is_sample_reg (term_var "reg")
 
           ∗ asn_own_sample_regs;
@@ -594,7 +602,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
           ∗ asn_is_sample_reg (term_var "reg")
 
@@ -635,7 +643,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
           ∗ asn_is_sample_reg (term_var "reg")
 
@@ -671,7 +679,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
           ∗ asn_is_sample_reg (term_var "reg")
 
@@ -711,7 +719,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
           ∗ asn_is_sample_reg (term_var "reg")
 
@@ -752,7 +760,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
           ∗ asn_is_sample_reg (term_var "src_reg")
           ∗ asn_is_sample_reg (term_var "dest_reg")
@@ -805,9 +813,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
-          ∗ asn_untrusted
-              (term_var "segb1") (term_var "segb2") (term_var "pc")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
 
           ∗ term_var "instr" = term_union Uast Kjump (term_var "jump_arg");
 
@@ -843,7 +850,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_ipe_configured (term_var "ipectl")
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
           ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
           ∗ asn_is_sample_reg (term_var "reg")
 
@@ -936,29 +943,28 @@ Ltac symbolic_simpl :=
   compute;
   constructor;
   simpl.
-  (* cbn [Erasure.inst_symprop Erasure.erase_valuation Erasure.erase_symprop Erasure.erase_formula]. *)
 
 Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
 Proof.
   symbolic_simpl.
-  repeat split; intros; unfold puntrusted in *;
-    try congruence; try lia.
+  repeat split;
+    unfold puntrusted in *;
+    try congruence;
+    lia.
 Qed.
 
 Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
-(* XXX *)
 Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContractWithFuel 10 sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
 Proof.
   symbolic_simpl.
-  repeat split; intros; try congruence.
+  repeat split; congruence.
 Qed.
 
 Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
-(* XXX *)
 Lemma valid_contract_setPC : Symbolic.ValidContractWithFuel 10 sep_contract_setPC fun_setPC.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
@@ -970,7 +976,6 @@ Proof.
   destruct (bv.unsigned_add_view v2 [bv 0x2]); cbn in *; lia.
 Qed.
 
-(* XXX *)
 Lemma valid_contract_fetch : Symbolic.ValidContractWithFuel 10 sep_contract_fetch fun_fetch.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
@@ -990,54 +995,22 @@ Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10 sep_
 Proof.
   symbolic_simpl.
   repeat split; subst.
-  - clear - H1 H3. unfold puntrusted in *. exfalso.
-    assert (bv.unsigned v1 < bv.unsigned v2)%Z by admit.
+  - unfold puntrusted in *. exfalso.
     destruct (bv.unsigned_bounds v).
     destruct (bv.unsigned_add_view v [bv 0x2]); cbn in *; lia.
-  - clear - H1 H3. unfold puntrusted in *. exfalso.
-    assert (bv.unsigned v1 < bv.unsigned v2)%Z by admit.
+  - unfold puntrusted in *. exfalso.
     destruct (bv.unsigned_bounds v).
     destruct (bv.unsigned_add_view v [bv 0x1]); cbn in *; lia.
-Admitted.
+Qed.
 
 Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
-(* TODO recheck *)
-
 Lemma valid_contract_execute_move : Symbolic.ValidContractWithFuel 10 sep_contract_execute_move fun_execute.
-Proof.
-  (* symbolic_simpl. *)
-  (* repeat split; try assumption; *)
-  (*   right; (split; *)
-  (*           [(assumption || cbn; cbn in H10; cbn in H8; rewrite <-H10; assumption) *)
-  (*           | exact I]). *)
-  now apply validcontract_reflect_fuel_sound.
-Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_execute_jump : Symbolic.ValidContractWithFuel 10 sep_contract_execute_jump fun_execute.
-Proof.
-  (* symbolic_simpl. *)
-  (* repeat split; try assumption; *)
-  (*   left; (split; [assumption | exact I]). *)
-  now apply validcontract_reflect_fuel_sound.
-Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_execute_call : Symbolic.ValidContractWithFuel 10 sep_contract_execute_call fun_execute.
-Proof.
-  (* symbolic_simpl. *)
-  (* repeat split; try assumption; *)
-  (*   left; (split; [assumption | exact I]). *)
-  now apply validcontract_reflect_fuel_sound.
-Qed.
-
-
-
-
-(*
-    replace (bv.unsigned v3) with (bv.unsigned v3 + 0) by ring.
-    rewrite Z.add_comm with (n := 8).
-    apply Z.add_lt_mono; [assumption | reflexivity].
-    rewrite <-bv.of_Z_add, <-bv.of_N_add, bv.of_Z_unsigned, bv.of_N_bin, bv.add_comm;
-
-*)
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
