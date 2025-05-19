@@ -1,0 +1,11 @@
+\chapter{Introduction}
+
+An \intro{Instruction Set Architecture}[ISA] \cite{ArmISA} defines the interface between a CPU's hardware and software. It specifies the semantics of the instructions, the available registers, how the memory is managed, etc. In addition to these functional aspects, the ISA can guarantee some \emph{security} properties, particularly when the hardware supports primitives for the development of secure software, such as \intro{Trusted Execution Environments}[TEEs] \todocite{sgx} or capability pointers \todocite{}.
+
+Such security guarantees are essentially a \emph{promise} by the hardware designers to the users, like the rest of the ISA. However, while it is possible to test whether or not the functional properties hold (\eg by executing one instruction and inspecting the registers), the same approach is not sufficient in the case of security properties. The root of the problem is that functional properties say what the CPU \emph{does} in a given state, while security properties assert what the CPU does \emph{not} do in an \emph{arbitrary} (attacker-controlled) state (e.g. the value stored at a protected location is never leaked to unprivileged code).
+
+As a matter of fact, it is common for hardware designs to not uphold their ISA's guarantees due to microarchitectural attacks  \cite{Bognar2024}\todocite{any SGX vuln paper}, but also for the ISA to be inconsistent with its own security properties, \ie to be vulnerable to architectural attacks \cite{Bognar2024}\todocite{maybe SGX or sth}.
+
+Formal methods can be used to bridge the gap between the functional and security aspects of the ISA by means of a formal proof, thus eliminating in principle the latter kind of vulnerabilities. Such proofs, if developed manually, require a large time investment and are and not robust to changes to the ISA. Fortunately, (semi-)automated verification is feasible in this space, as demostrated by tools like \intro{Katamaran} \todocite{}.
+
+The objective of this thesis is to apply Katamaran to a real-world architecture (namely TI's MSP430 microcontrollers), proving that its ISA properly ensures integrity and confidentiality of data in the presence of a simple memory protection mechanism.

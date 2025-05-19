@@ -1,0 +1,46 @@
+\input{preamble.tex}
+
+\includeonly{
+  chapters/introduction,
+  chapters/background,
+  chapters/contracts,
+}
+
+\listfiles
+
+\begin{document}
+
+% includere cover? (inkscape?)
+
+% \frontispiece{} % antiporta
+
+\titlehead{
+  {\Large Università di Pisa \hfill A.Y.~2024--2025} \\
+  {\large Dipartimento di Informatica}
+}
+\subject{Master's Thesis in Computer Science}
+\title{Formal Verification of Real-World Microcontroller Firmware}
+\subtitle{subtitle }
+\author{Alessio Duè}
+\date{18 July 2025}
+\publishers{relatori...\thanks{footnote}}
+
+% \uppertitleback{}
+% \lowertitleback{}
+% \dedication{}
+
+% \frontmatter
+\maketitle %[-1] % frontespizio
+\tableofcontents
+
+\mainmatter
+\include{chapters/introduction}
+\include{chapters/background}
+\include{chapters/contracts}
+
+% \chapter{Block Verifier}
+
+\backmatter
+\printbibliography[heading=bibintoc]
+
+\end{document}

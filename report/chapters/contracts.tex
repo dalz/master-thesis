@@ -1,0 +1,430 @@
+\chapter{Verification of the \texorpdfstring{\msp}{MSP430} ISA}
+
+The first contribution of this thesis is a mechanized proof of the security properties established by IPE. The verification process involves:
+\begin{enumerate}
+\item codifying IPE as a Sail specification;
+\item translating such specification to Rocq to be used with Katamaran;
+\item stating the desired guarantees as universal contracts, and
+\item proving them with the help of Katamaran's symbolic executor.
+\end{enumerate}
+
+Due to the vulnerabilities covered in \cref{sec:ipe-attacks}, it would be impossible to successfully verify IPE's security on a faithful model of the \msp; the inteded security guarantees do not hold there. Rather, we will work on a specification that fixes the faults in IPE's design that are exploited in the attacks. Our work should then tell us that there are no additional undiscovered vulnerabilities.
+
+\section{Formalizing \texorpdfstring{\msp}{MSP430}'s ISA}
+
+Texas Instruments doesn't provide a precise, machine-readable description of the \msp's ISA, which we need for our proof. Hence, the first step is to develop a formal specification in Sail, starting from the official user manuals.
+
+The intention is to model the common behavior of the family described in \cite{slau367p}. In some places the specification relies on some model-specific detail (\eg the addresses the MPU registers are mapped to); we refer to the \msp[FR5969]'s manual \cite{slas704g} in such cases. Another source of information about IPE and the bootloader is \cite{slaa685}.
+
+The development of a Sail model of the \msp was already started in \cite{mspthesis}, with a number of limitations, including a restricted set of supported addressing modes, lack of interrupt and reset handling and no support for the Memory Protection Unit and IPE. In \cref{sec:sail-ipe} we show how the model is extended with IPE, and in \cref{sec:model-limitations} we discuss the effect of the missing features.
+
+\subsection{Modeling IPE}
+\label{sec:sail-ipe}
+
+Extending the model to support IPE requires adding the configuration registers and inserting permission checks every time memory is accessed.
+
+\subsubsection{MPU registers}
+
+The IPE configuration registers (listed in \cref{tab:ipe-registers}) are part of the MPU register file, which we model as a whole, even though we don't have full support for the MPU.
+
+\begin{table}
+  \centering
+  \begin{tabular}{ll} \toprule
+    Register & Function \\ \midrule
+    \reg{MPUIPC0} & control register: enabled (\regbit{MPUIPENA}, bit 6), locked (\regbit{MPUIPLOCK}, bit 7) \\
+    \reg{MPUIPSEGB2} & upper boundary of IPE region* (inclusive) \\
+    \reg{MPUIPSEGB1} & lower boundary of IPE region* (exclusive) \\ \bottomrule
+  \end{tabular}
+  *16 most significant bits of a 20-bit address (TODO but the model is limited to 16 bit addresses)
+  \caption{IPE registers.}
+  \label{tab:ipe-registers}
+\end{table}
+
+For each register we define a Sail \sail{register} (essentially a global variable) and a variant in the enum \sail{mpu_register_name} to refer to it symbolically. The MPU register file is mapped to memory starting at address \sail{mpu_reg_base} (\addr{050a} in the \msp[fr5969]), so we also record the offset (in machine words) of each register's location relative to \sail{mpu_reg_base} (\cref{lst:ipe-registers-definition}) so that we can convert between addresses and register names later.
+
+\begin{lstlisting}[
+  language=sail,
+  float, label=lst:ipe-registers-definition,
+  caption={IPE register declarations (other MPU registers omitted).}
+]
+  register MPUIPC0_reg    : wordBits
+  register MPUIPSEGB2_reg : wordBits
+  register MPUIPSEGB1_reg : wordBits
+
+  enum mpu_register_name =
+    { MPUIPC0, MPUIPSEGB2, MPUIPSEGB1, /* ... */ }
+
+  mapping mpu_register_index : mpu_register_name <-> range(0, 7) =
+    { MPUIPC0 <-> 5, MPUIPSEGB2 <-> 6, MPUIPSEGB1 <-> 7, /* ... */ }
+\end{lstlisting}
+
+To enable reading and writing these registers we hook into the existing \sail{readMem} and \sail{writeMem} functions, that are wrappers around the foreign functions \sail{read_ram} and \sail{write_ram} (for the latter see \cref{sec:sail-structure}). If the address that is being accessed belongs to the MPU register file, the access is handled by \sail{read_mpu_reg_byte}/\sail{write_mpu_reg_byte}, otherwise by \sail{readMem}/\sail{writeMem} (\cref{lst:if-mpu-reg}).
+
+\begin{lstlisting}[
+  language=sail,
+  float, label=lst:if-mpu-reg,
+  caption={Extract from \sail{readMem}.} % actually read_mem_aux
+]
+  if is_mpu_reg_addr(addr)
+  then read_mpu_reg_byte(addr)
+  else read_ram(/* ... */, addr)
+\end{lstlisting}
+
+\Cref{lst:write_mpu_reg_byte} shows how writing to the registers is implemented. The offset \sail{idx} of the accessed address from \sail{mpu_reg_base} is used to identify the register (through the \sail{mpu_register_index} mapping from \cref{lst:ipe-registers-definition}). If the IPE registers are locked (\ie bit \regbit{MPUIPLOCK} of \reg{MPUIPC0} is set) the write has no effect. Memory is byte-addressable and registers are 16 bit wide, so \sail{write_mpu_reg_byte} distinguishes between writing to either byte of the register.
+
+\begin{lstlisting}[
+  language=sail,
+  float, label=lst:write_mpu_reg_byte,
+  caption={\sail{write_mpu_reg_byte} (parts related to MPU omitted).}
+]
+  val write_mpu_reg_byte : (Address, byteBits) -> unit
+  function write_mpu_reg_byte(addr, v) =
+    let idx : int = unsigned(addr >> 1) - unsigned(mpu_reg_base >> 1) in
+    let low_byte = addr[0..0] == 0b0 in
+    if idx >= 0 & idx < 8 then
+      let reg = mpu_register_index(idx) in
+
+      // ...
+
+      // prevent write on locked registers
+      else if (// ...
+            | (is_ipe_reg(reg) & MPUIPC0_reg[MPUIPLOCK_bit..MPUIPLOCK_bit] == 0b1)
+      then ()
+
+      else if low_byte
+      then match reg {
+        // ...
+        MPUIPC0    => MPUIPC0_reg[7..0] = v,
+        MPUIPSEGB2 => MPUIPSEGB2_reg[7..0] = v,
+        MPUIPSEGB1 => MPUIPSEGB1_reg[7..0] = v,
+      }
+      else match reg {
+        // ...
+        MPUIPC0    => MPUIPC0_reg[15..8] = v,
+        MPUIPSEGB2 => MPUIPSEGB2_reg[15..8] = v,
+        MPUIPSEGB1 => MPUIPSEGB1_reg[15..8] = v,
+      }
+
+    else assert(false)
+\end{lstlisting}
+
+\subsubsection{Access permission check}
+
+We need to ensure that all accesses to memory are allowed by the IPE configuration. First, we define a helper \sail{check_ipe_access} (\cref{lst:check_ipe_access}) that, given an address, returns true if access to that address is allowed, \ie:
+\begin{itemize}
+\item IPE is disabled (bit \regbit{MPUIPENA} of \reg{MPUIPC0} is unset) \circref{cia-enabled}, or
+\item the address is unprotected \circref{cia-unprotected}, \ie outside of the region delimited by \sail{MPUIPSEGB1 << 4} and \sail{MPUIPSEGB2 << 4} (see the note in \cref{tab:ipe-registers}), or
+\item we are executing trusted code \circref{cia-trusted}, \ie the PC is inside the IPE region except the first 8 bytes (reserved for the IPE configuration structure, see \cref{sec:bootloader}).
+\end{itemize}
+
+\startcstep
+\begin{lstlisting}[
+  language=sail, mathescape=true,
+  float, label=lst:check_ipe_access,
+  caption={Definition of \sail{check_ipe_access}. The \sail{jump} parameter and condition \circref{cia-jump} are discussed in \cref{sec:entry-point}.}
+]
+  val check_ipe_access : (Address, bool) -> bool
+  function check_ipe_access(addr, jump) =
+    let pc = unsigned(PC_reg) in
+    MPUIPC0_reg[MPUIPENA_bit..MPUIPENA_bit] == 0b0 $\circdef{cia-enabled}$
+    | ~(in_ipe_segment(addr)) $\circdef{cia-unprotected}$
+    | (ipe_lower() + 8 <= pc & pc < ipe_higher()) $\circdef{cia-trusted}$
+    | (jump & unsigned(addr) == ipe_lower() + 8) $\circdef{cia-jump}$
+\end{lstlisting}
+
+We again hook into \sail{readMem} and \sail{writeMem} to call \sail{check_ipe_access} and throw an \sail{ipe_violation} exception if it returns false.
+
+\subsubsection{Restricted entry into the IPE region}
+\label{sec:entry-point}
+
+IPE as designed and implemented is susceptible to code reuse attacks (\cref{sec:code-reuse}). In our model we instead define a single entry point, the ninth byte in the IPE region---just after the space dedicated to the IPE configuration structure (\cref{sec:bootloader}). Changing the PC to point to a protected address constitutes an IPE violation if the code performing the change is untrusted (\ie the previous value of PC was outside the protected region).
+
+An advantage of the entry point not being the first protected address is that it's not possible to accidentally ``fall through'' to the IPE region when executing the instruction immediatly preceding the lower boundary.
+
+Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:dispatch}, where an identifier for the trusted function to call is wrote to \reg{R4}.
+
+\begin{lstlisting}[
+  language=asm,
+  float, label=lst:dispatch,
+  caption={Emulation of multiple entry points via a dispatcher function.}
+]
+  untrusted:
+      mov #1, r4
+      call ipe_entry
+
+  ipe_entry:
+      cmp r4, #0
+      beq trusted_fun_a
+      cmp r4, #1
+      beq trusted_fun_b
+      ...
+\end{lstlisting}
+
+To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \texttt{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. There is no function that is called sistematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
+
+\subsubsection{Ensuring proper PC modification order}
+
+If the same instruction can both modify the PC and access memory, the change to the PC must happen last to avoid attacks such as controlled call corruption (\cref{sec:call-corruption}).
+
+The Sail specification already did this properly for \asm{call}, but not for instructions with two operands where the source register uses the \intro{indirect autoincrement} mode and the destination's mode (absolute or indexed) involves writing to memory. The instruction \asm{mov @pc+, &addr} reads the value stored at the address contained in the \reg{PC} register, increments \reg{PC} by 2, and writes the value to the address \sail{addr}. If the starting PC is untrusted and \sail{addr} is protected the operation should fail, even if \(\mathrm{PC} + 2\) is in the IPE region, so the permission check has to be performed before the increment---but it didn't in the existing Sail specification.
+
+In practice this wouldn't have caused any problem, since it is not possible to reach the entry point by adding 2 to a PC outside the IPE region, so an IPE violation would be generated anyway.  % also the first 8 bytes don't grant privileges
+
+There is no way to modify PC and access memory in the same instruction other than these two instructions. (TODO double-check)
+
+\subsection{Limitations of the model}
+\label{sec:model-limitations}
+
+As anticipated, even after adding IPE the model is still not complete, but we believe this simplified specification to still be a worthwhile verification target.
+
+The missing addressing modes add immediate parameters and absolute addresses, that give no more power to the attacker compared to the supported modes, which already allow read/write access to arbitrary memory locations.
+
+The MPU is used to further \emph{restrict} access to memory, by dividing it in up to three segments with different permissions. It is intended mostly to prevent accidental modification of memory and not as a security feature, but can be combined with IPE to get stronger guarantees \cite{Bognar2024}. Regardless, \emph{not} including it restricts the attacker \emph{less}, so our verification doesn't lose any value from this.
+
+Resets can be part of an exploit, as they disable register locking. We can exclude this possibility by making sure that IPE gets enabled and locked after every boot; this is a property we can prove about the device's bootloader.
+
+The most significant omission is interrupt handling, which is an essential component of the attack sketched in \cref{sec:interrupts}. ...
+
+\section{Translation to \texorpdfstring{\usail}{μSail}}
+
+Katamaran works with \usail, a subset of Sail embedded in Rocq. We were able to generate a \usail version of the specification using the conversion tool provided by Katamaran\footnote{\url{https://github.com/katamaran-project/sail-backend/}}, after removing uses of features not supported by the core calculus.
+
+In particolar, we needed to:
+\begin{itemize}
+\item Remove uses of the vector type and bitfields. Vectors are homogeneous static arrays; they were used to represent the MPU register file (instead of a number of different \sail{register}s) to simplify the implementation of unaligned word accesses. Bitfields are a convenience feature that allows naming certain bits and ranges in a bitvector for easier reference.
+
+\item Remove all uses of polymorphic functions, substituting them with monomorphic equivalents. Polymorphism is not supported by \usail.
+
+\item Split up large functions that pattern match on many arguments into several smaller functions. \usail doesn't support pattern matching on multiple values at once and or-patterns, so such match expressions become nested after translation. \Cref{lst:match-explosion} shows an example. In some cases this led to an explosion in the size of a \usail function, making it excessively slow to type-check in Rocq.
+
+\item Declare the signatures for the foreign functions and indicate at each of their uses that the call is to a foreign function.
+
+\item Perform some minor edits, such as adding missing type annotations for some statements.
+\end{itemize}
+
+\begin{lstlisting}[
+  language=sail,
+  float, label=lst:match-explosion,
+  caption={Example of a multi-argument match and its translation.}
+]
+  // original: 4 arms           // translation: 9 arms
+  match (x, y, z) {             match x {
+    (X1, Y1, Z1) => e1,           X1 => match y {
+    (X1, Y2, Z1) => e2,             Y1 => match z { Z1 => e1, _ => e4 },
+    (X2, Y1, Z2) => e3,             Y2 => match z { Z1 => e2, _ => e4 },
+    _            => e4              _  => e4,
+  }                               },
+                                  X2 => match y {
+                                    Y1 => match z { Z2 => e3, _ => e4 },
+                                    _  => e4,
+                                  },
+                                  _ => e4
+                                }
+\end{lstlisting}
+
+After translation we end up with two Rocq files, \file{Base.v} and \file{Machine.v}. \file{Base.v} contains Rocq versions of the Sail user-defined types, see \cref{lst:coq-ast} for an example. We are also required to define here our ``memory model'', \ie a type that represents memory. For our purpose we don't need anything more than a function mapping each address to the value it stores:
+\begin{minted}{coq}
+  Definition Memory := Address -> byteBits.
+\end{minted}
+but more complex representations could be used to model features such as memory-mapped IO.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Inductive ast : Set :=
+    | DOUBLEOP          : doubleop -> BW -> Register -> AM -> Register -> AM -> ast
+    | SINGLEOP          : singleop -> BW -> AM -> Register -> ast
+    | JUMP              : jump -> bv 10 -> ast
+    | DOESNOTUNDERSTAND : bv 16 -> ast.
+  \end{minted}
+  \caption{Rocq translation of the Sail type representing a decoded instruction.}
+  \label{lst:coq-ast}
+\end{listing}
+
+In \file{Machine.v} we find the \usail specification proper. See \cref{lst:translation-example} for an example of a \usail function definition contained in \file{Machine.v}. Here we also declare the foreign functions and lemmas used in the specification. % TODO maybe put them here?
+
+\begin{listing}
+  \begin{lstlisting}[language=sail]
+    val setPC: wordBits -> unit
+    function setPC(v) = writeReg(WORD_INSTRUCTION, PC, Word(v))
+  \end{lstlisting}
+  \begin{minted}{coq}
+    Definition fun_setPC : Stm ["v" :: ty.bvec (16)] ty.unit :=
+      stm_let "ga#205"
+        (ty.union Uwordbyte)
+        (stm_exp (exp_union Uwordbyte Kword (exp_var "v")))
+        (stm_call writeReg
+           (env.snoc
+              (env.snoc
+                 (env.snoc
+                    (env.nil)
+                    (_::_) (exp_val (ty.enum Ebw) WORD_INSTRUCTION)%exp)
+                 (_::_) (exp_val (ty.enum Eregister) PC)%exp)
+              (_::_) (exp_var "ga#205")%exp)).
+  \end{minted}
+  \caption{Code of a Sail function and its \usail translation (manually formatted).}
+  \label{lst:translation-example}
+\end{listing}
+
+\section{IPE security as universal contract}
+
+Now that we have a model of the \msp in a suitable format, we are ready to express the desired security guarantees by constructing a universal contract, as discussed in \cref{sec:universal-contracts}. We first need to decide on the exact property to prove, and then express it in Katamaran's separation logic.
+
+\subsection{Target properties}
+
+Our contract will focus on guaranteeing integrity and confidentiality of the IPE region when untrusted code is executed, and assuming that IPE is properly configured (\ie enabled, locked, \(\reg{MPUIPSEGB1} < \reg{MPUIPSEGB2}\)). Concretely, we want to ensure that:
+\begin{itemize}
+\item protected locations cannot be read and modified;
+\item jumps into the IPE region are only allowed if the target is the designated entry point;
+\item the IPE registers don't change their value.
+\end{itemize}
+
+It can then be proved separately that the bootloader sets the IPE registers to what is expected by the contract. We are not interested in verifying the security of trusted code, since it always has access to all memory; the only meaningful property we could prove is that it doesn't modify locked registers.
+
+We consider a location protected if it lies within the IPE boundaries; there is no reason to have a special case for the IVT (see \cref{sec:ipe}) considering that we don't support interrupts.
+
+``Untrusted code'' is all code that should not have access to protected memory. In addition to instructions not contained in the IPE region, the first 8 protected bytes also don't count as trusted. That said, we will treat them as such given that it simplifies the proofs and doesn't meaningfully weaken our result. The contract applies only to untrusted code, so this change does make it less applicable in general. However, a consequence of the guarantees we prove is that untrusted code cannot jump into the first 8 protected bytes, so it's not possible to get there in the first place under the reasonable assumptions that execution doesn't start from there at boot, and trusted code doesn't jump there.
+
+\subsection{Universal contract}
+
+We formalize the aforementioned properties with the universal contract shown in \cref{fig:universal-contract}. The contract constrains the possible outcomes of executing an arbitrary untrusted instruction under the assumption of correct IPE configuration.
+
+\begin{figure}
+  \centering
+  \[\startcstep
+    \hoarem
+    {\begin{aligned}
+      &\begin{alignedat}{2}
+        &\reg{PC} &&\ptor \mathit{pc\_old} \\
+        {}\ast{} &\reg{MPUIPC0}     &&\ptor \mathit{ipectl} \\
+        {}\ast{} &\reg{MPUIPSEGB1}  &&\ptor \mathit{segb1} \\
+        {}\ast{} &\reg{MPUIPSEGB2}  &&\ptor \mathit{segb2}
+      \end{alignedat} && \circdef{ipe-regs-in}
+      \\[2ex]
+      &\begin{aligned}
+        &\ast \pred{accessible\_addresses}~\mathit{segb1}~\mathit{segb2} \\
+        &\ast \pred{other\_registers}
+      \end{aligned} && \circdef{other-res-in}
+      \\[2ex]
+      &\begin{aligned}
+        &\ast \pred{ipe\_configured}~\mathit{ipectl}~\mathit{segb1}~\mathit{segb2} \\
+        &\ast \pred{untrusted}~\mathit{segb1}~\mathit{segb2}~\mathit{pc\_old}
+      \end{aligned} && \circdef{assumptions}~
+    \end{aligned}}
+    {\texttt{execute(\(\mathit{instr}\))}}
+    {\begin{aligned}
+      &\phantom{\ast{}}
+        \bigl(\exists\mathit{pc\_new}. \\
+      &\quad\begin{aligned}
+        &\reg{PC} \ptor \mathit{pc\_new} \\
+        {}\ast{} &\pred{untrusted\_or\_entry\_point}
+                ~\mathit{segb1}~\mathit{segb2}~\mathit{pc\_new}\bigr)
+      \end{aligned} && \circdef{pc-new}
+      \\[2ex]
+      &\begin{alignedat}{2}
+        &\ast \reg{MPUIPC0}     &&\ptor \mathit{ipectl} \\
+        &\ast \reg{MPUIPSEGB1}  &&\ptor \mathit{segb1} \\
+        &\ast \reg{MPUIPSEGB2}  &&\ptor \mathit{segb2}
+      \end{alignedat} && \circdef{ipe-regs-out}
+      \\[2ex]
+      &\begin{aligned}
+        &\ast \pred{accessible\_addresses}~\mathit{segb1}~\mathit{segb2} \\
+        &\ast \pred{other\_registers}
+      \end{aligned} && \circdef{other-res-out}
+    \end{aligned}}\]
+\caption{Universal contract for IPE security.}
+\label{fig:universal-contract}
+\end{figure}
+
+In the precondition we require ownership of:
+\begin{itemize}
+\item the PC and IPE registers, whose values are bound to \(\mathit{pc\_old}\), \(\mathit{ipectl}\), \(\mathit{segb1}\) and \(\mathit{segb2}\) \circref{ipe-regs-in}, and
+\item the remaining registers and all unprotected memory locations \circref{other-res-in}.
+\end{itemize}
+and we asssume that IPE is enabled and locked, and that the PC points to untrusted code \circref{assumptions}.
+
+The custom predicates referenced in the contract are defined in \cref{fig:aux-preds}. \pred{ipe\_configured} checks that the \regbit{MPUIPENA} and \regbit{MPUIPLOCK} bits of the control register are set, and that the lower boundary indeed comes before the upper boundary. \pred{untrusted} that the specified address is not in the IPE region. \pred{accessible\_addresses} gives ownership of all unprotected locations.\footnote{
+For an address \(a\), \(\pred{untrusted}~\mathit{segb1}~\mathit{segb2}~a
+\wand \exists v.\; a \ptom v\) gives ownership of \(a\) with an unknown value \(v\) if we can prove that \(a\) is not in the IPE segment.} Since we don't treat the first 8 protected bytes as untrusted, we don't have a distinct \pred{unprotected} and use \pred{untrusted} instead.
+
+% \pred{untrusted\_or\_entry\_point}
+
+\begin{figure}
+  \centering
+  \begin{align*}
+    &\begin{alignedat}{2}
+      &\pred{ipe\_configured}~\mathit{ipectl}~\mathit{segb1}~\mathit{segb2}
+      &&\triangleq \mathit{ipectl}[6] = 1 \wedge \mathit{ipectl}[7] = 1 \wedge \mathit{segb1} < \mathit{segb2}
+      \\
+      &\pred{untrusted}~\mathit{segb1}~\mathit{segb2}~\mathit{addr}
+      &&\triangleq \mathit{addr} < (\mathit{segb1} \ll 4) \vee (\mathit{segb2} \ll 4) \leq addr
+      \\
+      &\pred{accessible\_addresses}~\mathit{segb1}~\mathit{segb2}
+      &&\triangleq \bigast_{\mathclap{a \in \pred{Addr}}}
+         \left(\pred{untrusted}~\mathit{segb1}~\mathit{segb2}~a
+         \wand \exists v.\; a \ptom v\right) \\
+      &\pred{other\_registers}
+      &&\triangleq \bigast_{r \in \pred{Reg} \setminus \left\{ \reg{PC}, \reg{MPUIPC0}, \reg{MPUIPSEGB1}, \reg{MPUIPSEGB2}\right\}} \exists v.\; r \ptor v
+    \end{alignedat} \\
+    &\begin{aligned}
+      \pred{untrusted\_or\_entry\_point}~\mathit{segb1}~\mathit{segb2}~\mathit{addr} \triangleq {}
+      \pred{untrusted}~\mathit{segb1}~\mathit{segb2}~\mathit{addr}
+      \vee \mathit{addr} = (\mathit{segb1} \ll 4 + 8)
+    \end{aligned}
+  \end{align*}
+  \caption{Auxiliary predicates.}
+  \label{fig:aux-preds}
+\end{figure}
+
+Without even looking at the postcondition, we know that if the contract is provable then \sail{execute} doesn't give read/write access to protected locations under these assumptions: by the proof rules of separation logic, to prove a triple about code that manipulates memory we need to assert ownership of all the locations the code could access, and here \sail{execute} only gets chunks for unprotected locations in its precondition.
+
+The other security guarantees have to be spelled out in the postondition:
+\begin{itemize}
+\item the program counter may take a new value, that must be either outside the IPE boundaries or its entry point \circref{pc-new}, and
+\item the IPE registers' values are the same as before executing the instruction \circref{ipe-regs-out}.
+\end{itemize}
+We also get back ownership of unprotected memory and all other registers \circref{other-res-out}, whose contents are allowed to have changed thanks to the existentials in the definitions of \pred{accessible\_addresses} and \pred{other\_regs}. This has no implications in terms of security, but is useful to keep being able to reason about Sail code after the call to \sail{execute}.
+
+\section{Universal contract in Katamaran}
+
+\begin{minted}{coq}
+  Definition sep_contract_execute : SepContractFun execute :=
+  {|
+    sep_contract_logic_variables :=
+      [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+      ; "pc_old" :: ty.wordBits; "instr" :: ty.union Uast ];
+
+    sep_contract_localstore := [term_var "instr"];
+
+    sep_contract_precondition :=
+        PC_reg         ↦ term_var "pc_old"
+      ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+      ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+      ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+      ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+      ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+
+      ∗ asn_accessible_addresses "segb1" "segb2"
+      ∗ asn_mpu_registers
+      ∗ asn_own_sample_regs;
+
+    sep_contract_result        := "u";
+    sep_contract_postcondition :=
+        term_var "u" = term_val ty.unit tt
+
+      ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+      ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+      ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+      ∗ ∃ "pc_new",
+        (PC_reg ↦ term_var "pc_new"
+         ∗ asn_untrusted_or_entry_point
+             (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+
+      ∗ asn_accessible_addresses "segb1" "segb2"
+      ∗ asn_mpu_registers
+      ∗ asn_own_sample_regs;
+  |}.
+\end{minted}
+
+% quella semplificazione fatta senno serviva catena

@@ -1,0 +1,77 @@
+\documentclass[
+  % draft,
+  fontsize=12,
+]{scrbook}
+
+\usepackage[l2tabu,orthodox]{nag}
+
+\usepackage{polyglossia}
+\setdefaultlanguage{english}
+
+\usepackage{mathtools} % amssymb
+\usepackage{mleftright}
+\mleftright
+
+\usepackage{fontspec}
+\usepackage[warnings-off={mathtools-colon,mathtools-overbracket}]{unicode-math}
+\defaultfontfeatures{Ligatures=TeX}
+
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{TeX Gyre Heros}
+% \setmonofont[Instance=Regular]{Fira Code}
+\directlua{luaotfload.add_fallback("monofb", {"texgyrepagellamath:mode=node;"})}
+\setmonofont[RawFeature={fallback=monofb}]{Inconsolata}
+\setmathfont{Tex Gyre Pagella Math}
+
+% \setmainfont{Libertinus Serif}
+% \setsansfont{Libertinus Sans}
+% \setmonofont{Libertinus Mono}
+
+\usepackage{microtype}
+% \frenchspacing
+
+% \usepackage[strict=true]{csquotes}
+\usepackage[
+  backend=biber,
+  bibencoding=utf-8,
+  safeinputenc,
+  bibwarn=true,
+  style=numeric, %alphabetic,
+  maxnames=100,
+  alldates=iso,
+]{biblatex}
+\addbibresource{bibliography.bib}
+
+\usepackage{listings}
+\lstset{
+  basicstyle=\small\ttfamily,
+  columns=fullflexible,
+  keepspaces=true,
+  captionpos=b,
+}
+\lstdefinelanguage{sail}{
+  morekeywords={
+    val,function,let,in,match,if,then,else,register,enum,mapping,bitfield
+    bool,int,bits,range,vector,
+    unsigned
+  },
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+}
+\lstdefinelanguage{asm}{}
+\usepackage[newfloat]{minted}
+\setminted{fontsize=\small}
+\removefromtoclist[float]{lol} % https://github.com/gpoore/minted/issues/390
+
+\usepackage{graphicx}
+\graphicspath{{img/}}
+
+\usepackage{booktabs}
+
+\input{macros.tex}
+
+\usepackage[hidelinks,unicode]{hyperref} % backref
+\usepackage[noabbrev]{cleveref} % capitalise
+
+% \minisec{}

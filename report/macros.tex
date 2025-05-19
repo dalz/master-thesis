@@ -1,0 +1,48 @@
+\usepackage{xspace,scalerel}
+
+\newcommand*{\ie}{i.e.\xspace}
+\newcommand*{\eg}{e.g.\xspace}
+
+\NewDocumentCommand{\intro}{m o}{\emph{#1}\IfValueT{#2}{ (#2)}}
+
+\newcommand*{\file}[1]{\texttt{#1}}
+\newcommand*{\reg}[1]{\texttt{\MakeUppercase{#1}}}
+\newcommand*{\regbit}[1]{\reg{#1}}
+\newcommand*{\hex}[1]{\texttt{0x#1}}
+\newcommand*{\addr}[1]{\hex{#1}}
+\DeclareRobustCommand{\pred}[1]{\ifmmode\mathrm{#1}\else\emph{#1}\fi}
+
+\newcommand*{\asm}[1]{\text{\lstinline£#1£}}
+\newcommand*{\sail}[1]{\text{\lstinline[language=sail]£#1£}}
+
+\NewDocumentCommand{\msp}{o}
+  {\textsf{\textsc{\oldstylenums{msp\kern-0.06em430\IfValueT{#1}{\MakeLowercase{#1}}}}}\xspace}
+\newcommand*{\usail}{μSail\xspace}
+
+\NewDocumentCommand{\hoare}{m m o m}
+  {\left\{#1\right\}#2\left\{\IfValueT{#3}{#3.\;}#4\right\}}
+
+\NewDocumentCommand{\hoarem}{m m o m}
+  {\begin{aligned}
+     &\left\{#1\right\} \\
+     &\quad #2 \\
+     &\left\{\IfValueT{#3}{#3.\;}#4\right\}
+   \end{aligned}}
+
+\newcommand*{\ptor}{\mapsto}
+\newcommand*{\ptom}{\mapsto_{\mathrm{m}}}
+\newcommand*{\wand}{\mathrel{-\!\!\ast}}
+\DeclareMathOperator*{\bigast}{\scalerel*{\ast}{\sum}}
+
+% FIXME every (n) ref links to the first (n) def
+\usepackage{circledsteps}
+\makeatletter
+\newcommand*{\circdef}[1]{
+  \refstepcounter{cstepcnt}%
+  \Circled{\arabic{cstepcnt}}%
+  \ltx@label{{circ:#1}}}
+\makeatother
+\newcommand{\circref}[1]{\CircledText{\small\ref{circ:#1}}}
+
+
+\newcommand*{\todocite}[1]{[#1]}
