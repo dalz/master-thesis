@@ -110,14 +110,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       (segb1 segb2 pc : Term Σ ty.wordBits)
       : Assertion Σ
     :=
-      asn.formula
-        (formula_or
-           (formula_relop bop.lt
-              (term_unsigned pc)
-              (word_times_16 segb1))
-           (formula_relop bop.le
-              (word_times_16 segb2)
-              (term_unsigned pc))).
+      asn.formula (formula_user untrusted [segb1;segb2;pc]).
 
     Definition asn_untrusted_or_entry_point {Σ}
       (segb1 segb2 pc : Term Σ ty.wordBits) : Assertion Σ
@@ -930,7 +923,7 @@ End MSP430Specification.
 
 Import MSP430Specification.
 Import SymProp.notations.
-(* Import Erasure.notations. *)
+Import Erasure.notations.
 
 Module MSP430Executor :=
   MakeExecutor MSP430Base MSP430Signature MSP430Program MSP430Specification.
@@ -938,24 +931,8 @@ Module MSP430Executor :=
 Import MSP430Executor.
 Import MSP430Executor.Symbolic.
 
-Definition VcGenErasure {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) : Erasure.ESymProp :=
-  Erasure.erase_symprop (postprocess (SPureSpec.replay (postprocess (vcgen default_config 10 c body wnil)))).
-
-Definition ValidContractWithErasure {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) : Prop :=
-  VerificationConditionWithErasure (VcGenErasure c body).
-
-Lemma verification_condition_with_erasure_sound (p : 𝕊 ctx.nil) :
-  VerificationConditionWithErasure (Erasure.erase_symprop p) ->
-  VerificationCondition p.
-Proof. intros [H]. constructor. now rewrite <- Erasure.erase_safe. Qed.
-
-Lemma validcontract_with_erasure_sound {Δ τ} (c : SepContract Δ τ) (body : Stm Δ τ) :
-  ValidContractWithErasure c body ->
-  ValidContractWithFuel 10 c body.
-Proof. Admitted.
-
 Ltac symbolic_simpl :=
-  apply validcontract_with_erasure_sound;
+  apply validcontract_with_erasure_and_fuel_sound;
   compute;
   constructor;
   simpl.
@@ -964,106 +941,94 @@ Ltac symbolic_simpl :=
 Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
 Proof.
   symbolic_simpl.
-  repeat split; intros.
-  - rewrite H in H2; discriminate H2.
-  - exfalso; destruct H1; lia.
-  - intuition.
-  - intuition.
+  repeat split; intros; unfold puntrusted in *;
+    try congruence; try lia.
 Qed.
 
 Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 (* XXX *)
-Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
-Proof. Admitted.
-(*   symbolic_simpl. *)
-(*   repeat split; intros; *)
-(*     try (rewrite H0 in H10; exfalso; cbn in H10; apply H10; reflexivity); *)
-(*     rewrite H0 in H11; exfalso; cbn in H11; apply H11; reflexivity. *)
-(* Qed. *)
+Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContractWithFuel 10 sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
+Proof.
+  symbolic_simpl.
+  repeat split; intros; try congruence.
+Qed.
 
 Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 (* XXX *)
-Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
-Proof. Admitted.
-(*   symbolic_simpl. *)
-(*   repeat split; assumption. *)
-(* Qed. *)
+Lemma valid_contract_setPC : Symbolic.ValidContractWithFuel 10 sep_contract_setPC fun_setPC.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
-Lemma valid_contract_incPC : Symbolic.ValidContract sep_contract_incPC fun_incPC.
+Lemma valid_contract_incPC : Symbolic.ValidContractWithFuel 10 sep_contract_incPC fun_incPC.
 Proof.
-  (* compute. constructor. cbn [SymProp.safe instprop instprop_formula]. *)
-  (* repeat split; intros; try assumption. *)
-  (* exfalso. clear - H1 H2. *)
-  (* cbn in H1. cbn in H2. *)
-  (* destruct H1. *)
-  (* rewrite bv.unsigned_add in H2. *)
-  (* unfold bv.truncz in H2. *)
-  (* cbn in H2. *)
-Admitted. (* TODO probably needs more preconditions *)
+  symbolic_simpl.
+  repeat split; intros; unfold puntrusted in *.
+  destruct (bv.unsigned_bounds v2).
+  destruct (bv.unsigned_add_view v2 [bv 0x2]); cbn in *; lia.
+Qed.
 
 (* XXX *)
-Lemma valid_contract_fetch : Symbolic.ValidContract sep_contract_fetch fun_fetch.
-Proof. Admitted.
-(*   symbolic_simpl. *)
-(*   repeat (intros; repeat exists [bv 0]; split; try assumption). *)
-(* Qed. *)
+Lemma valid_contract_fetch : Symbolic.ValidContractWithFuel 10 sep_contract_fetch fun_fetch.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_read_register : Symbolic.ValidContractWithFuel 10 sep_contract_read_register fun_read_register.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_write_register : Symbolic.ValidContractWithFuel 10 sep_contract_write_register fun_write_register.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_read_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_read_indirect : Symbolic.ValidContractWithFuel 10 sep_contract_read_indirect fun_read_indirect.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10 sep_contract_read_autoincrement fun_read_autoincrement.
 Proof.
   symbolic_simpl.
-  repeat split; try assumption.
-  - exfalso.
-    cbn in H1. cbn in H4. cbn in H5.
-    rewrite H5 in H4.
-    clear - H4 H1.
-    admit. (* TODO add to preconditions *)
-  - cbn in H5. rewrite H5 in H4. assumption.
-  - admit. (* TODO same but with +1 instead of +2 *)
-  - cbn in H5. rewrite H5 in H4. assumption.
+  repeat split; subst.
+  - clear - H1 H3. unfold puntrusted in *. exfalso.
+    assert (bv.unsigned v1 < bv.unsigned v2)%Z by admit.
+    destruct (bv.unsigned_bounds v).
+    destruct (bv.unsigned_add_view v [bv 0x2]); cbn in *; lia.
+  - clear - H1 H3. unfold puntrusted in *. exfalso.
+    assert (bv.unsigned v1 < bv.unsigned v2)%Z by admit.
+    destruct (bv.unsigned_bounds v).
+    destruct (bv.unsigned_add_view v [bv 0x1]); cbn in *; lia.
 Admitted.
 
 Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.
-Proof. symbolic_simpl. exact I. Qed.
+Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 (* TODO recheck *)
 
 Lemma valid_contract_execute_move : Symbolic.ValidContractWithFuel 10 sep_contract_execute_move fun_execute.
 Proof.
-  symbolic_simpl.
-  repeat split; try assumption;
-    right; (split;
-            [(assumption || cbn; cbn in H10; cbn in H8; rewrite <-H10; assumption)
-            | exact I]).
+  (* symbolic_simpl. *)
+  (* repeat split; try assumption; *)
+  (*   right; (split; *)
+  (*           [(assumption || cbn; cbn in H10; cbn in H8; rewrite <-H10; assumption) *)
+  (*           | exact I]). *)
+  now apply validcontract_reflect_fuel_sound.
 Qed.
 
 Lemma valid_contract_execute_jump : Symbolic.ValidContractWithFuel 10 sep_contract_execute_jump fun_execute.
 Proof.
-  symbolic_simpl.
-  repeat split; try assumption;
-    left; (split; [assumption | exact I]).
+  (* symbolic_simpl. *)
+  (* repeat split; try assumption; *)
+  (*   left; (split; [assumption | exact I]). *)
+  now apply validcontract_reflect_fuel_sound.
 Qed.
 
 Lemma valid_contract_execute_call : Symbolic.ValidContractWithFuel 10 sep_contract_execute_call fun_execute.
 Proof.
-  symbolic_simpl.
-  repeat split; try assumption;
-    left; (split; [assumption | exact I]).
+  (* symbolic_simpl. *)
+  (* repeat split; try assumption; *)
+  (*   left; (split; [assumption | exact I]). *)
+  now apply validcontract_reflect_fuel_sound.
 Qed.
 
 
