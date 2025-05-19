@@ -61,7 +61,7 @@ function writeReg(bw, reg, v) = {
   in
 
   match reg {
-    PC    =>    { check_byte_access(v, X); PC_reg = v },
+    PC    =>    { check_byte_access(v, true); PC_reg = v },
     SP    =>    SP_reg = v,
     SRCG1 => SRCG1_reg = v,
     CG2   =>   CG2_reg = v,

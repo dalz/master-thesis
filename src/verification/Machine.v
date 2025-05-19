@@ -248,16 +248,15 @@ Module Import MSP430Program <: Program MSP430Base.
                                                   ](ty.bool)
       | check_ipe_access                     : Fun[
                                                     "addr"  ∷  ty.bvec (16);
-                                                    "m"  ∷  ty.enum Eaccess_mode
+                                                    "jump"  ∷  ty.bool
                                                   ](ty.bool)
       | check_byte_access                    : Fun[
                                                     "addr"  ∷  ty.bvec (16);
-                                                    "m"  ∷  ty.enum Eaccess_mode
+                                                    "jump"  ∷  ty.bool
                                                   ](ty.unit)
       | read_mem_aux                         : Fun[
                                                     "bw"  ∷  ty.enum Ebw;
-                                                    "addr"  ∷  ty.bvec (16);
-                                                    "m"  ∷  ty.enum Eaccess_mode
+                                                    "addr"  ∷  ty.bvec (16)
                                                   ](ty.union Uwordbyte)
       | readMem                              : Fun[
                                                     "bw"  ∷  ty.enum Ebw;
@@ -607,7 +606,7 @@ Module Import MSP430Program <: Program MSP430Base.
     | decode : FunX [ "w" :: ty.union Uwordbyte ] (ty.union Uast). (* could take a bv 16, but this is more convenient since fetch returns a WordByte... *)
 
     Inductive Lem : PCtx -> Set :=
-    | extract_accessible_ptsto : Lem ["addr" :: ty.Address; "m" :: ty.enum Eaccess_mode]
+    | extract_accessible_ptsto : Lem ["addr" :: ty.Address]
     | return_accessible_ptsto : Lem ["addr" :: ty.Address]
     | open_ptsto_instr : Lem ["addr" :: ty.Address]
     | close_ptsto_instr : Lem ["addr" :: ty.Address(* ; "w" :: ty.wordBits *)]
@@ -3314,10 +3313,95 @@ Module Import MSP430Program <: Program MSP430Base.
       [0] : OCaml position: Pos(nanosail/SailToNanosail/Translate/ExtendedType.ml:230:7887:7914)
             Sail position: /home/ale/documenti/uni/magistrale/tesi/_opam/share/sail/lib/vector.sail:77
      *)
-    
+
     Definition fun_check_ipe_access : Stm [
                                             "addr"  ∷  ty.bvec (16);
-                                            "m"  ∷  ty.enum Eaccess_mode
+                                            "jump"  ∷  ty.bool
+                                          ]
+                                          (ty.bool) :=
+      stm_let "pc"
+              (ty.int)
+              (stm_let "жreg_PC_reg_646"
+                       (ty.wordBits)
+                       (stm_read_register PC_reg)
+                       (stm_exp (exp_unop uop.unsigned (exp_var "жreg_PC_reg_646"))))
+              (stm_let "ga#157"
+                       (ty.bool)
+                       (stm_let "ga#146"
+                                (ty.bvec (1))
+                                (stm_let "жreg_MPUIPC0_reg_647"
+                                         (ty.wordBits)
+                                         (stm_read_register MPUIPC0_reg)
+                                         (stm_exp (exp_unop (uop.vector_subrange 6 1) (exp_var "жreg_MPUIPC0_reg_647"))))
+                                (stm_exp (((exp_var "ga#146") = (exp_val (ty.bvec 1) ([bv 0]))))))
+                       (stm_let "ж652"
+                                (ty.bool)
+                                (stm_exp (exp_var "ga#157"))
+                                (stm_if ((stm_exp (exp_var "ж652")))
+                                        (stm_exp (exp_true))
+                                        (stm_let "ga#156"
+                                                 (ty.bool)
+                                                 (stm_let "ga#147"
+                                                          (ty.bool)
+                                                          (stm_call in_ipe_segment (env.snoc (env.nil)
+                                                                                             (_::_)
+                                                                                             ((exp_var "addr"))%exp))
+                                                          (stm_exp (exp_unop uop.not (exp_var "ga#147"))))
+                                                 (stm_let "ж651"
+                                                          (ty.bool)
+                                                          (stm_exp (exp_var "ga#156"))
+                                                          (stm_if ((stm_exp (exp_var "ж651")))
+                                                                  (stm_exp (exp_true))
+                                                                  (stm_let "ga#155"
+                                                                           (ty.bool)
+                                                                           (stm_let "ga#151"
+                                                                                    (ty.bool)
+                                                                                    (stm_let "ga#149"
+                                                                                             (ty.int)
+                                                                                             (stm_let "ga#148"
+                                                                                                      (ty.int)
+                                                                                                      (stm_call ipe_lower (env.snoc (env.nil)
+                                                                                                                                    (_::_)
+                                                                                                                                    ((exp_val (ty.unit) (tt)))%exp))
+                                                                                                      (stm_exp (((exp_var "ga#148"))+((exp_int 8%Z)))))
+                                                                                             (stm_exp (((exp_var "ga#149"))<=((exp_var "pc")))))
+                                                                                    (stm_let "ж648"
+                                                                                             (ty.bool)
+                                                                                             (stm_exp (exp_var "ga#151"))
+                                                                                             (stm_if ((stm_exp (exp_var "ж648")))
+                                                                                                     (stm_let "ga#150"
+                                                                                                              (ty.int)
+                                                                                                              (stm_call ipe_higher (env.snoc (env.nil)
+                                                                                                                                             (_::_)
+                                                                                                                                             ((exp_val (ty.unit) (tt)))%exp))
+                                                                                                              (stm_exp (((exp_var "pc"))<((exp_var "ga#150")))))
+                                                                                                     (stm_exp (exp_false)))))
+                                                                           (stm_let "ж650"
+                                                                                    (ty.bool)
+                                                                                    (stm_exp (exp_var "ga#155"))
+                                                                                    (stm_if ((stm_exp (exp_var "ж650")))
+                                                                                            (stm_exp (exp_true))
+                                                                                            (stm_let "ж649"
+                                                                                                     (ty.bool)
+                                                                                                     (stm_exp (exp_var "jump"))
+                                                                                                     (stm_if ((stm_exp (exp_var "ж649")))
+                                                                                                             (stm_let "ga#153"
+                                                                                                                      (ty.int)
+                                                                                                                      (stm_exp (exp_unop uop.unsigned (exp_var "addr")))
+                                                                                                                      (stm_let "ga#154"
+                                                                                                                               (ty.int)
+                                                                                                                               (stm_let "ga#152"
+                                                                                                                                        (ty.int)
+                                                                                                                                        (stm_call ipe_lower (env.snoc (env.nil)
+                                                                                                                                                                      (_::_)
+                                                                                                                                                                      ((exp_val (ty.unit) (tt)))%exp))
+                                                                                                                                        (stm_exp (((exp_var "ga#152"))+((exp_int 8%Z)))))
+                                                                                                                               (stm_exp (((exp_var "ga#153"))=((exp_var "ga#154"))))))
+                                                                                                             (stm_exp (exp_false))))))))))))).
+
+(*    Definition fun_check_ipe_access : Stm [
+                                            "addr"  ∷  ty.bvec (16);
+                                            "jump"  ∷  ty.bool
                                           ]
                                           (ty.bool) :=
       stm_let "pc"
@@ -3393,12 +3477,9 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                        (stm_exp (exp_var "ga#152"))
                                                                                                                        (stm_if ((stm_exp (exp_var "ж655")))
                                                                                                                                (stm_exp (exp_false))
-                                                                                                                               (* XXX (stm_call in_ivt_or_rv (env.snoc (env.nil)
-                                                                                                                                                                (_::_)
-                                                                                                                                                                ((exp_var "addr"))%exp)) *)
                                                                                                                                (stm_exp (exp_false)))))
                                                                                                      (stm_exp (exp_unop uop.not (exp_var "ga#153"))))
-                                                                                            (stm_exp (exp_false))))))))))).
+                                                                                            (stm_exp (exp_false))))))))))). *)
     
     (*
       Extended type
@@ -3414,18 +3495,14 @@ Module Import MSP430Program <: Program MSP430Base.
     *)
     Definition fun_check_byte_access : Stm [
                                              "addr"  ∷  ty.bvec (16);
-                                             "m"  ∷  ty.enum Eaccess_mode
+                                             "jump"  ∷  ty.bool
                                            ]
                                            (ty.unit) :=
       stm_let "ga#158"
               (ty.bool)
               (stm_let "ga#157"
                        (ty.bool)
-                       (stm_call check_ipe_access (env.snoc (env.snoc (env.nil)
-                                                                      (_::_)
-                                                                      ((exp_var "addr"))%exp)
-                                                            (_::_)
-                                                            ((exp_var "m"))%exp))
+                       (stm_call check_ipe_access (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) (exp_var "jump")))
                        (stm_exp (exp_unop uop.not (exp_var "ga#157"))))
               (stm_let "ж659"
                        (ty.bool)
@@ -3451,8 +3528,7 @@ Module Import MSP430Program <: Program MSP430Base.
     *)
     Definition fun_read_mem_aux : Stm [
                                         "bw"  ∷  ty.enum Ebw;
-                                        "addr"  ∷  ty.bvec (16);
-                                        "m"  ∷  ty.enum Eaccess_mode
+                                        "addr"  ∷  ty.bvec (16)
                                       ]
                                       (ty.union Uwordbyte) :=
       stm_let "ж660"
@@ -3461,11 +3537,7 @@ Module Import MSP430Program <: Program MSP430Base.
               (stm_match_enum Ebw
                               (stm_exp (exp_var "ж660"))
                               (fun K => match K with
-                                        | BYTE_INSTRUCTION => stm_seq (stm_call check_byte_access (env.snoc (env.snoc (env.nil)
-                                                                                                                      (_::_)
-                                                                                                                      ((exp_var "addr"))%exp)
-                                                                                                            (_::_)
-                                                                                                            ((exp_var "m"))%exp))
+                                        | BYTE_INSTRUCTION => stm_seq (stm_call check_byte_access (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) exp_false))
                                                                       (stm_let "ga#162"
                                                                                (ty.bvec (8))
                                                                                (stm_let "ga#161"
@@ -3479,7 +3551,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                  (stm_if ((stm_exp (exp_var "ж662")))
                                                                                                          (stm_call read_mpu_reg_byte (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp))
                                                                                                          (stm_seq
-                                                                                                            (stm_lemma extract_accessible_ptsto [exp_var "addr"; exp_var "m"])
+                                                                                                            (stm_lemma extract_accessible_ptsto [exp_var "addr"])
                                                                                                             (stm_let "res"
                                                                                                                ty.byteBits
                                                                                                                (stm_foreign read_ram [exp_var "addr"])
@@ -3492,13 +3564,12 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                       (stm_exp (exp_binop bop.bvand (exp_var "addr") (exp_val (ty.bvec 16) ([bv 65534]))))
                                                                       (stm_let "ga#163"
                                                                                (ty.union Uwordbyte)
-                                                                               (stm_call read_mem_aux (env.snoc (env.snoc (env.snoc (env.nil)
+                                                                               (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                                                                     (_::_)
                                                                                                                                     ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
                                                                                                                           (_::_)
                                                                                                                           ((exp_var "addr"))%exp)
-                                                                                                                (_::_)
-                                                                                                                ((exp_var "m"))%exp))
+                                                                                                                )
                                                                                (stm_let "ж665"
                                                                                         (ty.union Uwordbyte)
                                                                                         (stm_exp (exp_var "ga#163"))
@@ -3510,13 +3581,11 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                (stm_let "ga#164"
                                                                                                                                                                         (ty.bvec (16))
                                                                                                                                                                         (stm_exp (exp_binop bop.bvadd (exp_var "addr") (exp_val (ty.bvec 16) ([bv 1]))))
-                                                                                                                                                                        (stm_call read_mem_aux (env.snoc (env.snoc (env.snoc (env.nil)
+                                                                                                                                                                        (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                                                                                                                                                              (_::_)
                                                                                                                                                                                                                              ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
                                                                                                                                                                                                                    (_::_)
-                                                                                                                                                                                                                   ((exp_var "ga#164"))%exp)
-                                                                                                                                                                                                         (_::_)
-                                                                                                                                                                                                         ((exp_var "m"))%exp)))
+                                                                                                                                                                                                                   ((exp_var "ga#164"))%exp)))
                                                                                                                                                                (stm_let "ж666"
                                                                                                                                                                         (ty.union Uwordbyte)
                                                                                                                                                                         (stm_exp (exp_var "ga#165"))
@@ -3552,13 +3621,11 @@ Module Import MSP430Program <: Program MSP430Base.
                                    "addr"  ∷  ty.bvec (16)
                                  ]
                                  (ty.union Uwordbyte) :=
-      stm_call read_mem_aux (env.snoc (env.snoc (env.snoc (env.nil)
+      stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                           (_::_)
                                                           ((exp_var "bw"))%exp)
                                                 (_::_)
-                                                ((exp_var "addr"))%exp)
-                                      (_::_)
-                                      ((exp_val (ty.enum Eaccess_mode) (R)))%exp).
+                                                ((exp_var "addr"))%exp).
     
     (*
       Extended type
@@ -3592,11 +3659,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                       (stm_match_union_alt_list Uwordbyte
                                                                                                 (stm_exp (exp_var "ж683"))
                                                                                                 [
-                                                                                                  existT Kbyte (MkAlt (pat_var "v") (stm_seq (stm_call check_byte_access (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                             (_::_)
-                                                                                                                                                                                             ((exp_var "addr"))%exp)
-                                                                                                                                                                                   (_::_)
-                                                                                                                                                                                   ((exp_val (ty.enum Eaccess_mode) (W)))%exp))
+                                                                                                  existT Kbyte (MkAlt (pat_var "v") (stm_seq (stm_call check_byte_access (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) exp_false))
                                                                                                                                              (stm_let "ga#168"
                                                                                                                                                       (ty.bool)
                                                                                                                                                       (stm_call is_mpu_reg_addr (env.snoc (env.nil)
@@ -3608,7 +3671,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                (stm_if ((stm_exp (exp_var "ж685")))
                                                                                                                                                                        (stm_call write_mpu_reg_byte (env.snoc (env.snoc (env.nil) (_::_) ((exp_var "addr"))%exp) (_::_) ((exp_var "v"))%exp))
                                                                                                                                                                        (stm_seq
-                                                                                                                                                                          (stm_lemma extract_accessible_ptsto [exp_var "addr"; exp_val (ty.enum Eaccess_mode) W])
+                                                                                                                                                                          (stm_lemma extract_accessible_ptsto [exp_var "addr"])
                                                                                                                                                                           (stm_seq
                                                                                                                                                                              (stm_foreign write_ram [exp_var "addr"; exp_var "v"])
                                                                                                                                                                              (stm_lemma return_accessible_ptsto [exp_var "addr"]))))))));
@@ -3805,13 +3868,17 @@ Module Import MSP430Program <: Program MSP430Base.
                        (stm_let "жreg_PC_reg_719"
                                 (ty.wordBits)
                                 (stm_read_register PC_reg)
-                                (stm_call read_mem_aux (env.snoc (env.snoc (env.snoc (env.nil)
+                                (stm_seq (* (stm_lemma open_ptsto_instr [exp_var "жreg_PC_reg_719"]) *) (stm_exp (exp_val ty.unit tt))
+                                (stm_let "x"
+                                   (ty.union Uwordbyte)
+                                   (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                      (_::_)
                                                                                      ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
                                                                            (_::_)
-                                                                           ((exp_var "жreg_PC_reg_719"))%exp)
-                                                                 (_::_)
-                                                                 ((exp_val (ty.enum Eaccess_mode) (X)))%exp)))
+                                                                           ((exp_var "жreg_PC_reg_719"))%exp))
+                                   (stm_seq
+                                      (* (stm_lemma close_ptsto_instr [exp_var "жreg_PC_reg_719"]) *) (stm_exp (exp_val ty.unit tt))
+                                      (stm_exp (exp_var "x"))))))
 
                           (stm_seq
                              (stm_call incPC (env.snoc (env.nil)
@@ -4251,7 +4318,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                              (_::_)
                                                                                                                              ((exp_var "v"))%exp)
                                                                                                                    (_::_)
-                                                                                                                   ((exp_val (ty.enum Eaccess_mode) (X)))%exp))
+                                                                                                                   exp_true))
                                                                              (stm_seq (stm_let "ж820"
                                                                                                (ty.wordBits)
                                                                                                (stm_exp (exp_var "v"))

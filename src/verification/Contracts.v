@@ -67,18 +67,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
 
     (* Predicates *)
 
-    Definition asn_mpu_pwd_correct {Σ} (mpuctl0 : Term Σ ty.wordBits) : Assertion Σ :=
-      asn.formula
-        (formula_relop bop.eq
-           (term_vector_subrange 8 8 mpuctl0)
-           (term_val (ty.bvec 8) [bv 0x96])).
-
-    Definition asn_ipe_unlocked {Σ} (ipectl : Term Σ ty.wordBits) : Assertion Σ :=
-      asn.formula
-        (formula_relop bop.eq
-           (term_vector_subrange 7 1 ipectl)
-           (term_val (ty.bvec 1) [bv 0x0])).
-
     Definition word_times_16 {Σ} (w : Term Σ ty.wordBits) : Term Σ ty.int :=
       (term_binop bop.times
          (term_unsigned w)
@@ -88,8 +76,7 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       (term_binop bop.plus n (term_val ty.int m)).
 
     Definition term_word_plus {Σ} (m : bv 16) (n : Term Σ ty.wordBits) : Term Σ ty.wordBits :=
-      term_binop bop.bvadd n (term_val ty.wordBits m)
-      (* term_get_slice_int (term_plus m n) *).
+      term_binop bop.bvadd n (term_val ty.wordBits m).
 
     Definition asn_ipe_entry_point {Σ}
       (segb1 addr : Term Σ ty.wordBits)
@@ -100,49 +87,41 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
            (term_plus 8 (word_times_16 segb1))
            (term_unsigned addr)).
 
+    (* True when executing code at PC does not grant access to the IPE region.
+
+       The precise definition would be:
+       - PC outside the IPE region, or
+       - PC within first 8 bytes of the IPE region.
+
+       Additionally, if the IVT and RV are in the IPE region, they are always
+       accessible for reading and writing, and execution from them is
+       prohibited (see section 9.4.1 of slau367p).
+
+       However:
+       - we don't support the IVT and RV, so don't care about that special case;
+       - treat the first 8 bytes as trusted.
+
+       The latter means that our contracts don't guarantee anything about code
+       executed from the first 8 bytes of the IPE region (since they all assume
+       asn_untrusted), but also they guarantee that untrusted code cannot jump
+       to there in the first place.
+    *)
     Definition asn_untrusted {Σ}
       (segb1 segb2 pc : Term Σ ty.wordBits)
       : Assertion Σ
     :=
       asn.formula
-        (* PC outside IPE segment except first 8 bytes
-           or execute read in IVT or RV (9.4.1) (TODO) *)
         (formula_or
            (formula_relop bop.lt
               (term_unsigned pc)
-              (* (term_plus 8  *)(word_times_16 segb1))(* ) *)
+              (word_times_16 segb1))
            (formula_relop bop.le
               (word_times_16 segb2)
               (term_unsigned pc))).
-      (*     (* not execute access in IVT or RV (9.4.1) *) *)
-      (*     /\ ((Z.lt addr 0xFF80 \/ Z.le 0xFFFF addr) *)
-      (*         \/ am <> X)) *)
 
     Definition asn_untrusted_or_entry_point {Σ}
       (segb1 segb2 pc : Term Σ ty.wordBits) : Assertion Σ
       := asn_ipe_entry_point segb1 pc ∨ asn_untrusted segb1 segb2 pc.
-
-    Definition asn_unprotected {Σ}
-      (segb1 segb2 : Term Σ ty.wordBits)
-      (am : Term Σ (ty.enum Eaccess_mode))
-      (addr : Term Σ ty.Address)
-      : Assertion Σ
-    :=
-        asn.formula (formula_relop bop.lt
-                       (term_unsigned addr)
-                       (word_times_16 segb1))
-      ∨ asn.formula (formula_relop bop.le
-                       (word_times_16 segb2)
-                       (term_unsigned addr))
-
-      ∨ ( am = term_enum Eaccess_mode X
-        ∗ asn_ipe_entry_point segb1 addr).
-
-      (* ∨ (am = term_enum Eaccess_mode X
-         ∗ asn.formula (formula_relop bop.lt
-                          (term_unsigned pc)
-                          (term_plus 8 (word_times_16 segb1)))
-         ∗ pc = addr) *)
 
     Definition asn_ipe_configured {Σ} (ipectl : Term Σ ty.wordBits) :=
       asn.formula
@@ -202,20 +181,16 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
     Definition lemma_extract_accessible_ptsto : SepLemma extract_accessible_ptsto :=
       {|
         lemma_logic_variables :=
-          [ "addr" :: ty.Address; "m" :: ty.enum Eaccess_mode
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ];
+          ["addr" :: ty.Address; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits];
 
-        lemma_patterns := [term_var "addr"; term_var "m"];
+        lemma_patterns := [term_var "addr"];
 
         lemma_precondition :=
             MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ asn_accessible_addresses "segb1" "segb2"
-          ∗ asn_unprotected
-              (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "addr");
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "addr");
 
         lemma_postcondition :=
             MPUIPSEGB1_reg ↦ term_var "segb1"
@@ -308,14 +283,14 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       {|
         sep_contract_logic_variables :=
           [ "addr"   :: ty.Address
-          ; "m"      :: ty.enum Eaccess_mode
+          ; "jump"   :: ty.bool
           ; "ipectl" :: ty.wordBits
           ; "segb1"  :: ty.wordBits
           ; "segb2"  :: ty.wordBits
           ; "pc"     :: ty.wordBits
           ];
 
-        sep_contract_localstore := [term_var "addr"; term_var "m"];
+        sep_contract_localstore := [term_var "addr"; term_var "jump"];
 
         sep_contract_precondition :=
             PC_reg         ↦ term_var "pc"
@@ -335,22 +310,21 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
-          ∗ asn_unprotected
-              (term_var "segb1") (term_var "segb2")
-              (term_var "m") (term_var "addr");
-
+          ∗ (asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "addr")
+             ∨ (asn.formula (formula_bool (term_var "jump"))
+                ∗ asn_ipe_entry_point (term_var "segb1") (term_var "addr")))
       |}.
 
     Definition sep_contract_read_mem_aux :
       SepContractFun read_mem_aux :=
       {|
         sep_contract_logic_variables :=
-          [ "bw" :: ty.enum Ebw; "addr" :: ty.Address; "m" :: ty.enum Eaccess_mode
+          [ "bw" :: ty.enum Ebw; "addr" :: ty.Address
           ; "ipectl" :: ty.wordBits; "segb1"  :: ty.wordBits; "segb2"  :: ty.wordBits
           ; "pc" :: ty.wordBits
           ];
 
-        sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "m"];
+        sep_contract_localstore := [term_var "bw"; term_var "addr"];
 
         sep_contract_precondition :=
             PC_reg         ↦ term_var "pc"
@@ -460,9 +434,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ PC_reg ↦ term_var "pc_new"
-          ∗ ( asn_untrusted
-                (term_var "segb1") (term_var "segb2") (term_var "pc_new")
-            ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new"));
+          ∗ asn_untrusted_or_entry_point
+              (term_var "segb1") (term_var "segb2") (term_var "pc_new");
       |}.
 
     Definition sep_contract_incPC :
@@ -589,17 +562,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         sep_contract_postcondition   :=
             term_var "u" = term_val ty.unit tt
 
-          (* ∗ (PC_reg ↦ term_var "pc_old" *)
-          (*    ∨ term_var "reg" = term_val (ty.enum Eregister) PC *)
-          (*      ∗ ∃ "pc_new", *)
-          (*        (PC_reg ↦ term_var "pc_new" *)
-          (*         ∗ (term_var "v" = term_union Uwordbyte Kword (term_var "pc_new") *)
-          (*            ∨ ∃ "b", *)
-          (*              (term_var "v" = term_union Uwordbyte Kword (term_var "b") *)
-          (*               ∗ term_var "pc_new" = (term_unop uop.zext (term_var "b")))) *)
-          (*         ∗ asn_untrusted_or_entry_point *)
-          (*             (term_var "segb1") (term_var "segb2") (term_var "pc_new"))) *)
-
           ∗ (PC_reg ↦ term_var "pc_old"
              ∨ (term_var "reg" = term_val (ty.enum Eregister) PC
                 ∗ ∃ "pc_new",
@@ -615,12 +577,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
 
                       (* don't care *)
                       ∨ term_var "bw" = term_enum Ebw BYTE_INSTRUCTION))))
-
-
-          (* ∗ ∃ "pc_new", *)
-          (*   (PC_reg ↦ term_var "pc_new" *)
-          (*      ∗ asn_untrusted_or_entry_point *)
-          (*          (term_var "segb1") (term_var "segb2") (term_var "pc_new")) *)
 
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
@@ -872,9 +828,9 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ ∃ "pc_new",
-            (PC_reg ↦ term_var "pc_new"
-             ∗ (asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new")
-                ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new")));
+            ( PC_reg ↦ term_var "pc_new"
+            ∗ asn_untrusted_or_entry_point
+                (term_var "segb1") (term_var "segb2") (term_var "pc_new"));
       |}.
 
     Definition sep_contract_execute_call :
@@ -915,9 +871,9 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
             term_var "u" = term_val ty.unit tt
 
           ∗ ∃ "pc_new",
-            (PC_reg ↦ term_var "pc_new"
-             ∗ (asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new")
-                ∨ asn_ipe_entry_point (term_var "segb1") (term_var "pc_new")))
+            ( PC_reg ↦ term_var "pc_new"
+            ∗ asn_untrusted_or_entry_point
+                (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
 
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
@@ -927,68 +883,6 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
           ∗ asn_mpu_registers
           ∗ asn_own_sample_regs
       |}.
-
-    (*
-    Definition sep_contract_execute :
-      SepContractFun execute :=
-      {|
-        sep_contract_logic_variables :=
-          [ "mpuctl0" :: ty.wordBits; "ipectl" :: ty.wordBits
-          ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-          ; "pc" :: ty.wordBits
-          ; "instr" :: ty.union Uast ];
-
-        sep_contract_localstore := [term_var "instr"];
-
-        sep_contract_precondition :=
-            PC_reg ↦ term_var "pc"
-          ∗ MPUCTL0_reg    ↦ term_var "mpuctl0"
-          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ asn_accessible_addresses "segb1" "segb2";
-
-        sep_contract_result          := "u";
-        sep_contract_postcondition   :=
-            term_var "u" = term_val ty.unit tt
-
-            (* TODO if password is wrong then only it is allowed to change *)
-          ∗ (∃ "mpuctl0_new", MPUCTL0_reg ↦ term_var "mpuctl0_new")
-
-          ∗ ∃ "ipectl_new", ∃ "segb1_new", ∃ "segb2_new", ∃ "pc_new",
-            ( MPUIPC0_reg    ↦ term_var "ipectl_new"
-            ∗ MPUIPSEGB1_reg ↦ term_var "segb1_new"
-            ∗ MPUIPSEGB2_reg ↦ term_var "segb2_new"
-
-              (* IPE control registers can change if the password is correct
-                 and they are not locked TODO and they are not protected by IPE? *)
-            ∗ (   asn_mpu_pwd_correct (term_var "mpuctl0")
-                ∗ asn_ipe_unlocked (term_var "ipectl")
-
-              ∨ (* otherwise they must stay the same *)
-                  term_var "ipectl_new" = term_var "ipectl"
-                ∗ term_var "segb1_new"  = term_var "segb1"
-                ∗ term_var "segb2_new"  = term_var "segb2"
-              )
-
-            ∗ PC_reg ↦ term_var "pc_new"
-
-            ∗ (* jumps to untrusted sections are always allowed *)
-              ( asn_not_in_ipe_segment
-                  (term_var "segb1") (term_var "segb2") (term_var "pc_new")
-
-                (* arbitrary jumps into the IPE segment are allowed only from the IPE segment *)
-              ∨ asn_access_allowed
-                  (term_var "ipectl_new") (term_var "segb1_new") (term_var "segb2_new")
-                  (term_enum Eaccess_mode X) (term_var "pc") (term_var "pc_new")
-
-                (* untrusted code can only jump to the entry point *)
-              ∨ asn_ipe_entry_point (term_var "segb1_new") (term_var "pc_new")
-              )
-
-            ∗ asn_accessible_addresses "pc_new" "ipectl" "segb1_new" "segb2_new");
-      |}.
-     *)
 
     (* The following maps μSail function names to their contracts. *)
     Definition CEnv : SepContractEnv :=
@@ -1064,20 +958,21 @@ Ltac symbolic_simpl :=
   apply validcontract_with_erasure_sound;
   compute;
   constructor;
-  cbn [Erasure.inst_symprop Erasure.erase_valuation Erasure.erase_symprop Erasure.erase_formula].
+  simpl.
+  (* cbn [Erasure.inst_symprop Erasure.erase_valuation Erasure.erase_symprop Erasure.erase_formula]. *)
+
 Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
 Proof.
   symbolic_simpl.
   repeat split; intros.
-  1: cbn in H; cbn in H2; rewrite H in H2; discriminate H2.
-  all: cbn in H1; cbn in H5; cbn in H6; exfalso; destruct H1; lia.
+  - rewrite H in H2; discriminate H2.
+  - exfalso; destruct H1; lia.
+  - intuition.
+  - intuition.
 Qed.
 
 Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 (* XXX *)
 Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
@@ -1089,10 +984,7 @@ Proof. Admitted.
 (* Qed. *)
 
 Lemma valid_contract_writeMem : Symbolic.ValidContractWithFuel 10 sep_contract_writeMem fun_writeMem.
-Proof.
-  symbolic_simpl.
-  repeat split; intros; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 (* XXX *)
 Lemma valid_contract_setPC : Symbolic.ValidContract sep_contract_setPC fun_setPC.
@@ -1121,27 +1013,16 @@ Proof. Admitted.
 (* Qed. *)
 
 Lemma valid_contract_read_register : Symbolic.ValidContractWithFuel 10 sep_contract_read_register fun_read_register.
-Proof.
-  symbolic_simpl. exact I.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 Lemma valid_contract_write_register : Symbolic.ValidContractWithFuel 10 sep_contract_write_register fun_write_register.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 Lemma valid_contract_read_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 Lemma valid_contract_read_indirect : Symbolic.ValidContractWithFuel 10 sep_contract_read_indirect fun_read_indirect.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
 
 Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10 sep_contract_read_autoincrement fun_read_autoincrement.
 Proof.
@@ -1158,10 +1039,9 @@ Proof.
 Admitted.
 
 Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.
-Proof.
-  symbolic_simpl.
-  repeat split; assumption.
-Qed.
+Proof. symbolic_simpl. exact I. Qed.
+
+(* TODO recheck *)
 
 Lemma valid_contract_execute_move : Symbolic.ValidContractWithFuel 10 sep_contract_execute_move fun_execute.
 Proof.

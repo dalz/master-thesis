@@ -7,11 +7,11 @@ val read_ram = pure "read_ram" : forall 'n 'm.
 val write_ram = pure "write_ram" : forall 'n 'm.
   (atom('m), atom('n), bits('m), bits('m), bits(8 * 'n)) -> unit
 
-val read_mem_aux : (BW, Address, access_mode) -> WordByte
+val read_mem_aux : (BW, Address) -> WordByte
 
-function read_mem_aux(bw, addr, m) = match bw {
+function read_mem_aux(bw, addr) = match bw {
   BYTE_INSTRUCTION => {
-    check_byte_access(addr, m);
+    check_byte_access(addr, false);
     Byte(if is_mpu_reg_addr(addr)
          then read_mpu_reg_byte(addr)
          else read_ram(sizeof(address_size), 1, 0x0000, addr))
@@ -19,20 +19,20 @@ function read_mem_aux(bw, addr, m) = match bw {
 
   WORD_INSTRUCTION =>
     let addr = addr & 0xFFFE in // TODO is this right?
-    let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr, m) in
-    let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1, m) in
+    let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr) in
+    let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1) in
     Word(h @ l)
 }
 
 val readMem : (BW, Address) -> WordByte
-function readMem(bw, addr) = read_mem_aux(bw, addr, R)
+function readMem(bw, addr) = read_mem_aux(bw, addr)
 
 val writeMem : (BW, Address, WordByte) -> unit
 
 function writeMem(bw, addr, v) = match bw {
   BYTE_INSTRUCTION => match v {
     Byte(v) => {
-      check_byte_access(addr, W);
+      check_byte_access(addr, false);
       if is_mpu_reg_addr(addr)
       then write_mpu_reg_byte(addr, v)
       else write_ram(sizeof(address_size), 1, 0x0000, addr, v)
@@ -93,7 +93,7 @@ function fetch() = {
   // TODO maybe do this check at eatch FDE step so we can also do this for the stack pointer
   assert(PC_reg[0..0] == 0b0, "PC is not correctly aligned");
 
-  let data = read_mem_aux(WORD_INSTRUCTION, PC_reg, X);
+  let data = read_mem_aux(WORD_INSTRUCTION, PC_reg);
   incPC();
   data
 }

@@ -152,27 +152,19 @@ function in_ivt_or_rv(addr) =
   unsigned(0xFF80) <= unsigned(addr)
   & unsigned(addr) <= unsigned(0xFFFF)
 
-enum access_mode = R | W | X
-val is_x : (access_mode) -> bool
-function is_x(m) = match m { X => true, _ => false }
-
-val check_ipe_access : (Address, access_mode) -> bool
-function check_ipe_access(addr, m) =
+val check_ipe_access : (Address, bool) -> bool
+function check_ipe_access(addr, jump) =
   let pc = unsigned(PC_reg) in
   // allow access if...
   // ...IPE disabled, or
   MPUIPC0_reg[MPUIPENA_bit..MPUIPENA_bit] == 0b0
-  | ~(in_ipe_segment(addr))
-  | (// ...PC in IPE segment except first 8 bytes, and
-     (ipe_lower() + 8 <= pc & pc < ipe_higher())
-     // not execute access in IVT or RV (9.4.1)
-     & ~(is_x(m) & in_ivt_or_rv(addr)))
+  | // ...address unprotected, or
+    ~(in_ipe_segment(addr))
+  | // PC in IPE segment except first 8 bytes, or
+    (ipe_lower() + 8 <= pc & pc < ipe_higher())
+  | // ...address is entry point and checking permission to jump
+    (jump & unsigned(addr) == ipe_lower() + 8)
 
-val check_byte_access : (Address, access_mode) -> unit
-function check_byte_access(addr, m) =
-  if ~(check_ipe_access(addr, m)) then throw ipe_violation(addr)
-
-// TODO brownout reset?
-// doesn't seem to be implemented
-// disables MPU
-// clears MPULOCK and MPUIPLOCK
+val check_byte_access : (Address, bool) -> unit
+function check_byte_access(addr, jump) =
+  if ~(check_ipe_access(addr, jump)) then throw ipe_violation(addr)
