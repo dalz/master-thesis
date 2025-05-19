@@ -23,7 +23,8 @@ Import ListNotations.
 Open Scope string_scope.
 Open Scope Z_scope.
 
-Inductive PurePredicate : Set := .
+Inductive PurePredicate : Set :=
+| untrusted.
 
 Inductive Predicate :=
 | ptstomem
@@ -42,6 +43,10 @@ End TransparentObligations.
 Derive EqDec for PurePredicate.
 Derive EqDec for Predicate.
 
+Definition puntrusted (segb1 segb2 pc : bv 16) : Prop :=
+  bv.unsigned pc < bv.unsigned segb1 * 16 \/
+  bv.unsigned segb2 * 16 <= bv.unsigned pc.
+
 Module Export MSP430Signature <: Signature MSP430Base.
   Import MSP430Base.
 
@@ -52,11 +57,13 @@ Module Export MSP430Signature <: Signature MSP430Base.
     (* Maps each pure predicate to a list of arguments with their types. *)
     Definition 𝑷_Ty (p : 𝑷) : Ctx Ty :=
       match p with
+      | untrusted => [ty.Address; ty.Address; ty.Address]
       end.
 
     (* Interprets a pure predicate name as a Coq proposition. *)
     Definition 𝑷_inst (p : 𝑷) : env.abstract Val (𝑷_Ty p) Prop :=
       match p with
+      | untrusted => puntrusted
       end.
 
     Instance 𝑷_eq_dec : EqDec 𝑷 := PurePredicate_eqdec.
