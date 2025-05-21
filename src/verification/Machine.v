@@ -3580,7 +3580,7 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                (ty.union Uwordbyte)
                                                                                                                                                                (stm_let "ga#164"
                                                                                                                                                                         (ty.bvec (16))
-                                                                                                                                                                        (stm_exp (exp_binop bop.bvadd (exp_var "addr") (exp_val (ty.bvec 16) ([bv 1]))))
+                                                                                                                                                                        (stm_exp (exp_binop bop.bvor (exp_var "addr") (exp_val (ty.bvec 16) ([bv 1]))))
                                                                                                                                                                         (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                                                                                                                                                              (_::_)
                                                                                                                                                                                                                              ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
@@ -3868,16 +3868,16 @@ Module Import MSP430Program <: Program MSP430Base.
                        (stm_let "жreg_PC_reg_719"
                                 (ty.wordBits)
                                 (stm_read_register PC_reg)
-                                (stm_seq (* (stm_lemma open_ptsto_instr [exp_var "жreg_PC_reg_719"]) *) (stm_exp (exp_val ty.unit tt))
+                                (stm_seq (stm_lemma open_ptsto_instr [exp_var "жreg_PC_reg_719"])
                                 (stm_let "x"
                                    (ty.union Uwordbyte)
-                                   (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
+                                   (stm_debugk (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                      (_::_)
                                                                                      ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
                                                                            (_::_)
-                                                                           ((exp_var "жreg_PC_reg_719"))%exp))
+                                                                           ((exp_var "жreg_PC_reg_719"))%exp)))
                                    (stm_seq
-                                      (* (stm_lemma close_ptsto_instr [exp_var "жreg_PC_reg_719"]) *) (stm_exp (exp_val ty.unit tt))
+                                      (stm_lemma close_ptsto_instr [exp_var "жreg_PC_reg_719"])
                                       (stm_exp (exp_var "x"))))))
 
                           (stm_seq

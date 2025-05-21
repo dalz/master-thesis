@@ -18,9 +18,9 @@ function read_mem_aux(bw, addr) = match bw {
   },
 
   WORD_INSTRUCTION =>
-    let addr = addr & 0xFFFE in // TODO is this right?
+    let addr = addr & 0xFFFE in
     let Byte(l) = read_mem_aux(BYTE_INSTRUCTION, addr) in
-    let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr + 1) in
+    let Byte(h) = read_mem_aux(BYTE_INSTRUCTION, addr | 1) in
     Word(h @ l)
 }
 

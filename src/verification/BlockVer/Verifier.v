@@ -111,6 +111,11 @@ Section BlockVerificationDerived.
         PC_reg ↦ term_var "na"
       ∗ ptstoinstr_with_args (term_var "a") i.
 
+    Definition debug_config : Config :=
+      MkConfig (fun _ _ _ => false) (fun _ _ => true).
+
+    Definition config := (* debug_config *) default_config.
+
     Definition sexec_instruction (i : ast_with_args) :
       ⊢ STerm ty.Address -> SHeapSpec (STerm ty.Address) :=
       let inline_fuel := 10%nat in
@@ -120,12 +125,12 @@ Section BlockVerificationDerived.
                       [env].["a"∷_ ↦ a] ;;
 
         ⟨ θ2 ⟩ w <- evalStoreSpec
-                      (sexec default_config inline_fuel (FunDef fetch) _)
+                      (sexec config inline_fuel (FunDef fetch) _)
                       [env].["_ж716"∷_ ↦ term_val ty.unit tt] ;;
         ⟨ θ3 ⟩ d <- sexec_call_foreign decode
                       [env].["w"∷_ ↦ w] ;;
         ⟨ θ4 ⟩ _ <- evalStoreSpec
-                      (sexec default_config inline_fuel (FunDef execute) _)
+                      (sexec config inline_fuel (FunDef execute) _)
                       [env].["merge#var"∷_ ↦ d] ;;
 
 
@@ -160,7 +165,7 @@ Section BlockVerificationDerived.
       fun w =>
         ⟨ θ0 ⟩ δ <- demonic_ctx id Σ ;;
         ⟨ θ1 ⟩ a <- demonic (Some "a") _ ;;
-        let δ1 := env.snoc (persist ( A:= Sub Σ) δ θ1) _ a in
+        let δ1 := env.snoc (persist (A := Sub Σ) δ θ1) _ a in
         ⟨ θ2 ⟩ _ <- produce req δ1 ;;
         let a2 := persist__term a θ2 in
         ⟨ θ3 ⟩ na <- sexec_block_addr b a2 a2 ;;
