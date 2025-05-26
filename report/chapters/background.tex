@@ -279,7 +279,7 @@ This shift in viewpoint is consequential for machine-assisted proofs of security
 
 So far we have been stating the pre- and postconditions informally. To make them more precise we need a language that can express properties involving memory, registers and access permissions, while being simple enough to facilitate (semi-)automated reasoning. The obvious choice here is a basic separation logic.
 
-Generally speaking, separation logic is a kind of Hoare logic extended with predicates that state ownership of \emph{resources}, such as memory locations and registers. For example, \(\ell \ptom v\) asserts that we own the location \(\ell\) and that the value stored at that location is \(v\).
+Generally speaking, separation logic is a kind of Hoare logic extended with predicates that state ownership of \emph{resources}, such as memory locations and registers. For example, \(\ell \ptom v\)\footnote{Pronounced \(\ell\) points to \(v\).} asserts that we own the location \(\ell\) and that the value stored at that location is \(v\).
 
 Separation logic introduces a new connective, the \intro{separating conjunction}. \(P \ast Q\) is true when \(P\) and \(Q\) both hold and have exclusive ownership of the resources they assert. For example, while \(\ell \ptom v \wedge \ell \ptom v\) is true for a memory where location \(\ell\) stores \(v\), \(\ell \ptom v \ast \ell \ptom v\) is always false: the two conjuncts don't have exclusive ownership of \(\ell\). So from the validity of \(\ell_1 \ptom v \ast \ell_2 \ptom v\) we can derive that \(\ell_1 \neq \ell_2\).
 

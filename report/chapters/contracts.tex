@@ -386,45 +386,353 @@ We also get back ownership of unprotected memory and all other registers \circre
 
 \section{Universal contract in Katamaran}
 
+\Cref{lst:universal-contract} shows the translation of the universal contract to a Rocq definition to be verified by Katamaran. The contract is represented by a record with five fields (here listed without their \coq{sep_contract_} prefix):
+\begin{labeling}{\coq{logic_variables}}
+\item[\coq{logic_variables}] A list of the universally quantified variables used in the contract and their types. Up until now we treated free variables as universally quantified, but in Rocq we need to be explicit about them.
+\item[\coq{localstore}] A list of variables bound to the parameters of the function.
+\item[\coq{precondition}] The precondition, expressed in Katamaran's separation logic.
+
+\item[\coq{result}] Variable that will be bound to the function's return value in the postcondition.
+\item[\coq{postcondition}] The postcondition.
+\end{labeling}
+
+The only change from \cref{fig:universal-contract} is that we have a separate predicate \coq{asn_mpu_registers} for asserting ownership of the MPU registers, which are consequently not included in \coq{asn_other_registers}; this will be useful later.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition sep_contract_execute : SepContractFun execute :=
+    {|
+      sep_contract_logic_variables :=
+        [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+        ; "pc_old" :: ty.wordBits; "instr" :: ty.union Uast ];
+
+      sep_contract_localstore := [term_var "instr"];
+
+      sep_contract_precondition :=
+          PC_reg         ↦ term_var "pc_old"
+        ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+        ∗ asn_accessible_addresses "segb1" "segb2"
+        ∗ asn_mpu_registers
+        ∗ asn_other_registers
+
+        ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+        ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old");
+
+      sep_contract_result        := "u";
+      sep_contract_postcondition :=
+          term_var "u" = term_val ty.unit tt
+
+        ∗ ∃ "pc_new",
+          (PC_reg ↦ term_var "pc_new"
+           ∗ asn_untrusted_or_entry_point
+               (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+
+        ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+        ∗ asn_accessible_addresses "segb1" "segb2"
+        ∗ asn_mpu_registers
+        ∗ asn_other_registers;
+    |}.
+  \end{minted}
+  \caption{Universal contract in Katamaran.}
+  \label{lst:universal-contract}
+\end{listing}
+
+There is however some nuance in the way the auxiliary predicates are defined. \coq{asn_mpu_registers} (\cref{lst:asn_mpu_registers}), \coq{asn_other_registers}, \coq{asn_ipe_configured} (\cref{lst:asn_ipe_configured}), \coq{asn_untrusted_or_entry_point} are simple Rocq definitions. On the other hand, \coq{asn_untrusted} and \coq{asn_accessible_addresses} are a Katamaran \coq{PurePredicate} and \coq{Predicate}, respectively.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition asn_mpu_registers {Σ} : Assertion Σ :=
+        ∃ "MPUCTL0_reg"  , MPUCTL0_reg  ↦ term_var "MPUCTL0_reg"
+      ∗ ∃ "MPUCTL1_reg"  , MPUCTL1_reg  ↦ term_var "MPUCTL1_reg"
+      ∗ ∃ "MPUSEGB2_reg" , MPUSEGB2_reg ↦ term_var "MPUSEGB2_reg"
+      ∗ ∃ "MPUSEGB1_reg" , MPUSEGB1_reg ↦ term_var "MPUSEGB1_reg"
+      ∗ ∃ "MPUSAM_reg"   , MPUSAM_reg   ↦ term_var "MPUSAM_reg".
+  \end{minted}
+  \caption{Definition of \coq{asn_mpu_registers}.}
+  \label{lst:asn_mpu_registers}
+\end{listing}
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition asn_ipe_configured {Σ} (ipectl segb1 segb2 : Term Σ ty.wordBits) :=
+      asn.formula
+        (formula_and
+          (formula_and
+             (* enabled *)
+             (formula_relop bop.eq
+                (term_vector_subrange 6 1 ipectl)
+                (term_val (ty.bvec 1) [bv 0x1]))
+             (* locked *)
+             (formula_relop bop.eq
+                (term_vector_subrange 7 1 ipectl)
+                (term_val (ty.bvec 1) [bv 0x1])))
+          (* segb1 < segb2 *)
+          (formula_relop bop.lt
+             (term_unsigned segb1)
+             (term_unsigned segb2))).
+  \end{minted}
+  \caption{Definition of \coq{asn_ipe_configured}.}
+  \label{lst:asn_ipe_configured}
+\end{listing}
+
+\subsection{Pure predicates and \texttt{asn\_untrusted}}
+
+\emph{TODO please someone fact-check this :)}
+
+Auxiliary predicates given as normal Rocq definitions are completely transparent to Katamaran: they are always expanded to their meaning. Complex preconditions that include disjunctions or many variables impact negatively the performance of the symbolic executor. Pure predicates are an answer to this: they are defined in terms of the usual assertion language, but must be unfolded manually by the user when needed. This way, the performance cost of the precondition is only paid when it is actually needed to solve a verification condition.
+
+In our case, the eagerly-expanded version of \coq{asn_untrusted} proved to be problematic for the verification time: the disjunction (address before or after the IPE region) would cause Katamaran to needlessly explore both possibilities. Replacing it with a pure predicate, as shown in \cref{lst:pure-untrusted}, mitigates this issue.
+
+We will see how the unfolding of \coq{asn_untrusted} is incorporated into the proofs in \cref{sec:TODO}.
+
+\begin{listing}
+  \begin{minted}{coq}
+    (* Sig.v *)
+    Inductive PurePredicate : Set :=
+    | untrusted.
+
+    Definition 𝑷_Ty (p : 𝑷) : Ctx Ty :=
+      match p with
+      | untrusted => [ty.Address; ty.Address; ty.Address]
+      end.
+
+    Definition puntrusted (segb1 segb2 pc : bv 16) : Prop :=
+      bv.unsigned pc < bv.unsigned segb1 * 16 \/
+      bv.unsigned segb2 * 16 <= bv.unsigned pc.
+
+    Definition 𝑷_inst (p : 𝑷) : env.abstract Val (𝑷_Ty p) Prop :=
+      match p with
+      | untrusted => puntrusted
+      end.
+
+    (* Contracts.v *)
+    Definition asn_untrusted {Σ} (segb1 segb2 pc : Term Σ ty.wordBits) : Assertion Σ :=
+      asn.formula (formula_user untrusted [segb1; segb2; pc]).
+  \end{minted}
+  \caption{Definition of the pure predicate \coq{untrusted}.}
+  \label{lst:pure-untrusted}
+\end{listing}
+
+\subsection{Spatial predicates and \texttt{asn\_accessible\_addresses}}
+
+Katamaran's logic comes equipped with a predicate for asserting ownership of registers, which is derived automatically from the register definitions in the \usail specification; we used it already in \cref{lst:universal-contract}, \eg in \coq{PC_reg ↦ term_var "pc_old"}. Our universal contract deals with access to memory as well, so we need to extend the logic to be able to express ownership of memory locations. New resources can be added to Katamaran by defining a spatial predicate.
+
+Spatial predicates may go beyond what is already expressible in the logic. Unlike pure predicates, they are not aliases for a logical assertion, but completely opaque objects whose meaning is entirely determined by the operations that the user defines on them. These operations come under the form of lemmas and foreign function contracts. (TODO iris model, maybe in background)
+
+In our formalization we make use of a number of spatial predicates. We will discuss some now; the rest are relevant to the block verifier and will be presented in \cref{ch:block-verifier}.
+
+\subsubsection{Memory location ownership with \coq{ptstomem}}
+
+A predicate definition comprises of its name, argument types, and whether it is \emph{duplicable} and \emph{precise}. \Cref{lst:ptstomem} shows this done for the resource of memory locations, \coq{ptstomem}. We also define a notation \coq{l m↦ v} for easier use of the predicate and affinity with the built-in points-to for registers.
+
+The \msp's memory is byte addressable, so the argument \coq{l} is an address (16 bits in our model) and \coq{v} a bitvector of length 8. Predicates that represent exclusive ownership of a resource, including \coq{ptstomem}, are not duplicable. This means that if a contract specifies a \coq{ptstomem} in its precondition, it \emph{consumes} the resource when it is invoked: the location will not be usable anymore unless it is returned in the postcondition.
+
+A precise predicate partitions its arguments into inputs and outputs, and guarantees that from equality of inputs follows equality of outputs. \coq{ptstomem} is precise with the location as input and value as output: if we know that \coq{l m↦ v} and \coq{l m↦ u}, then \coq{v = u}, since the same memory location cannot store two different values at the same time. This information is used to improve the symbolic executor's performance.
+
+\begin{listing}
+  \begin{minted}{coq}
+    (* Sig.v *)
+    Inductive Predicate := ptstomem | (* ... *).
+
+    Definition 𝑯_Ty (p : 𝑯) : Ctx Ty :=
+      match p with
+      | ptstomem => [ty.Address; ty.byteBits]
+      | (* ... *)
+      end.
+
+    Definition 𝑯_precise (p : 𝑯) : option (Precise 𝑯_Ty p) :=
+      match p with
+      | ptstomem => Some (MkPrecise [ty.Address] [ty.byteBits] eq_refl)
+      | (* ... *)
+      end.
+
+    (* Contracts.v *)
+    Local Notation "l m↦ v" :=
+      (asn.chunk (chunk_user ptstomem [l; v])) (at level 70).
+  \end{minted}
+  \caption{Definition of the \emph{points to memory} resource.}
+  \label{lst:ptstomem}
+\end{listing}
+
+The utility of \coq{ptstomem} is established by the foreign function contracts for \sail{read_ram} and \sail{write_ram}, shown in \cref{lst:read-write-foreign-contracts}. Reading from and writing to memory requires ownership of the corresponding \coq{ptstomem} chunk, which is returned in the postcondition---unchanged when reading, with the updated value when writing. The return value of \sail{read_ram} is the value pointed to by the address in the precondition.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition sep_contract_read_ram : SepContractFunX read_ram :=
+      {|
+        sep_contract_logic_variables := ["l" :: ty.Address; "v" :: ty.byteBits];
+        sep_contract_localstore      := [term_var "l"];
+        sep_contract_precondition    := term_var "l" m↦ term_var "v";
+        sep_contract_result          := "w";
+        sep_contract_postcondition   := term_var "v" = term_var "w"
+                                        ∗ term_var "l" m↦ term_var "v";
+      |}.
+
+    Definition sep_contract_write_ram : SepContractFunX write_ram :=
+      {|
+        sep_contract_logic_variables := ["l" :: ty.Address; "v" :: ty.byteBits; "w" :: ty.byteBits];
+        sep_contract_localstore      := [term_var "l"; term_var "v"];
+        sep_contract_precondition    := term_var "l" m↦ term_var "w";
+        sep_contract_result          := "_";
+        sep_contract_postcondition   := term_var "l" m↦ term_var "v";
+      |}.
+  \end{minted}
+  % omitted term_var "u" = term_val ty.unit tt
+  \caption{Contracts for the foreign functions \sail{read_ram} and \sail{write_ram}.}
+  \label{lst:read-write-foreign-contracts}
+\end{listing}
+
+\subsubsection{Untrusted memory ownership with \coq{accessible_addresses}}
+
+In our initial presentation of the universal contract, \sail{execute} received ownership of a subset of memory via \pred{accessible\_addresses} (\cref{fig:aux-preds}), defined by a separating conjunction over the set of untrusted addresses. Providing the symbolic executor with tens of thousands of \coq{ptstomem} chunks is unreasonable; an implicit representation of said separating conjunction is called for here.
+
+The idea is to have a spatial predicate, \coq{accessible_addresses}, represent the whole untrusted memory. When we need to access a location, we extract the corresponding \coq{ptstomem} chunk from \coq{accessible_addresses}, transforming the latter into an \coq{accessible_addresses_without} predicate. This is necessary to avoid extracting the same \coq{ptstomem} multiple times, which would be unsound.\footnote{Remember that \coq{ptstomem} represents \emph{exclusive} ownership; in separation logic, \(\ell \ptom v \ast \ell \ptom v \to \bot\).} \coq{accessible_addresses_without} can later be recombined with the extracted chunk to regain full ownership of untrusted memory.
+
+\Cref{lst:accessible_addresses} shows the definition of the two predicates in Katamaran. \coq{accessible_addresses} takes two parameters, the IPE boundaries; it will grant access to addresses outside of them. \coq{accessible_addresses_without} takes an additional parameter, the address that has been extracted. TODO precise with no outputs?
+
+\begin{listing}
+  \begin{minted}{coq}
+    (* Sig.v *)
+    Inductive Predicate :=
+    | accessible_addresses
+    | accessible_addresses_without
+    | (* ... *).
+
+    Definition 𝑯_Ty (p : 𝑯) : Ctx Ty :=
+      match p with
+      | accessible_addresses => [ty.wordBits; ty.wordBits]
+      | accessible_addresses_without => [ty.wordBits; ty.wordBits; ty.Address]
+      | (* ... *)
+      end.
+
+    Definition 𝑯_precise (p : 𝑯) : option (Precise 𝑯_Ty p) :=
+      match p with
+      | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits] ε eq_refl)
+      | accessible_addresses_without => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.Address] ε eq_refl)
+      | (* ... *)
+      end.
+
+    (* Contracts.v *)
+    Local Notation asn_accessible_addresses segb1 segb2 :=
+      asn.chunk_angelic (chunk_user accessible_addresses
+                          [term_var segb1; term_var segb2]).
+  \end{minted}
+  \caption{Definition of \coq{accessible_addresses} and \coq{accessible_addresses_without}.}
+  \label{lst:accessible_addresses}
+\end{listing}
+
+Extraction of a single location happens with the \coq{extract_accessible_ptsto} lemma shown in \cref{lst:accessible-lemmas}. The lemma takes an argument, \coq{addr}, which must be an untrusted address according to \coq{asn_untrusted}. Given an \coq{accessible_addresses} predicate matching the current IPE boundaries, the lemma returns a \coq{ptstomem} chunk for \coq{addr} and the corresponding \coq{accessible_addresses_without}. The companion lemma \coq{return_accessible_ptsto} recombines the two into the full \coq{accessible_addresses}.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition lemma_extract_accessible_ptsto : SepLemma extract_accessible_ptsto :=
+      {|
+        lemma_logic_variables :=
+          ["addr" :: ty.Address; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits];
+
+        lemma_patterns := [term_var "addr"];
+
+        lemma_precondition :=
+            MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "addr");
+
+        lemma_postcondition :=
+            MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+          ∗ asn_accessible_addresses_without "segb1" "segb2" "addr"
+          ∗ ∃ "v", term_var "addr" m↦ term_var "v";
+      |}.
+
+    Definition lemma_return_accessible_ptsto : SepLemma return_accessible_ptsto :=
+      {|
+        lemma_logic_variables :=
+          [ "addr" :: ty.Address; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ];
+
+        lemma_patterns := [term_var "addr"];
+
+        lemma_precondition :=
+            asn_accessible_addresses_without "segb1" "segb2" "addr"
+          ∗ ∃ "v", term_var "addr" m↦ term_var "v";
+
+        lemma_postcondition := asn_accessible_addresses "segb1" "segb2";
+      |}.
+  \end{minted}
+  \caption{Lemmas for the manipulation of \coq{accessible_addresses}}
+  \label{lst:accessible-lemmas}
+\end{listing}
+
+These lemmas must be called explicitly in the \usail specification before and after each call to \sail{read_ram} and \sail{write_ram}, which require the \coq{ptstomem} chunk. In practice, this means adding \coq{stm_lemma} statements to the translation of the \sail{readMem} and \sail{writeMem} wrappers, as exemplified in \cref{lst:accessible-lemma-use}.
+
+\begin{listing}
+  \begin{minted}{coq}
+    (stm_seq
+      (stm_lemma extract_accessible_ptsto [exp_var "addr"])
+      (stm_let "res" ty.byteBits
+         (stm_foreign read_ram [exp_var "addr"])
+         (stm_seq
+            (stm_lemma return_accessible_ptsto [exp_var "addr"])
+            (stm_exp (exp_var "res")))))
+  \end{minted}
+  \caption{Excerpt from the \usail definition of \sail{readMem}, showing the application of \coq{extract_accessible_ptsto} and \coq{return_accessible_ptsto}.}
+  \label{lst:accessible-lemma-use}
+\end{listing}
+
+\section{Universal contract verification}
+
+With the aid of Katamaran, the universal contract can be proved without having to reason about every single statement in the \usail specification. Katamaran symbolically executes the object code of the contract starting from the user-provided precondition, and tries to match the generated postcondition with the desired one. If this process cannot be carried out automatically, the user is left with some verification conditions to prove manually, that typically involve arithmetic or existentially quantified variables.
+
+% TODO for another chapter maybe: this is the happy path, figuring out what's wrong/whether the contract is provable at all takes more effort, with giant VCs etc
+
+We cannot expect Katamaran to process the universal contract in one go. Breaking down the verification goal into smaller, easier parts is fundamental in keeping the execution time of the solver reasonable. We do this in two ways:
+\begin{itemize}
+\item We define contracts for complex function that are called multiple times. Once a contract for a function is defined, it will be used in place of symbolically executing the body at each call.
+\item For functions that pattern match on their inputs, such as \sail{execute}, we can restrict the arguments to be a specific variant (or a limited subset) of the union or enum. We can then either prove the contract separately for all choices of inputs, or select a few representative cases.
+\end{itemize}
+
+In this section we present our proof of the universal contract for the \msp in a top-down fashion, starting from the security guarantee we ended up verifying and progressively showing the auxilliary specifications we had to prove to get there.
+
+\subsection{Simplified statement of the universal contract}
+
+We proved the universal contract for a restricted set of instructions, which we deemed the most likely to be ill-specified. Specifically, we considered the move instruction with the four addressing modes supported by the Sail model (register, indexed, indirect register, indirect autoincrement), the call instruction, and all jump instructions. The \msp has no dedicated load/store instructions, relying on the addressing modes for memory accesses.
+
+In practice, we defined three different contracts, each a copy of \cref{lst:universal-contract} with an additional precondition constraining the \sail{instr} argument to \sail{execute}. For move, this would be:
 \begin{minted}{coq}
-  Definition sep_contract_execute : SepContractFun execute :=
-  {|
-    sep_contract_logic_variables :=
-      [ "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
-      ; "pc_old" :: ty.wordBits; "instr" :: ty.union Uast ];
-
-    sep_contract_localstore := [term_var "instr"];
-
-    sep_contract_precondition :=
-        PC_reg         ↦ term_var "pc_old"
-      ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-      ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-      ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-
-      ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-      ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
-
-      ∗ asn_accessible_addresses "segb1" "segb2"
-      ∗ asn_mpu_registers
-      ∗ asn_own_sample_regs;
-
-    sep_contract_result        := "u";
-    sep_contract_postcondition :=
-        term_var "u" = term_val ty.unit tt
-
-      ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-      ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-      ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-
-      ∗ ∃ "pc_new",
-        (PC_reg ↦ term_var "pc_new"
-         ∗ asn_untrusted_or_entry_point
-             (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
-
-      ∗ asn_accessible_addresses "segb1" "segb2"
-      ∗ asn_mpu_registers
-      ∗ asn_own_sample_regs;
-  |}.
+  term_var "instr" =
+    term_union Uast Kdoubleop
+      (term_tuple
+         [term_val (ty.enum Edoubleop) MOV;
+          term_var "bw";
+          term_var "src_reg";
+          term_var "src_am";
+          term_var "dest_reg";
+          term_var "dest_am"]);
 \end{minted}
+
+Additionally, since most of the 16 registers of the \msp are general purpose registers with no special behavior, we restrict the choice of \coq{src_reg} and \coq{dest_reg} to a few representative cases:
+\begin{minted}{coq}
+  ∗ asn_is_sample_reg (term_var "src_reg")
+  ∗ asn_is_sample_reg (term_var "dest_reg")
+\end{minted}
+with:
+\begin{minted}{coq}
+  Definition asn_is_sample_reg {Σ} (reg : Term Σ (ty.enum Eregister)) : Assertion Σ :=
+      reg = term_val (ty.enum Eregister) PC
+    ∨ reg = term_val (ty.enum Eregister) SRCG1
+    ∨ reg = term_val (ty.enum Eregister) R4.
+\end{minted}
+and we replace \coq{asn_other_registers} with \coq{asn_own_sample_regs}, asserting ownership of \reg{SRCG1} and \reg{R4} with arbitrary values (an existential variable), as well as some registers (\eg the stack pointer \reg{SP}) that are required by many functions. We don't include the program counter in \coq{asn_own_sample_regs} since we often need to bind its value to a variable for later use; quantifying it existentially would not be enough.
+
+Clearly, this assumption weakens the security result. Faults in the specification that only appear with registers or instructions not covered here would not be identified, but we think this is very unlikely and preferred to focus on other aspects of the verification instead. Nonetheless, lifting the restriction on registers without incurring in performance issues would be possible by employing a predicate in the same vein as \coq{asn_accessible_addresses}.
+
+\subsection{Contracts for reading from and writing to registers}
+
 
 % quella semplificazione fatta senno serviva catena

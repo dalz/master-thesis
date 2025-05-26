@@ -28,3 +28,5 @@ misc/
 *.log
 *.out
 *.xml
+*-SAVE-ERROR
+report/main.pdf
