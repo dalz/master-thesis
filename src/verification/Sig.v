@@ -30,6 +30,7 @@ Inductive Predicate :=
 | ptstomem
 | ptstoinstr
 | encodes_instr
+| instr_arg
 | accessible_addresses
 | accessible_addresses_without.
 
@@ -76,6 +77,7 @@ Module Export MSP430Signature <: Signature MSP430Base.
       | ptstomem => [ty.Address; ty.byteBits]
       | ptstoinstr => [ty.Address; ty.union Uinstr_or_data]
       | encodes_instr => [ty.wordBits; ty.union Uast]
+      | instr_arg => [ty.wordBits]
       | accessible_addresses => [ty.wordBits; ty.wordBits]
       | accessible_addresses_without => [ty.wordBits; ty.wordBits; ty.Address]
       end.
@@ -99,6 +101,7 @@ Module Export MSP430Signature <: Signature MSP430Base.
       | ptstomem => Some (MkPrecise [ty.Address] [ty.byteBits] eq_refl)
       | ptstoinstr => Some (MkPrecise [ty.Address] [ty.union Uinstr_or_data] eq_refl)
       | encodes_instr => Some (MkPrecise [ty.wordBits] [ty.union Uast] eq_refl)
+      | instr_arg => Some (MkPrecise [ty.wordBits] ε eq_refl)
       | accessible_addresses => Some (MkPrecise [ty.wordBits; ty.wordBits] ε eq_refl)
       | accessible_addresses_without => Some (MkPrecise [ty.wordBits; ty.wordBits; ty.Address] ε eq_refl)
       end.

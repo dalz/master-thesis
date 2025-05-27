@@ -23,7 +23,8 @@
      * transfer only happens once if no previous secured IPE structure pointer
      * exists." [slau367p]
      */
-    .sect ".bootcode", "a"
+    ; .sect ".bootcode", "a"
+.text
 start_bootcode:
     tst &saved_ptr
     jnz check_struct

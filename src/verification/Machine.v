@@ -3871,11 +3871,11 @@ Module Import MSP430Program <: Program MSP430Base.
                                 (stm_seq (stm_lemma open_ptsto_instr [exp_var "жreg_PC_reg_719"])
                                 (stm_let "x"
                                    (ty.union Uwordbyte)
-                                   (stm_debugk (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
+                                   (stm_call read_mem_aux (env.snoc (env.snoc (env.nil)
                                                                                      (_::_)
                                                                                      ((exp_val (ty.enum Ebw) (WORD_INSTRUCTION)))%exp)
                                                                            (_::_)
-                                                                           ((exp_var "жreg_PC_reg_719"))%exp)))
+                                                                           ((exp_var "жreg_PC_reg_719"))%exp))
                                    (stm_seq
                                       (stm_lemma close_ptsto_instr [exp_var "жreg_PC_reg_719"])
                                       (stm_exp (exp_var "x"))))))

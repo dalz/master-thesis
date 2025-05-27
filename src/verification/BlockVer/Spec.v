@@ -1,7 +1,8 @@
 From Coq Require Import
      ZArith.ZArith
      Strings.String
-     Lists.List.
+     Lists.List
+     Lia.
 From Equations Require Import
      Equations.
 From Katamaran Require Import
@@ -57,7 +58,7 @@ Module Assembly.
     I0 (DOUBLEOP MOV WORD_INSTRUCTION CG2 REGISTER_MODE r INDIRECT_REGISTER_MODE).
 
   Definition cmp_rm rs rd :=
-    I0 (DOUBLEOP CMP WORD_INSTRUCTION rs REGISTER_MODE rd INDIRECT_REGISTER_MODE).
+    I1 (DOUBLEOP CMP WORD_INSTRUCTION rs REGISTER_MODE rd INDEXED_MODE) [bv 0].
 
   Definition cmp_mr rs rd :=
     I0 (DOUBLEOP CMP WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd REGISTER_MODE).
@@ -66,26 +67,28 @@ Module Assembly.
     I0 (DOUBLEOP MOV WORD_INSTRUCTION rs REGISTER_MODE rd REGISTER_MODE).
 
   Definition mov_mm rs rd :=
-    I0 (DOUBLEOP MOV WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd INDIRECT_REGISTER_MODE).
+    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd INDEXED_MODE) [bv 0].
 
   Definition mov_mr rs rd :=
     I0 (DOUBLEOP MOV WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd REGISTER_MODE).
 
+  Definition mov_rm rs rd :=
+    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs REGISTER_MODE rd INDEXED_MODE) [bv 0].
+
   Definition mov_im rs i rd :=
-    I1
-      (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd INDIRECT_REGISTER_MODE)
-      i.
+    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd INDIRECT_REGISTER_MODE) i.
 
   Definition mov_ir rs i rd :=
-    I1
-      (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd REGISTER_MODE)
-      i.
+    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd REGISTER_MODE) i.
 
   Definition xor_ar rs rd :=
     I0 (DOUBLEOP XOR WORD_INSTRUCTION rs INDIRECT_AUTOINCREMENT_MODE rd REGISTER_MODE).
 
   Definition jump kind off :=
     I0 (JUMP kind off).
+
+  Definition jnz := jump JNE.
+  Definition jmp := jump JMP.
 
 End Assembly.
 
@@ -96,7 +99,7 @@ Module Utils.
   Notation "a @ b" := (term_binop (@bop.bvapp _ 8 8) a b) (at level 60).
   Notation "v +' n" :=  (term_binop bop.bvadd v (term_val ty.wordBits [bv n])) (at level 50).
 
-  Notation "a m↦ v" := (asn.chunk (chunk_user ptstomem [a; v])) (at level 70).
+  Notation "a m↦ v" := (asn.chunk_angelic (chunk_user ptstomem [a; v])) (at level 70).
   Notation "a i↦ i" := (asn.chunk (chunk_user ptstoinstr [a; i])) (at level 70).
   Notation "w ≡ i" := (asn.chunk (chunk_user encodes_instr [w; i])) (at level 70).
 
@@ -108,6 +111,9 @@ Module Utils.
     (asn.chunk_angelic (chunk_user accessible_addresses_without
                           [term_var segb1; term_var segb2; term_var addr])).
 
+  Definition asn_instr_arg {Σ} (a : Term Σ ty.wordBits) :=
+    asn.chunk_angelic (chunk_user instr_arg [a]).
+
   Definition term_plus {Σ} (m : Z) (n : Term Σ ty.int) : Term Σ ty.int :=
     (term_binop bop.plus n (term_val ty.int m)).
 
@@ -116,8 +122,8 @@ Module Utils.
        (term_unsigned w)
        (term_val ty.int 16%Z)).
 
-  Definition high {Σ} (v : Term Σ (ty.bvec 16)) : Term Σ _ := term_vector_subrange 0 8 v.
-  Definition low {Σ} (v : Term Σ (ty.bvec 16)) : Term Σ _ := term_vector_subrange 8 8 v.
+  Definition high {Σ} (v : Term Σ (ty.bvec 16)) : Term Σ _ := term_vector_subrange 8 8 v.
+  Definition low {Σ} (v : Term Σ (ty.bvec 16)) : Term Σ _ := term_vector_subrange 0 8 v.
 
   Definition bor1 {Σ} (v : Term Σ ty.wordBits) : Term Σ _ :=
     term_binop bop.bvor v (term_val ty.wordBits [bv 1]).
@@ -130,10 +136,9 @@ Module Utils.
     (bl bh : Term Σ ty.byteBits)
     : Assertion Σ
   :=
-      addr m↦ bl
+    asn_word_aligned addr
+    ∗ addr m↦ bl
     ∗ bor1 addr m↦ bh.
-
-  Notation "a w↦ l h" := (asn_ptsto_word a l h) (at level 70).
 
   Definition asn_ipe_entry_point {Σ}
       (segb1 addr : Term Σ ty.wordBits)
@@ -145,8 +150,11 @@ Module Utils.
            (term_unsigned addr)).
 
   Definition asn_not_mpu_reg_addr {Σ} (addr : Term Σ ty.Address) : Assertion Σ :=
-    term_unsigned addr < term_unsigned MPUIPC0_addr
+    term_unsigned addr < term_val ty.int 0x05a0
     ∨ term_unsigned (MPUIPSEGB1_addr +' 2) <= term_unsigned addr.
+  Definition asn_mpu_reg_addr {Σ} (addr : Term Σ ty.Address) : Assertion Σ :=
+    term_val ty.int 0x05a0 <= term_unsigned addr
+    ∗ term_unsigned addr < term_unsigned (MPUIPSEGB1_addr +' 2).
 
   Definition asn_mpu_registers {Σ} : Assertion Σ :=
       ∃ "MPUCTL0_reg"    , MPUCTL0_reg    ↦ term_var "MPUCTL0_reg"
@@ -200,9 +208,10 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
         ∃ "bl", ∃ "bh",
         ( asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
         ∗ ( ∃ "i", (term_var "id" = term_union Uinstr_or_data Ki (term_var "i")
-                    ∗ term_var "bh" @ term_var "bl" ≡ term_var "i")
+                    ∗ term_var "bl" @ term_var "bh" ≡ term_var "i")
           ∨ ∃ "d", (term_var "id" = term_union Uinstr_or_data Kd (term_var "d")
-                    ∗ term_var "bh" @ term_var "bl" = term_var "d")))
+                    ∗ term_var "bl" @ term_var "bh" = term_var "d"
+                    ∗ asn_instr_arg (term_var "d"))))
     |}.
 
   Definition lemma_close_ptsto_instr : SepLemma close_ptsto_instr :=
@@ -212,13 +221,15 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
 
       lemma_patterns := [term_var "addr"];
 
+      (* problema si può prendere il secondo branch? magari invertendoli *)
       lemma_precondition :=
         ∃ "bl", ∃ "bh",
         ( asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
         ∗ ( ∃ "i", (term_var "id" = term_union Uinstr_or_data Ki (term_var "i")
-                    ∗ term_var "bh" @ term_var "bl" ≡ term_var "i")
+                    ∗ term_var "bl" @ term_var "bh" ≡ term_var "i")
           ∨ ∃ "d", (term_var "id" = term_union Uinstr_or_data Kd (term_var "d")
-                    ∗ term_var "bh" @ term_var "bl" = term_var "d")));
+                    ∗ term_var "bl" @ term_var "bh" = term_var "d"
+                    ∗ asn_instr_arg (term_var "d"))));
 
       lemma_postcondition := term_var "addr" i↦ term_var "id";
     |}.
@@ -276,48 +287,6 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
 
   (* Sail function contracts *)
 
-  (*
-  Definition asn_read_mpu_reg_result {Σ}
-    (ipectl segb1 segb2 addr : Term Σ ty.wordBits) (v : Term Σ ty.byteBits)
-    : Assertion Σ
-  :=
-    ( addr = MPUIPC0_addr ∗ v = low ipectl
-    ∨ addr = MPUIPC0_addr +' 1 ∗ v = high ipectl
-    ∨ addr = MPUIPSEGB1_addr ∗ v = low segb1
-    ∨ addr = MPUIPSEGB1_addr +' 1 ∗ v = high segb1
-    ∨ addr = MPUIPSEGB2_addr ∗ v = low segb2
-    ∨ addr = MPUIPSEGB2_addr +' 1 ∗ v = high segb2
-    ∨ term_unsigned addr < term_unsigned MPUIPC0_addr
-    ∨ term_unsigned (MPUIPSEGB1_addr +' 2) <= term_unsigned addr).
-
-  Definition sep_contract_read_mpu_reg_byte :
-    SepContractFun read_mpu_reg_byte :=
-    {|
-      sep_contract_logic_variables :=
-        [ "addr" :: ty.Address; "ipectl" :: ty.wordBits
-        ; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ];
-
-      sep_contract_localstore := [term_var "addr"];
-
-      sep_contract_precondition :=
-          MPUIPC0_reg    ↦ term_var "ipectl"
-        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-        ∗ asn_mpu_registers;
-
-      sep_contract_result        := "v";
-      sep_contract_postcondition :=
-          asn_read_mpu_reg_result
-            (term_var "ipectl") (term_var "segb1") (term_var "segb2")
-            (term_var "addr") (term_var "v")
-
-        ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-        ∗ asn_mpu_registers;
-    |}.
-   *)
-
   Definition sep_contract_check_byte_access :
     SepContractFun check_byte_access :=
     {|
@@ -345,6 +314,20 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
         ∗ MPUIPSEGB2_reg ↦ term_var "segb2";
     |}.
 
+  Definition sep_contract_is_mpu_reg_addr :
+    SepContractFun is_mpu_reg_addr :=
+    {|
+      sep_contract_logic_variables := ["addr" :: ty.Address];
+      sep_contract_localstore      := [term_var "addr"];
+      sep_contract_precondition    := ⊤;
+      sep_contract_result          := "v";
+      sep_contract_postcondition   :=
+          asn_mpu_reg_addr (term_var "addr")
+          ∗ term_var "v" = term_val ty.bool true
+        ∨ asn_not_mpu_reg_addr (term_var "addr")
+          ∗ term_var "v" = term_val ty.bool false;
+    |}.
+
   Definition sep_contract_read_mem_aux :
       SepContractFun read_mem_aux :=
       {|
@@ -362,28 +345,109 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
           ∗ ( ( term_var "bw" = term_enum Ebw WORD_INSTRUCTION
-              ∗ asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
-              (* ∗ asn_word_aligned (term_var "addr") *))
+              ∗ asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh"))
             ∨ ( term_var "bw" = term_enum Ebw BYTE_INSTRUCTION
-              ∗ term_var "addr" m↦ term_var "bl"))
+              ∗ term_var "addr" m↦ term_var "bl"
+              ∗ term_var "bh" = term_val ty.byteBits [bv 0])) (* avoid existential *)
 
           (* the bootcode never reads the MPU registers *)
-          ∗ asn_not_mpu_reg_addr (term_var "addr");
+          ∗ asn_not_mpu_reg_addr (term_var "addr")
+          ∗ asn_not_mpu_reg_addr (bor1 (term_var "addr"));
 
         sep_contract_result        := "v";
         sep_contract_postcondition :=
             ( ( term_var "bw" = term_enum Ebw WORD_INSTRUCTION
-              ∗ term_var "v" = term_union Uwordbyte Kword (term_var "bh" @ term_var "bl")
+              ∗ term_var "v" = term_union Uwordbyte Kword (term_var "bl" @ term_var "bh")
               ∗ asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh"))
             ∨ ( term_var "bw" = term_enum Ebw BYTE_INSTRUCTION
               ∗ term_var "v" = term_union Uwordbyte Kbyte (term_var "bl")
-              ∗ term_var "addr" m↦ term_var "bl"))
+              ∗ term_var "addr" m↦ term_var "bl")
+            (* ∨ asn_mpu_reg_addr (term_var "addr") *))
 
           ∗ PC_reg         ↦ term_var "pc"
           ∗ MPUIPC0_reg    ↦ term_var "ipectl"
           ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
           ∗ MPUIPSEGB2_reg ↦ term_var "segb2";
       |}.
+
+  Definition foo {Σ} reg reg_addr reg_val addr v : Assertion Σ :=
+    addr = reg_addr ∗ reg ↦ v @ high reg_val
+    ∨ addr = reg_addr +' 1 ∗ reg ↦ low reg_val @ v.
+
+  Definition sep_contract_write_mpu_reg_byte :
+    SepContractFun write_mpu_reg_byte :=
+    {|
+      sep_contract_logic_variables :=
+        [ "addr" :: ty.Address; "v" :: ty.byteBits
+        ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ];
+
+      sep_contract_localstore := [term_var "addr"; term_var "v"];
+
+      sep_contract_precondition :=
+          MPUIPC0_reg    ↦ term_var "ipectl"
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+        ∗ asn_mpu_registers
+
+        (* ipe registers unlocked *)
+        ∗ term_vector_subrange 7 1 (term_var "ipectl") = term_val (ty.bvec 1) [bv 0]
+
+        ∗ ( term_var "addr" = MPUIPC0_addr
+          ∨ term_var "addr" = MPUIPC0_addr +' 1
+          ∨ term_var "addr" = MPUIPSEGB1_addr
+          ∨ term_var "addr" = MPUIPSEGB1_addr +' 1
+          ∨ term_var "addr" = MPUIPSEGB2_addr
+          ∨ term_var "addr" = MPUIPSEGB2_addr +' 1);
+
+      sep_contract_result        := "u";
+      sep_contract_postcondition :=
+          term_var "u" = term_val ty.unit tt
+        ∗ asn_mpu_registers
+        ∗ ( foo MPUIPC0_reg MPUIPC0_addr (term_var "ipectl") (term_var "addr") (term_var "v")
+          ∨ foo MPUIPSEGB1_reg MPUIPSEGB1_addr (term_var "segb1") (term_var "addr") (term_var "v")
+          ∨ foo MPUIPSEGB2_reg MPUIPSEGB2_addr (term_var "segb2") (term_var "addr") (term_var "v")
+          ∨ term_unsigned (term_var "addr") < term_unsigned MPUIPC0_addr)
+    |}.
+
+
+  (* Definition sep_contract_writeMem : *)
+  (*   SepContractFun writeMem := *)
+  (*   {| *)
+  (*     sep_contract_logic_variables := *)
+  (*       [ "bw" :: ty.enum Ebw; "addr" :: ty.Address; "pc" :: ty.wordBits *)
+  (*       ; "ipectl" :: ty.wordBits; "segb1" :: ty.wordBits; "segb2" :: ty.wordBits *)
+  (*       ; "v" :: ty.union Uwordbyte ]; *)
+
+  (*     sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "v"]; *)
+
+  (*     sep_contract_precondition := *)
+  (*         PC_reg         ↦ term_var "pc" *)
+  (*       ∗ MPUIPC0_reg    ↦ term_var "ipectl" *)
+  (*       ∗ MPUIPSEGB1_reg ↦ term_var "segb1" *)
+  (*       ∗ MPUIPSEGB2_reg ↦ term_var "segb2" *)
+  (*       ∗ asn_mpu_registers *)
+
+  (*       ∗ ( ( term_var "bw" = term_enum Ebw WORD_INSTRUCTION *)
+  (*           ∗ ∃ "bl", ∃ "bh", asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")) *)
+  (*         ∨ ( term_var "bw" = term_enum Ebw BYTE_INSTRUCTION *)
+  (*           ∗ ∃ "bl", term_var "addr" m↦ term_var "b"))); *)
+
+  (*     sep_contract_result        := "v"; *)
+  (*     sep_contract_postcondition := *)
+  (*         ( ( term_var "bw" = term_enum Ebw WORD_INSTRUCTION *)
+  (*           ∗ term_var "v" = term_union Uwordbyte Kword (term_var "bl" @ term_var "bh") *)
+  (*           ∗ asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")) *)
+  (*         ∨ ( term_var "bw" = term_enum Ebw BYTE_INSTRUCTION *)
+  (*           ∗ term_var "v" = term_union Uwordbyte Kbyte (term_var "bl") *)
+  (*           ∗ term_var "addr" m↦ term_var "bl") *)
+  (*         (* ∨ asn_mpu_reg_addr (term_var "addr") *)) *)
+
+  (*       ∗ PC_reg         ↦ term_var "pc" *)
+  (*       ∗ MPUIPC0_reg    ↦ term_var "ipectl" *)
+  (*       ∗ MPUIPSEGB1_reg ↦ term_var "segb1" *)
+  (*       ∗ MPUIPSEGB2_reg ↦ term_var "segb2" *)
+  (*       ∗ asn_mpu_registers; *)
+  (*   |}. *)
 
   (* Definition sep_contract_fetch : SepContractFun fetch := *)
   (*   {| *)
@@ -437,8 +501,9 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
   Definition CEnv : SepContractEnv :=
     fun Δ τ f =>
       match f with
+      | is_mpu_reg_addr => Some sep_contract_is_mpu_reg_addr
       | read_mem_aux => Some sep_contract_read_mem_aux
-      (* | write_mpu_reg_byte => Some sep_contract_write_mpu_reg_byte *)
+      | write_mpu_reg_byte => Some sep_contract_write_mpu_reg_byte
       | check_byte_access => Some sep_contract_check_byte_access
       (* | fetch => Some sep_contract_fetch *)
       | _ => None
@@ -478,24 +543,38 @@ Module RiscvPmpSpecVerif.
 
   Ltac symbolic_simpl :=
     apply validcontract_with_erasure_and_fuel_sound;
-    compute;
+    vm_compute;
     constructor;
     simpl.
 
-  Definition ValidContractWithFuel {Δ τ} (fuel : nat) (c : SepContract Δ τ) (body : Stm Δ τ) : Prop :=
-  VerificationCondition
-    ((SPureSpec.replay ( (vcgen default_config fuel c body wnil)))).
-  
+  (* Definition ValidContractWithFuel {Δ τ} (fuel : nat) (c : SepContract Δ τ) (body : Stm Δ τ) : Prop := *)
+  (* VerificationCondition *)
+  (*   ((SPureSpec.replay ( (vcgen default_config fuel c body wnil)))). *)
+
+  Lemma valid_is_mpu_reg_addr : ValidContract sep_contract_is_mpu_reg_addr fun_is_mpu_reg_addr.
+  Proof. symbolic_simpl. lia. Qed.
+
+  Lemma bvor_idem : forall n u v, bv.lor (bv.lor u v) v = @bv.lor n u v.
+  Proof. Admitted.
+
   Lemma valid_read_mem_aux : ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
   Proof.
-  vm_compute. Set Printing Depth 200. Admitted.
-    (* symbolic_simpl. Admitted. *)
+    symbolic_simpl.
+    repeat split; try lia; rewrite <- H0; rewrite bvor_idem; intuition.
+  Qed.
 
   Lemma valid_check_byte_access : ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
   Proof. now symbolic_simpl. Qed.
 
-  (* Lemma valid_execute_fetch : ValidContractWithFuel 10 sep_contract_fetch fun_fetch. *)
-  (* Proof. *)
-  (*   symbolic_simpl. *)
-  (* Qed. *)
+  Lemma valid_write_mpu_reg_byte : ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
+  Proof.
+    symbolic_simpl.
+    intuition; rewrite H in H2; try discriminate.
+
+    unfold bv.vector_subrange. cbn [bv.leview plus]. destruct bv.appView.
+    destruct (bv.view ys). destruct bv.appView. unfold bv.update_vector_subrange.
+    cbn [plus bv.leview]. rewrite bv.app_nil_r. cbn [bv.plus_n_O eq_rect eq_sym f_equal].
+    rewrite bv.appView_app. destruct bv.appView. destruct (bv.view xs).
+    rewrite bv.app_nil. reflexivity.
+  Admitted.
 End RiscvPmpSpecVerif.

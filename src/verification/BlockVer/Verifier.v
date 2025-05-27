@@ -106,9 +106,9 @@ Section BlockVerificationDerived.
       ∗ ptstoinstr_with_args (term_var "a") i.
 
     Definition exec_instruction_epilogue (i : ast_with_args) :
-      Assertion ([ctx] ▻ ("a":: ty.Address) ▻ ("na":: ty.Address))
+      Assertion ([ctx] ▻ ("a":: ty.Address) ▻ ("an":: ty.Address))
     :=
-        PC_reg ↦ term_var "na"
+        PC_reg ↦ term_var "an"
       ∗ ptstoinstr_with_args (term_var "a") i.
 
     Definition debug_config : Config :=
@@ -134,12 +134,12 @@ Section BlockVerificationDerived.
                       [env].["merge#var"∷_ ↦ d] ;;
 
 
-        ⟨ θ5 ⟩ na <- angelic None _ ;;
+        ⟨ θ5 ⟩ an <- angelic None _ ;;
         let a5 := persist__term a (θ1 ∘ θ2 ∘ θ3 ∘ θ4 ∘ θ5) in
         ⟨ θ6 ⟩ _ <- consume
                        (exec_instruction_epilogue i)
-                       [env].["a"∷_ ↦ a5].["na"∷_ ↦ na] ;;
-        pure (persist__term na θ6).
+                       [env].["a"∷_ ↦ a5].["an"∷_ ↦ an] ;;
+        pure (persist__term an θ6).
 
 
     Fixpoint sexec_block_addr (b : list ast_with_args) :
@@ -168,9 +168,9 @@ Section BlockVerificationDerived.
         let δ1 := env.snoc (persist (A := Sub Σ) δ θ1) _ a in
         ⟨ θ2 ⟩ _ <- produce req δ1 ;;
         let a2 := persist__term a θ2 in
-        ⟨ θ3 ⟩ na <- sexec_block_addr b a2 a2 ;;
+        ⟨ θ3 ⟩ an <- sexec_block_addr b a2 a2 ;;
         let δ3 := persist δ1 (θ2 ∘ θ3) in
-        consume ens δ3.["an"∷ty.Address ↦ na].
+        consume ens δ3.["an"∷ty.Address ↦ an].
 
     Definition sblock_verification_condition {Σ : LCtx}
       (req : Assertion (Σ ▻ "a"∷ty.Address)) (b : list ast_with_args)
@@ -196,11 +196,11 @@ Section BlockVerificationDerived.
                [env].["w"∷_ ↦ w] ;;
         _ <- evalStoreSpec (cexec inline_fuel (FunDef execute))
                [env].["merge#var"∷_ ↦ d] ;;
-        na <- angelic _ ;;
+        an <- angelic _ ;;
         _ <- consume
                (exec_instruction_epilogue i)
-               [env].["a"∷ty.Address ↦ a].["na"∷_ ↦ na] ;;
-        pure na.
+               [env].["a"∷ty.Address ↦ a].["an"∷_ ↦ an] ;;
+        pure an.
 
     Fixpoint cexec_block_addr (b : list ast_with_args) :
       Val ty.Address -> Val ty.Address -> CHeapSpec (Val ty.Address) :=
@@ -222,8 +222,8 @@ Section BlockVerificationDerived.
       lenv <- demonic_ctx Σ ;;
       a    <- demonic _ ;;
       _    <- produce req lenv.["a"∷ty.Address ↦ a]  ;;
-      na   <- cexec_block_addr b a a ;;
-      consume ens lenv.["a"∷ty.Address ↦ a].["an"∷ty.Address ↦ na].
+      an   <- cexec_block_addr b a a ;;
+      consume ens lenv.["a"∷ty.Address ↦ a].["an"∷ty.Address ↦ an].
 
     Definition cblock_verification_condition {Σ : LCtx}
       (req : Assertion (Σ ▻ "a"∷ty.Address)) (b : list ast_with_args)
