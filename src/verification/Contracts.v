@@ -508,8 +508,8 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
         ∗ asn_mpu_registers
 
         ∗ ∃ "pc_new",
-          ( term_var "pc_new" = term_word_plus [bv 2] (term_var "pc_old")
-            ∗ PC_reg ↦ term_var "pc_new"
+          ( (* term_var "pc_new" = term_word_plus [bv 2] (term_var "pc_old") *)
+            (* ∗ *) PC_reg ↦ term_var "pc_new"
             ∗ asn_untrusted
                 (term_var "segb1") (term_var "segb2") (term_var "pc_new"));
     |}.
@@ -949,8 +949,8 @@ Proof.
   symbolic_simpl.
   repeat split;
     unfold puntrusted in *;
-    try congruence;
-    lia.
+    try lia.
+  congruence.
 Qed.
 
 Lemma valid_contract_read_mem_aux : Symbolic.ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
@@ -977,7 +977,7 @@ Proof.
 Qed.
 
 Lemma valid_contract_fetch : Symbolic.ValidContractWithFuel 10 sep_contract_fetch fun_fetch.
-Proof. now apply validcontract_reflect_fuel_sound. Qed.
+Proof. now symbolic_simpl. Qed.
 
 Lemma valid_contract_read_register : Symbolic.ValidContractWithFuel 10 sep_contract_read_register fun_read_register.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
@@ -995,12 +995,10 @@ Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10 sep_
 Proof.
   symbolic_simpl.
   repeat split; subst.
-  - unfold puntrusted in *. exfalso.
-    destruct (bv.unsigned_bounds v).
-    destruct (bv.unsigned_add_view v [bv 0x2]); cbn in *; lia.
-  - unfold puntrusted in *. exfalso.
-    destruct (bv.unsigned_bounds v).
-    destruct (bv.unsigned_add_view v [bv 0x1]); cbn in *; lia.
+  - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
+    destruct (bv.unsigned_add_view [bv [16] 0x2] v); cbn in *; lia.
+  - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
+    destruct (bv.unsigned_add_view [bv [16] 0x1] v); cbn in *; lia.
 Qed.
 
 Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.

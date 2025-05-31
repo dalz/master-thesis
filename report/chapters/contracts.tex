@@ -270,6 +270,7 @@ In \file{Machine.v} we find the \usail specification proper. See \cref{lst:trans
 Now that we have a model of the \msp in a suitable format, we are ready to express the desired security guarantees by constructing a universal contract, as discussed in \cref{sec:universal-contracts}. We first need to decide on the exact property to prove, and then express it in Katamaran's separation logic.
 
 \subsection{Target properties}
+\label{sec:target-properties}
 
 Our contract will focus on guaranteeing integrity and confidentiality of the IPE region when untrusted code is executed, and assuming that IPE is properly configured (\ie enabled, locked, \(\reg{MPUIPSEGB1} < \reg{MPUIPSEGB2}\)). Concretely, we want to ensure that:
 \begin{itemize}
@@ -687,17 +688,17 @@ These lemmas must be called explicitly in the \usail specification before and af
 
 \section{Universal contract verification}
 
-With the aid of Katamaran, the universal contract can be proved without having to reason about every single statement in the \usail specification. Katamaran symbolically executes the object code of the contract starting from the user-provided precondition, and tries to match the generated postcondition with the desired one. If this process cannot be carried out automatically, the user is left with some verification conditions to prove manually, that typically involve arithmetic or existentially quantified variables.
+With the aid of Katamaran, the universal contract can be proved without having to reason explicitly about every single statement in the \usail specification. Katamaran symbolically executes the object code of the contract starting from the user-provided precondition, and tries to match the generated postcondition with the desired one. If this process cannot be carried out automatically, the user is left with some verification conditions to prove manually, that typically involve non-trivial arithmetic.
 
 % TODO for another chapter maybe: this is the happy path, figuring out what's wrong/whether the contract is provable at all takes more effort, with giant VCs etc
 
 We cannot expect Katamaran to process the universal contract in one go. Breaking down the verification goal into smaller, easier parts is fundamental in keeping the execution time of the solver reasonable. We do this in two ways:
 \begin{itemize}
-\item We define contracts for complex function that are called multiple times. Once a contract for a function is defined, it will be used in place of symbolically executing the body at each call.
+\item We define contracts for complex functions that are called multiple times. Once a contract for a function is defined, it will be used in place of symbolically executing the body for each call.
 \item For functions that pattern match on their inputs, such as \sail{execute}, we can restrict the arguments to be a specific variant (or a limited subset) of the union or enum. We can then either prove the contract separately for all choices of inputs, or select a few representative cases.
 \end{itemize}
 
-In this section we present our proof of the universal contract for the \msp in a top-down fashion, starting from the security guarantee we ended up verifying and progressively showing the auxilliary specifications we had to prove to get there.
+In this section we present our proof of the universal contract for the \msp in a top-down fashion, starting from the security guarantee we ended up verifying and progressively showing the auxiliary specifications we had to prove to get there.
 
 \subsection{Simplified statement of the universal contract}
 
@@ -730,9 +731,295 @@ with:
 \end{minted}
 and we replace \coq{asn_other_registers} with \coq{asn_own_sample_regs}, asserting ownership of \reg{SRCG1} and \reg{R4} with arbitrary values (an existential variable), as well as some registers (\eg the stack pointer \reg{SP}) that are required by many functions. We don't include the program counter in \coq{asn_own_sample_regs} since we often need to bind its value to a variable for later use; quantifying it existentially would not be enough.
 
-Clearly, this assumption weakens the security result. Faults in the specification that only appear with registers or instructions not covered here would not be identified, but we think this is very unlikely and preferred to focus on other aspects of the verification instead. Nonetheless, lifting the restriction on registers without incurring in performance issues would be possible by employing a predicate in the same vein as \coq{asn_accessible_addresses}.
+Clearly, this assumption weakens the security result. Faults in the specification that only appear with registers or instructions not covered here would not be identified, but we think this is very unlikely and preferred to focus on other aspects of the verification instead. Nonetheless, lifting the restriction on registers without running into performance issues would be possible by employing a predicate in the same vein as \coq{asn_accessible_addresses}, and verifying more instructions is just a matter of defining and proving more contracts.
 
 \subsection{Contracts for reading from and writing to registers}
 
+Due to the various addressing modes and the IPE locking mechanism, manipulating registers requires more than a simple read or assignment. Symbolic execution of \sail{readReg} and \sail{writeReg} each of the numerous times they are called leads to an explosion in the verification time.
 
-% quella semplificazione fatta senno serviva catena
+To tackle this issue, we define and prove a contract for the auxiliary functions that do the heavy lifting of \sail{readReg} and \sail{writeReg}, one for each addressing mode they support.
+
+\Cref{lst:read_register} shows the contract for the \sail{read_register}\footnote{Renamed \coq{read_am_register} in the \usail specification due to a name clash with a function provided by Katamaran.} function. The arguments are the register to read and an element of the \sail{BW} enum, which is either \sail{BYTE_INSTRUCTION} (meaning that we want to read the least significant byte of the register), or \sail{WORD_INSTRUCTION} (the whole 16-bit value); the return value, a variant of the union \sail{WordByte}, is either \sail{Byte(...)} or \sail{Word(...)} accordingly. This pattern shows up in many places in the \msp \usail specification.\footnote{A more sensible way to handle byte vs word instructions would be to zero-extend all bytes to words; this would reduce the number of variables in the contract, thus improving performance, and is more likely to be what happens in the hardware anyway. Still, it is interesting to evaluate how well Katamaran fares in the presence of this kind of quirks in existing specifications.} In the universal contract's verification, we never care about the specific value returned by \sail{read_register}, except for word reads on the \reg{PC} register. Consequently, in the postcondition the return value is an existentially quantified variable, which is asserted to be equal to the PC if appropriate.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition sep_contract_read_register : SepContractFun read_am_register :=
+      {|
+        sep_contract_logic_variables := [ ... ];
+        sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+        sep_contract_precondition :=
+            PC_reg ↦ term_var "pc"
+          ∗ asn_own_sample_regs
+          ∗ asn_is_sample_reg (term_var "reg");
+
+        sep_contract_result          := "v";
+        sep_contract_postcondition   :=
+            ( ∃ "b", (term_var "v" = term_union Uwordbyte Kbyte (term_var "b"))
+            ∨ ∃ "w", (term_var "v" = term_union Uwordbyte Kword (term_var "w")
+                      ∗ (term_var "reg" <> term_enum Eregister PC
+                         ∨ term_var "w" = term_var "pc")))
+
+          ∗ PC_reg ↦ term_var "pc"
+          ∗ asn_own_sample_regs;
+      |}.
+  \end{minted}
+  \caption{Contract for register-mode reads.}
+  \label{lst:read_register}
+\end{listing}
+
+\sail{write_register} has an additional complexity: since it can modify the PC, which amounts to a jump, it needs to ensure that the change is allowed by the current IPE configuration. This is reflected in the contract (\cref{lst:write_register}), where we assert ownership of the IPE registers in the precondition, assuming that IPE is enabled and locked and that we are executing untrusted code. We don't need to keep track of the values written to the registers, so we return them as points-to chunks with existentially quantified variables (through \coq{asn_own_sample_regs}). Again, the exception is the PC, for which we have a few cases:
+\begin{itemize}
+\item Unchanged from the precondition \circref{write-reg-pc-old}.
+\item If the write was to \reg{PC}, a new (unknown) value that is either in the untrusted region or the IPE entry point, since the write was performed by untrusted code \circref{write-reg-pc-new}. This guarantees that \sail{write_register} cannot be used to perform unauthorized jumps into the IPE region.
+\item For word writes to \reg{PC} we also keep track of the value that was written \circref{write-reg-special}, as this information is necessary in the proof of \sail{read_autoincrement}'s contract.
+\end{itemize}
+
+\begin{listing}
+  \startcstep
+  \begin{minted}[escapeinside=??]{coq}
+    Definition sep_contract_write_register : SepContractFun write_am_register :=
+      {|
+        sep_contract_logic_variables := [ ... ];
+        sep_contract_localstore := [term_var "bw"; term_var "reg"; term_var "v"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc_old"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_own_sample_regs;
+
+        sep_contract_result        := "u";
+        sep_contract_postcondition :=
+            term_var "u" = term_val ty.unit tt
+
+          ∗ (PC_reg ↦ term_var "pc_old" ?$\circdef{write-reg-pc-old}$?
+             ∨ (term_var "reg" = term_val (ty.enum Eregister) PC
+                ∗ ∃ "pc_new",
+                  (PC_reg ↦ term_var "pc_new" ?$\circdef{write-reg-pc-new}$?
+                   ∗ asn_untrusted_or_entry_point
+                       (term_var "segb1") (term_var "segb2") (term_var "pc_new")
+
+                   ∗ (term_var "bw" = term_enum Ebw WORD_INSTRUCTION
+                      ∗ (term_var "v" = term_union Uwordbyte Kword (term_var "pc_new") ?$\circdef{write-reg-special}$?
+                         ∨ ∃ "b", term_var "v" = term_union Uwordbyte Kbyte (term_var "b"))
+                      ∨ term_var "bw" = term_enum Ebw BYTE_INSTRUCTION))))
+
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_own_sample_regs;
+      |}.
+  \end{minted}
+  \caption{Contract for register-mode writes.}
+  \label{lst:write_register}
+\end{listing}
+
+As for the other addressing modes, the contracts for \sail{read_indexed}, \sail{read_indirect} and \sail{read_autoincrement} are almost the same; \cref{lst:read_indexed} shows \sail{read_indexed}'s. These addressing modes work as follows:
+\begin{description}
+\item[indexed] Interpret the register as a base address. Fetch the next word after the instruction (the offset). Add it to the base address and return the value stored in memory at that location.
+\item[indirect register] Return the value stored at the address contained in the register (like indexed without the offset).
+\item[indirect autoincrement] Like indirect register mode, but increment the register by 1 or 2 (byte/word instruction) after the read is performed.
+\end{description}
+
+In the precondition, we assert ownership of the (untrusted) PC, the (properly configured) IPE registers, the sample registers and, new from before, untrusted memory via \coq{asn_accessible_addresses}. From the postcondition we get back those resources; in particular, the IPE registers will have the same value and the PC, though changed\footnote{We could be more precise here and state that \coq{pc_new} is \coq{pc_old + 2}, but we would need to add an exception for the \reg{CG2} register, for which the index is not used and thus the PC not incremented, and we don't need this information for the proof of the universal contract anyway.}, will still be in the untrusted region. Proving this contract also guarantees that indexed-mode reads from untrusted code cannot access protected memory, since we don't give access to it in the precondition.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition sep_contract_read_indexed : SepContractFun read_indexed :=
+      {|
+        sep_contract_logic_variables := [ ... ];
+        sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc_old"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_old")
+          ∗ asn_is_sample_reg (term_var "reg")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
+
+        sep_contract_result        := "v";
+        sep_contract_postcondition :=
+            ∃ "pc_new",
+              ( PC_reg ↦ term_var "pc_new"
+              ∗ asn_untrusted
+                  (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers
+          ∗ asn_own_sample_regs;
+      |}.
+  \end{minted}
+  \caption{Contract for indexed-mode reads.}
+  \label{lst:read_indexed}
+\end{listing}
+
+Asserting that the new PC is still untrusted is instrumental in composing contracts when multiple auxiliary functions are called to execute a single instruction. For example, a move with indexed-mode source and register-mode destination will first invoke \sail{read_indexed} and then \sail{write_register}, the latter requiring that the PC be untrusted. We could alternatively extend \sail{write_register}'s to also be applicable when executing IPE code, but this is a significant complication that doesn't net us any gain as far as the security property we prove is concerned.
+
+It is not obvious that the update performed by \sail{read_indexed} actually keeps the PC in the untrusted region. This is true by a combination of our approximation of \coq{asn_untrusted}, that treats the first 8 bytes of the IPE region as trusted (see \cref{sec:target-properties}), and the fact that the 9th byte is the only allowed entry point.\footnote{Meaning that an exception is thrown if the PC enters the IPE region at any other address, and the postcondition is required to hold only for normally terminating programs, so the contract is satisfied in those cases.} It is then impossible to get to the entry point \(\reg{MPUIPSEGB1} \ll 4 + 8\) by adding 2 to the PC, which is either less than \(\reg{MPUIPSEGB1} \ll 4\) or at least \(\reg{MPUIPSEGB2} \ll 4\) with \(\reg{MPUIPSEGB1} < \reg{MPUIPSEGB2}\). Without the approximation it would be possible to start execution from \(\reg{MPUIPSEGB1} \ll 4 + 6\) and reach the entry point after the indexed read, forcing us to extend \sail{write_register}'s contract as mentioned above.
+% figure?
+
+It should be noted that \sail{write_register}'s postcondition does not guarantee that the PC is untrusted---it can't, since the user can set it to an arbitrary value, including the IPE entry point. This is not problematic: within the execution of a single instruction, \sail{write_register} is always the last auxiliary function with a contract to be called, so we don't need to satisfy any other precondition involving PC being untrusted after that.
+
+Moving on, \sail{read_autoincrement}'s contract is the same as \sail{read_register}'s. An auto\-increment-\-mode read from PC increments it by 1 or 2, so the same argument holds for the resulting PC being untrusted. As \sail{read_indirect} doesn't modify any register, its postcondition states that the PC is unchanged from the precondition, and is otherwise the same as \sail{read_register}'s and \sail{read_autoincrement}'s.
+
+\sail{write_indexed}'s contract is identical to \sail{read_indirect}'s, \ie like \cref{lst:read_indexed} but with \coq{PC_reg ↦ term_var "pc_old"} in the postcondition. One would expect the PC to be incremented by 2 as part of every indexed-mode write, but this happens elsewhere---this inconsistency with respect to \sail{read_indexed} comes from the original Sail specification.
+
+\subsubsection{Proofs}
+
+The above contracts can be proved automatically by Katamaran's symbolic executor, with the help of the contracts defined in the next sections and with the exception of \coq{read_autoincrement}'s. The verification condition we are left with requires proving that, assuming that \(\mathit{pc}\) is untrusted and \(\mathit{pc} + 2\) is the IPE entry point, then \(\mathit{pc} + 2\) is untrusted (and likewise for \(\mathit{pc} + 1\)). The conclusion is false (the entry point \emph{is} trusted), so we show that the premises are contradictory. Rocq's linear integer arithmetic solver (the \coq{lia} tactic) can handle the refutation, provided we first:
+\begin{itemize}
+\item unfold the definition of the \coq{puntrusted} predicate;
+\item make the bounds due to the PC being a 16-bit bitvector explicit, \ie \(0 \leq \reg{PC} < 2^{16}\);
+\item split the case where \(\mathit{pc} + 2\) overflows from the one where it doesn't.
+\end{itemize}
+The resulting proof script is shown in \cref{lst:autoincrement-proof}.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Lemma valid_contract_read_autoincrement : Symbolic.ValidContractWithFuel 10
+        sep_contract_read_autoincrement fun_read_autoincrement.
+    Proof.
+      symbolic_simpl.
+      repeat split; subst.
+      - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
+        destruct (bv.unsigned_add_view [bv [16] 0x2] v); cbn in *; lia.
+      - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
+        destruct (bv.unsigned_add_view [bv [16] 0x1] v); cbn in *; lia.
+    Qed.
+  \end{minted}
+  \caption{Proof of \sail{read_autoincrement}'s contract.}
+  \label{lst:autoincrement-proof}
+\end{listing}
+
+The implementation of \sail{read_autoincrement} updates the PC through \sail{write_register}, so here we are making use of the disjunct \circref{write-reg-special} of \sail{write_register}'s postcondition (\cref{lst:write_register}). Without that, we would ``forget'' (due to the existential quantification of \coq{pc_new}) that the value just written to \reg{PC} is \coq{pc_old} plus 1 or 2, and wouldn't have the information required to prove that it is untrusted as we did in \cref{lst:autoincrement-proof}.
+
+\subsection{Contracts for memory read/write wrappers}
+
+Another set of functions that are frequently used and have complex definitions are those that access memory with IPE permission checks. In particular, we provide contracts for:
+\begin{itemize}
+\item reading/writing to memory via \sail{readMem}, \sail{writeMem} and \sail{fetch};
+\item modifying the memory-mapped MPU registers with \sail{write_mpu_reg_byte};
+\item the function that performs the permission checks, \sail{check_byte_access}.
+\end{itemize}
+
+\Cref{lst:writeMem} shows \sail{writeMem}'s contract. We don't need to remember the actual values stored in memory for the purpose of verifying the universal contract, so the pre- and postcondition capture only the familiar security guarantees from the previous sections: the IPE registers don't change and protected memory locations are never accessed. \sail{readMem}'s contract is identical, with two exceptions: it doesn't have the \coq{v} parameter (the value being written), and the return value is not unit but an existentially quantified variable (the value of which we don't care about).
+
+\begin{listing}
+  % actually read_mem_aux
+  \begin{minted}{coq}
+    Definition sep_contract_writeMem : SepContractFun writeMem :=
+      {|
+        sep_contract_logic_variables := [ ... ];
+        sep_contract_localstore := [term_var "bw"; term_var "addr"; term_var "v"];
+
+        sep_contract_precondition :=
+            PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_ipe_configured (term_var "ipectl") (term_var "segb1") (term_var "segb2")
+          ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc")
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
+
+        sep_contract_result        := "v";
+        sep_contract_postcondition :=
+            term_var "v" = term_val ty.unit tt
+
+          ∗ PC_reg         ↦ term_var "pc"
+          ∗ MPUIPC0_reg    ↦ term_var "ipectl"
+          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+          ∗ asn_accessible_addresses "segb1" "segb2"
+          ∗ asn_mpu_registers;
+      |}.
+  \end{minted}
+  \caption{Contract for writing to memory with permission checks.}
+  \label{lst:writeMem}
+\end{listing}
+
+Ownership of the MPU registers is required as \sail{readMem} and \sail{writeMem} dispatch the operation to \sail{read_mpu_reg_byte} and \sail{write_mpu_reg_byte} if the address lies within the MPU register file range. \sail{write_mpu_reg_byte}'s contract is similar to \sail{writeMem}'s, but doesn't include the PC and \coq{asn_accessible_addresses} in the pre- and postcondition. It essentially asserts that the IPE registers are not modified.
+
+The contract for \sail{fetch}, which reads the word pointed to by the PC and increments it by 2, differs from \sail{readMem} in what the postcondition asserts about the program counter:
+\begin{minted}{coq}
+  ∃ "pc_new",
+    (PC_reg ↦ term_var "pc_new"
+     ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+\end{minted}
+Akin to \sail{read_indexed}, we are not interested in recording that \coq{pc_new} is \coq{pc_old + 2}, but we need to know that it is untrusted to be able to chain other contracts after a fetch.
+
+\sail{check_byte_access} takes two parameters: the address that should be checked for access permission, and a flag that is true if the check is for a jump, \ie if the IPE entry point should be considered accessible. The function returns the unit value if the check passes, and throws an exception otherwise. The contract states that, assuming properly configured IPE registers and untrusted PC, on successful termination the provided address is either untrusted or (on jump target checks) the entry point:
+\begin{minted}{coq}
+  asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "addr")
+  ∨ asn.formula (formula_bool (term_var "jump"))
+    ∗ asn_ipe_entry_point (term_var "segb1") (term_var "addr")
+\end{minted}
+
+\subsubsection{Proofs}
+
+Symbolic execution of \sail{check_byte_access} leaves some arithmetic verification conditions, which can be proved as follows:
+\begin{minted}{coq}
+  Lemma valid_contract_check_byte_access : Symbolic.ValidContractWithFuel 10
+      sep_contract_check_byte_access fun_check_byte_access.
+  Proof.
+    symbolic_simpl.
+    repeat split; unfold puntrusted in *; try lia.
+    congruence.
+  Qed.
+\end{minted}
+
+\coq{write_mpu_reg_byte} also requires some manual intervention. Its verification condition involves proving that after the write the IPE registers are unchanged under contradictory assumptions (IPE registers both locked and not locked at the same time), and can be easily discharged via \coq{congruence}:
+\begin{minted}{coq}
+  Lemma valid_contract_write_mpu_reg_byte : Symbolic.ValidContractWithFuel 10
+      sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
+  Proof.
+    symbolic_simpl.
+    repeat split; congruence.
+  Qed.
+\end{minted}
+
+The other contracts are proved automatically.
+
+\subsection{Contracts for updating the program counter}
+
+There are two auxiliary functions that are called in various places to update the PC: \sail{incPC}, incrementing it by 2, and \sail{setPC}. Their contracts have the usual assumptions about PC and IPE configuration. \sail{incPC}'s postcondition includes:
+\begin{minted}{coq}
+  ∃ "pc_new",
+    (PC_reg ↦ term_var "pc_new"
+     ∗ term_var "pc_new" = term_word_plus [bv 2] (term_var "pc_old")
+     ∗ asn_untrusted (term_var "segb1") (term_var "segb2") (term_var "pc_new"))
+\end{minted}
+while \sail{setPC}'s:
+\begin{minted}{coq}
+  PC_reg ↦ term_var "pc_new"
+  ∗ asn_untrusted_or_entry_point (term_var "segb1") (term_var "segb2") (term_var "pc_new");
+\end{minted}
+where \coq{pc_new} is \sail{setPC}'s argument. The key difference is that \sail{incPC} guarantees that the new PC is untrusted, while with \sail{setPC} it could be the entry point.
+
+\subsection{Proofs}
+
+\sail{setPC} is verified automatically. \sail{incPC} requires proving a verification condition resembling that of \sail{read_autoincrement}, and the proof is close to the one shown in \cref{lst:autoincrement-proof}.
+
+Thanks to the use of \sail{incPC}, various functions that increment the PC (indexed-mode reads and writes, \sail{fetch}) can be handled entirely by the symbolic executor. \sail{read_autoincrement} isn't because it modifies the PC via \sail{write_register}.
