@@ -58,7 +58,7 @@ Module Assembly.
     I0 (DOUBLEOP MOV WORD_INSTRUCTION CG2 REGISTER_MODE r INDIRECT_REGISTER_MODE).
 
   Definition cmp_rm rs rd :=
-    I1 (DOUBLEOP CMP WORD_INSTRUCTION rs REGISTER_MODE rd INDEXED_MODE) [bv 0].
+    I0 (DOUBLEOP CMP WORD_INSTRUCTION rs REGISTER_MODE rd INDIRECT_REGISTER_MODE).
 
   Definition cmp_mr rs rd :=
     I0 (DOUBLEOP CMP WORD_INSTRUCTION rs INDIRECT_REGISTER_MODE rd REGISTER_MODE).
@@ -76,7 +76,7 @@ Module Assembly.
     I1 (DOUBLEOP MOV WORD_INSTRUCTION rs REGISTER_MODE rd INDEXED_MODE) [bv 0].
 
   Definition mov_im rs i rd :=
-    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd INDIRECT_REGISTER_MODE) i.
+    I2 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd INDEXED_MODE) i [bv 0].
 
   Definition mov_ir rs i rd :=
     I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd REGISTER_MODE) i.
@@ -221,7 +221,6 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
 
       lemma_patterns := [term_var "addr"];
 
-      (* problema si può prendere il secondo branch? magari invertendoli *)
       lemma_precondition :=
         ∃ "bl", ∃ "bh",
         ( asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
@@ -409,6 +408,56 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
           ∨ term_unsigned (term_var "addr") < term_unsigned MPUIPC0_addr)
     |}.
 
+  Definition sep_contract_read_indexed : SepContractFun read_indexed :=
+    {|
+      sep_contract_logic_variables :=
+        [ "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+        ; "pc_old" :: ty.wordBits
+        ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister
+        ; "addr" :: ty.wordBits; "off" :: ty.wordBits
+        ; "vl" :: ty.byteBits; "vh" :: ty.byteBits
+        ];
+
+      sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+      sep_contract_precondition :=
+term_var "segb1" = term_val ty.wordBits [bv 0] ∗
+term_var "segb2" = term_val ty.wordBits [bv 0] ∗
+term_var "addr" = term_val ty.wordBits [bv 0x10] ∗
+term_var "off" = term_val ty.wordBits [bv 0] ∗
+term_var "pc_old" = term_val ty.wordBits [bv 0x20] ∗
+
+term_var "bw" = term_enum Ebw WORD_INSTRUCTION ∗
+
+        
+          PC_reg         ↦ term_var "pc_old"
+        ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+
+        ∗ term_var "reg" = term_enum Eregister R6
+        ∗ R6_reg ↦ term_var "addr"
+
+        ∗ term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
+        ∗ asn_ptsto_word (term_binop bop.bvadd (term_var "addr") (term_var "off"))
+            (term_var "vl") (term_var "vh")
+
+        ∗ asn_not_mpu_reg_addr (term_binop bop.bvadd (term_var "addr") (term_var "off"));
+
+      sep_contract_result          := "v";
+      sep_contract_postcondition   :=
+          term_var "v" = term_union Uwordbyte Kword (term_var "vl" @ term_var "vh")
+
+        ∗ PC_reg ↦ term_var "pc_old" +' 2
+        ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+        ∗ R6_reg ↦ term_var "addr"
+
+        ∗ term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
+        ∗ asn_ptsto_word (term_binop bop.bvadd (term_var "addr") (term_var "off"))
+            (term_var "vl") (term_var "vh");
+    |}.
 
   (* Definition sep_contract_writeMem : *)
   (*   SepContractFun writeMem := *)
@@ -501,10 +550,11 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
   Definition CEnv : SepContractEnv :=
     fun Δ τ f =>
       match f with
-      | is_mpu_reg_addr => Some sep_contract_is_mpu_reg_addr
-      | read_mem_aux => Some sep_contract_read_mem_aux
+      (* | is_mpu_reg_addr => Some sep_contract_is_mpu_reg_addr *)
+      (* | read_mem_aux => Some sep_contract_read_mem_aux *)
+      | read_indexed => Some sep_contract_read_indexed
       | write_mpu_reg_byte => Some sep_contract_write_mpu_reg_byte
-      | check_byte_access => Some sep_contract_check_byte_access
+      (* | check_byte_access => Some sep_contract_check_byte_access *)
       (* | fetch => Some sep_contract_fetch *)
       | _ => None
       end.
@@ -533,6 +583,7 @@ Module MSP430BlockVerifShalExecutor :=
 Module MSP430BlockVerifExecutor :=
   MakeExecutor MSP430Base MSP430Signature MSP430Program MSP430BlockVerifSpec.
 
+
 Module RiscvPmpSpecVerif.
   Import MSP430BlockVerifSpec.
   Import MSP430BlockVerifExecutor.Symbolic.
@@ -547,10 +598,7 @@ Module RiscvPmpSpecVerif.
     constructor;
     simpl.
 
-  (* Definition ValidContractWithFuel {Δ τ} (fuel : nat) (c : SepContract Δ τ) (body : Stm Δ τ) : Prop := *)
-  (* VerificationCondition *)
-  (*   ((SPureSpec.replay ( (vcgen default_config fuel c body wnil)))). *)
-
+  (*
   Lemma valid_is_mpu_reg_addr : ValidContract sep_contract_is_mpu_reg_addr fun_is_mpu_reg_addr.
   Proof. symbolic_simpl. lia. Qed.
 
@@ -565,16 +613,24 @@ Module RiscvPmpSpecVerif.
 
   Lemma valid_check_byte_access : ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
   Proof. now symbolic_simpl. Qed.
+   *)
+  Lemma valid_read_indexed : ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
+  Proof.
+    vm_compute. Set Printing Depth 200.
+    symbolic_simpl.
+    intros.
+  Qed.
 
   Lemma valid_write_mpu_reg_byte : ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
   Proof.
     symbolic_simpl.
     intuition; rewrite H in H2; try discriminate.
 
-    unfold bv.vector_subrange. cbn [bv.leview plus]. destruct bv.appView.
-    destruct (bv.view ys). destruct bv.appView. unfold bv.update_vector_subrange.
-    cbn [plus bv.leview]. rewrite bv.app_nil_r. cbn [bv.plus_n_O eq_rect eq_sym f_equal].
-    rewrite bv.appView_app. destruct bv.appView. destruct (bv.view xs).
-    rewrite bv.app_nil. reflexivity.
+    (* unfold bv.vector_subrange. cbn [bv.leview plus]. destruct bv.appView. *)
+    (* destruct (bv.view ys). destruct bv.appView. unfold bv.update_vector_subrange. *)
+    (* cbn [plus bv.leview]. rewrite bv.app_nil_r. cbn [bv.plus_n_O eq_rect eq_sym f_equal]. *)
+    (* rewrite bv.appView_app. destruct bv.appView. destruct (bv.view xs). *)
+    (* rewrite bv.app_nil. reflexivity. *)
   Admitted.
 End RiscvPmpSpecVerif.
+
