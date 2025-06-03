@@ -521,6 +521,7 @@ We will see how the unfolding of \coq{asn_untrusted} is incorporated into the pr
 \end{listing}
 
 \subsection{Spatial predicates and \texttt{asn\_accessible\_addresses}}
+\label{sec:spatial-preds}
 
 Katamaran's logic comes equipped with a predicate for asserting ownership of registers, which is derived automatically from the register definitions in the \usail specification; we used it already in \cref{lst:universal-contract}, \eg in \coq{PC_reg ↦ term_var "pc_old"}. Our universal contract deals with access to memory as well, so we need to extend the logic to be able to express ownership of memory locations. New resources can be added to Katamaran by defining a spatial predicate.
 
@@ -701,6 +702,7 @@ We cannot expect Katamaran to process the universal contract in one go. Breaking
 In this section we present our proof of the universal contract for the \msp in a top-down fashion, starting from the security guarantee we ended up verifying and progressively showing the auxiliary specifications we had to prove to get there.
 
 \subsection{Simplified statement of the universal contract}
+\label{sec:uc-simple}
 
 We proved the universal contract for a restricted set of instructions, which we deemed the most likely to be ill-specified. Specifically, we considered the move instruction with the four addressing modes supported by the Sail model (register, indexed, indirect register, indirect autoincrement), the call instruction, and all jump instructions. The \msp has no dedicated load/store instructions, relying on the addressing modes for memory accesses.
 
@@ -1000,7 +1002,7 @@ Symbolic execution of \sail{check_byte_access} leaves some arithmetic verificati
   Qed.
 \end{minted}
 
-The other contracts are proved automatically.
+\sail{readMem} and \sail{writeMem} need to obtain a \sail{ptstomem} chunk before calling \sail{read_ram} or \sail{write_ram} to perform the read or write. This happens by an invocation of the \sail{extract_accessible_ptsto} lemma which we need to add manually to the \usail specification as, detailed in \cref{sec:spatial-preds}. With that done, their contracts are verified automatically.
 
 \subsection{Contracts for updating the program counter}
 
@@ -1018,8 +1020,72 @@ while \sail{setPC}'s:
 \end{minted}
 where \coq{pc_new} is \sail{setPC}'s argument. The key difference is that \sail{incPC} guarantees that the new PC is untrusted, while with \sail{setPC} it could be the entry point.
 
-\subsection{Proofs}
+\subsubsection{Proofs}
 
 \sail{setPC} is verified automatically. \sail{incPC} requires proving a verification condition resembling that of \sail{read_autoincrement}, and the proof is close to the one shown in \cref{lst:autoincrement-proof}.
 
 Thanks to the use of \sail{incPC}, various functions that increment the PC (indexed-mode reads and writes, \sail{fetch}) can be handled entirely by the symbolic executor. \sail{read_autoincrement} isn't because it modifies the PC via \sail{write_register}.
+
+\section{Summary}
+
+Katamaran can prove automatically the security properties on move, jump and call instructions stated in \cref{sec:uc-simple}, provided we first reduce the complexity of the verification by introducing a number of supporting contracts. They are summarized in \cref{fig:deps}, which shows where each of them is used.
+
+
+% TODO spostare setPC a destra
+\begin{figure}
+  \begin{tikzpicture}[yscale=-1]
+    \node (move)           at (-3.5, 0)   {\sail{execute} (move)};
+    \node (call)           at (0, 0)      {\sail{execute} (call)};
+    \node (jump)           at (3.5, 0)    {\sail{execute} (jump)};
+
+    \node (readReg)        at (-2, 1.5)   {(\sail{readReg})};
+    \node (writeReg)       at (2, 1.5)    {(\sail{writeReg})};
+
+    \node (readRegister)   at (-5, 3)     {\sail{read_register}};
+    \node (readIndexed)    at (-4, 3.5)   {\sail{read_indexed}};
+    \node (readIndirect)   at (-2, 3)     {\sail{read_indirect}};
+    \node (readAutoincr)   at (-0, 3.5)   {\sail{read_autoincr}.};
+    \node (writeRegister)  at (4, 3.5)    {\sail{write_register}};
+    \node (writeIndexed)   at (7, 3)      {\sail{write_indexed}};
+
+    \node (fetch)          at (-4, 5)     {\sail{fetch}};
+    \node (setPC)          at (6.5, 5)    {\sail{setPC}};
+
+    \node (readMem)        at (-1, 6.5)   {\sail{readMem}};
+    \node (writeMem)       at (3, 6.5)    {\sail{writeMem}};
+    \node (incPC)          at (-4, 6.5)   {\sail{incPC}};
+
+    \node (checkByte)      at (6, 9)      {\sail{check_byte_access}};
+    \node (lemmaPtsTo)     at (-4, 8.7)   {\sail{extract_accessible_ptsto}\textsuperscript{\dag}};
+    \node (lemmaPtsTo2)    at (-4, 9.1)   {\sail{return_accessible_ptsto}\textsuperscript{\dag}};
+
+    \node (readRam)        at (-1, 10)    {\sail{read_ram}*};
+    \node (writeRam)       at (1.5, 10)   {\sail{write_ram}*};
+    \node (writeMpu)       at (4.5, 10)   {\sail{write_mpu_reg_byte}};
+
+    \graph {
+      (move) -> {(readReg),(writeReg)};
+      (jump) -> {(setPC)};
+      (call) -> {(readReg),(writeReg),(writeMem)};
+
+      (readReg) -> {(readRegister),(readIndexed),(readIndirect),(readAutoincr)};
+      (writeReg) -> {(writeRegister),(writeIndexed)};
+
+      (readIndexed) -> {(readMem),(fetch)};
+      (readIndirect) -> {(readMem)};
+      (readAutoincr) -> {(readMem), (writeRegister)};
+      (writeRegister) -> {(checkByte)};
+      (writeIndexed) -> {(writeMem)};
+
+      (fetch) -> {(readMem), (incPC)};
+
+      (readMem) -> {(readRam),(checkByte),(lemmaPtsTo)};
+      (writeMem) -> {(writeRam),(checkByte),(writeMpu),(lemmaPtsTo)};
+
+      (incPC) -> {(checkByte)};
+      (setPC) -> {(checkByte)};
+    };
+  \end{tikzpicture}
+  \caption{Summary of the contracts defined in this chapter. An edge from \(f\) to \(g\) means that \(g\)'s contract is used in the verification of \(f\)'s. Functions in parentheses are included for illustrative purposes but do not have a contract. Lemmas and foreign functions are marked with \dag{} and * respectively.}
+  \label{fig:deps}
+\end{figure}
