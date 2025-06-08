@@ -19,7 +19,14 @@
 \setmainfont{TeX Gyre Pagella}
 \setsansfont{TeX Gyre Heros}
 % \setmonofont[Instance=Regular]{Fira Code}
-\directlua{luaotfload.add_fallback("monofb", {"texgyrepagellamath:mode=node;"})}
+% ~/.cache/texlive/texmf-var/luatex-cache/generic/names/luaotfload-names.lua.gz
+\directlua{luaotfload.add_fallback("monofb", {
+    "texgyrepagellamath:mode=node;",
+    "notosansmono:mode=node;"
+    % "firacode:mode=node;",
+    % "freemono:mode=node;",
+    % "unifont:mode=node;"
+})}
 \setmonofont[RawFeature={fallback=monofb}]{Inconsolata}
 \setmathfont{Tex Gyre Pagella Math}
 

@@ -163,6 +163,7 @@ Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:di
 To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \texttt{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. There is no function that is called sistematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
 
 \subsubsection{Ensuring proper PC modification order}
+\label{sec:pc-mod-order}
 
 If the same instruction can both modify the PC and access memory, the change to the PC must happen last to avoid attacks such as controlled call corruption (\cref{sec:call-corruption}).
 
@@ -688,10 +689,10 @@ These lemmas must be called explicitly in the \usail specification before and af
 \end{listing}
 
 \section{Universal contract verification}
+\label{sec:uc-verification}
+
 
 With the aid of Katamaran, the universal contract can be proved without having to reason explicitly about every single statement in the \usail specification. Katamaran symbolically executes the object code of the contract starting from the user-provided precondition, and tries to match the generated postcondition with the desired one. If this process cannot be carried out automatically, the user is left with some verification conditions to prove manually, that typically involve non-trivial arithmetic.
-
-% TODO for another chapter maybe: this is the happy path, figuring out what's wrong/whether the contract is provable at all takes more effort, with giant VCs etc
 
 We cannot expect Katamaran to process the universal contract in one go. Breaking down the verification goal into smaller, easier parts is fundamental in keeping the execution time of the solver reasonable. We do this in two ways:
 \begin{itemize}
@@ -886,6 +887,7 @@ Moving on, \sail{read_autoincrement}'s contract is the same as \sail{read_regist
 \sail{write_indexed}'s contract is identical to \sail{read_indirect}'s, \ie like \cref{lst:read_indexed} but with \coq{PC_reg ↦ term_var "pc_old"} in the postcondition. One would expect the PC to be incremented by 2 as part of every indexed-mode write, but this happens elsewhere---this inconsistency with respect to \sail{read_indexed} comes from the original Sail specification.
 
 \subsubsection{Proofs}
+\label{sec:read-autoincrement-proof}
 
 The above contracts can be proved automatically by Katamaran's symbolic executor, with the help of the contracts defined in the next sections and with the exception of \coq{read_autoincrement}'s. The verification condition we are left with requires proving that, assuming that \(\mathit{pc}\) is untrusted and \(\mathit{pc} + 2\) is the IPE entry point, then \(\mathit{pc} + 2\) is untrusted (and likewise for \(\mathit{pc} + 1\)). The conclusion is false (the entry point \emph{is} trusted), so we show that the premises are contradictory. Rocq's linear integer arithmetic solver (the \coq{lia} tactic) can handle the refutation, provided we first:
 \begin{itemize}
@@ -1030,32 +1032,31 @@ Thanks to the use of \sail{incPC}, various functions that increment the PC (inde
 
 Katamaran can prove automatically the security properties on move, jump and call instructions stated in \cref{sec:uc-simple}, provided we first reduce the complexity of the verification by introducing a number of supporting contracts. They are summarized in \cref{fig:deps}, which shows where each of them is used.
 
-
-% TODO spostare setPC a destra
 \begin{figure}
-  \begin{tikzpicture}[yscale=-1]
+  \centering
+  \begin{tikzpicture}[yscale=-1.2,xscale=1.1]
     \node (move)           at (-3.5, 0)   {\sail{execute} (move)};
     \node (call)           at (0, 0)      {\sail{execute} (call)};
     \node (jump)           at (3.5, 0)    {\sail{execute} (jump)};
 
     \node (readReg)        at (-2, 1.5)   {(\sail{readReg})};
     \node (writeReg)       at (2, 1.5)    {(\sail{writeReg})};
+    \node (setPC)          at (7, 1.5)    {\sail{setPC}};
 
     \node (readRegister)   at (-5, 3)     {\sail{read_register}};
     \node (readIndexed)    at (-4, 3.5)   {\sail{read_indexed}};
     \node (readIndirect)   at (-2, 3)     {\sail{read_indirect}};
     \node (readAutoincr)   at (-0, 3.5)   {\sail{read_autoincr}.};
-    \node (writeRegister)  at (4, 3.5)    {\sail{write_register}};
-    \node (writeIndexed)   at (7, 3)      {\sail{write_indexed}};
+    \node (writeRegister)  at (3.5, 3.5)    {\sail{write_register}};
+    \node (writeIndexed)   at (5.5, 3)      {\sail{write_indexed}};
 
     \node (fetch)          at (-4, 5)     {\sail{fetch}};
-    \node (setPC)          at (6.5, 5)    {\sail{setPC}};
 
     \node (readMem)        at (-1, 6.5)   {\sail{readMem}};
     \node (writeMem)       at (3, 6.5)    {\sail{writeMem}};
     \node (incPC)          at (-4, 6.5)   {\sail{incPC}};
 
-    \node (checkByte)      at (6, 9)      {\sail{check_byte_access}};
+    \node (checkByte)      at (6.5, 9)      {\sail{check_byte_access}};
     \node (lemmaPtsTo)     at (-4, 8.7)   {\sail{extract_accessible_ptsto}\textsuperscript{\dag}};
     \node (lemmaPtsTo2)    at (-4, 9.1)   {\sail{return_accessible_ptsto}\textsuperscript{\dag}};
 
