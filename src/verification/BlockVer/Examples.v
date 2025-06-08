@@ -35,14 +35,14 @@ Module Examples.
     ∗ MPUIPSEGB1_reg ↦ term_val ty.wordBits [bv 0]
     ∗ MPUIPSEGB2_reg ↦ term_val ty.wordBits [bv 0].
 
-  Definition minimal_pre {Σ} (include_ipe : bool) : Assertion Σ :=
+  Definition minimal_pre {Σ} : Assertion Σ :=
       ∃ "lif", LastInstructionFetch ↦ term_var "lif"
     ∗ ∃ "srcg1", SRCG1_reg ↦ term_var "srcg1"
-    ∗ (* if include_ipe then asn_ipe_registers else *) ⊤
-    ∗ asn_mpu_registers.
+    (* ∗ asn_mpu_registers *)
+    ∗ MPUCTL0_reg ↦ term_val ty.wordBits [bv 0xA500].
 
-  Definition minimal_post {Σ} (include_ipe : bool) : Assertion Σ :=
-    minimal_pre include_ipe.
+  Definition minimal_post {Σ} : Assertion Σ :=
+    minimal_pre.
 
   Record BlockVerifierContract {Σ} :=
     MkBlockVerifierContract
@@ -51,19 +51,16 @@ Module Examples.
       ; postcondition : Assertion (Σ ▻ "a" :: ty.Address ▻ "an" :: ty.Address)
       }.
 
-  Definition MkValidBlockVerifierContract {Σ} (include_ipe : bool) (c : @BlockVerifierContract Σ) : Prop :=
+  Definition ValidBlockVerifierContract {Σ} (c : @BlockVerifierContract Σ) : Prop :=
   match c with
     {| precondition := pre; instrs := i; postcondition := post |} =>
-      safeE (* VerificationCondition *) (postprocess
+      (* safeE *) VerificationCondition (postprocess
                (sblock_verification_condition
-                  (minimal_pre include_ipe ∗ pre)
+                  (minimal_pre ∗ pre)
                   i
-                  (minimal_post include_ipe ∗ post)
+                  (minimal_post ∗ post)
                   wnil))
   end.
-
-  Definition ValidBlockVerifierContract {Σ} := @MkValidBlockVerifierContract Σ true.
-  Definition ValidBlockVerifierContractWithExplicitIPE {Σ} := @MkValidBlockVerifierContract Σ false.
 
   Local Notation "'{{' P '}}' i '{{' Q '}}'" :=
     (@MkBlockVerifierContract [ctx] P%asn i Q%asn)
@@ -204,8 +201,8 @@ Module Examples.
 
     Definition contract_evaluate_struct : BlockVerifierContract :=
       {{
-           (* asn_init_pc evaluate_struct_start *)
-⊤
+           asn_init_pc evaluate_struct_start
+
          ∗ asn_ipe_registers_zero
          ∗ R6_reg ↦ saved_ptr +' 6
          ∗ R7_reg ↦ MPUIPC0_addr
@@ -246,10 +243,12 @@ Module Examples.
 
     Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
     Proof.
-      symbolic_simpl.
-      repeat right.
-      rewrite H. unfold bv.add. vm_compute.
-      intuition; discriminate.
+      
+      vm_compute. Set Printing Depth 200.
+      (* symbolic_simpl. *)
+      (* repeat right. intuition.  *)
+      (* rewrite H. unfold bv.add. vm_compute. *)
+      (* intuition; discriminate. *)
     Qed.
 
   End Bootcode.

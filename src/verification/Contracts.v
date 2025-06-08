@@ -973,7 +973,7 @@ Proof.
   symbolic_simpl.
   repeat split; intros; unfold puntrusted in *.
   destruct (bv.unsigned_bounds v2).
-  destruct (bv.unsigned_add_view [bv [16] 0x2] v2); cbn in *; lia.
+  destruct (bv.unsigned_add_view v2 [bv [16] 0x2]); cbn in *; lia.
 Qed.
 
 Lemma valid_contract_fetch : Symbolic.ValidContractWithFuel 10 sep_contract_fetch fun_fetch.
@@ -996,9 +996,9 @@ Proof.
   symbolic_simpl.
   repeat split; subst.
   - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
-    destruct (bv.unsigned_add_view [bv [16] 0x2] v); cbn in *; lia.
+    destruct (bv.unsigned_add_view v [bv [16] 0x2]); cbn in *; lia.
   - exfalso. unfold puntrusted in *. destruct (bv.unsigned_bounds v).
-    destruct (bv.unsigned_add_view [bv [16] 0x1] v); cbn in *; lia.
+    destruct (bv.unsigned_add_view v [bv [16] 0x1]); cbn in *; lia.
 Qed.
 
 Lemma valid_contract_write_indexed : Symbolic.ValidContractWithFuel 10 sep_contract_write_indexed fun_write_indexed.
