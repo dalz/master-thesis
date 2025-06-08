@@ -2697,14 +2697,14 @@ Module Import MSP430Program <: Program MSP430Base.
               (stm_let "ga#114"
                        (ty.int)
                        (stm_let "ga#112"
-                                (ty.bvec (16))
-                                (stm_exp (exp_binop bop.shiftr (exp_var "addr") (exp_val (ty.bvec 1) ([bv 1]))))
+                                (ty.bvec (15))
+                                (stm_exp (exp_unop (uop.vector_subrange 1 15) (exp_var "addr")))
                                 (stm_exp (exp_unop uop.unsigned (exp_var "ga#112"))))
                        (stm_let "ga#115"
                                 (ty.int)
                                 (stm_let "ga#113"
-                                         (ty.bvec (16))
-                                         (stm_exp (exp_binop bop.shiftr (exp_val (ty.bvec 16) ([bv 1440])) (exp_val (ty.bvec 1) ([bv 1]))))
+                                         (ty.bvec (15))
+                                         (stm_exp (exp_unop (uop.vector_subrange 1 15) (exp_val (ty.bvec 16) ([bv 1440]))))
                                          (stm_exp (exp_unop uop.unsigned (exp_var "ga#113"))))
                                 (stm_exp (((exp_var "ga#114"))-((exp_var "ga#115"))))))
               (stm_let "ga#106"
@@ -2868,14 +2868,14 @@ Module Import MSP430Program <: Program MSP430Base.
               (stm_let "ga#132"
                        (ty.int)
                        (stm_let "ga#130"
-                                (ty.bvec (16))
-                                (stm_exp (exp_binop bop.shiftr (exp_var "addr") (exp_val (ty.bvec 1) ([bv 1]))))
+                                (ty.bvec (15))
+                                (stm_exp (exp_unop (uop.vector_subrange 1 15) (exp_var "addr")))
                                 (stm_exp (exp_unop uop.unsigned (exp_var "ga#130"))))
                        (stm_let "ga#133"
                                 (ty.int)
                                 (stm_let "ga#131"
-                                         (ty.bvec (16))
-                                         (stm_exp (exp_binop bop.shiftr (exp_val (ty.bvec 16) ([bv 1440])) (exp_val (ty.bvec 1) ([bv 1]))))
+                                         (ty.bvec (15))
+                                         (stm_exp (exp_unop (uop.vector_subrange 1 15) (exp_val (ty.bvec 16) ([bv 1440]))))
                                          (stm_exp (exp_unop uop.unsigned (exp_var "ga#131"))))
                                 (stm_exp (((exp_var "ga#132"))-((exp_var "ga#133"))))))
               (stm_let "low_byte"
