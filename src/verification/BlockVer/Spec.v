@@ -129,7 +129,14 @@ Module Utils.
     term_binop bop.bvor v (term_val ty.wordBits [bv 1]).
 
   Definition asn_word_aligned {Σ} (addr : Term Σ ty.Address) : Assertion Σ :=
-    addr = term_binop bop.bvand addr (term_val ty.Address [bv 0xfffe]).
+    asn.pattern_match addr (pat_bvec_split 1 15 "b" "addr'")
+      (fun _ => term_var "b" = term_val (ty.bvec 1) [bv 0]).
+
+  Definition addr0 {Σ} (v : Term Σ ty.wordBits) : Term Σ ty.wordBits :=
+    term_bvapp (term_val (ty.bvec 1) [bv 0x0]) (term_bvdrop 1 v).
+
+  Definition addr1 {Σ} (v : Term Σ ty.wordBits) : Term Σ ty.wordBits :=
+    term_bvapp (term_val (ty.bvec 1) [bv 0x1]) (term_bvdrop 1 v).
 
   Definition asn_ptsto_word {Σ}
     (addr : Term Σ ty.Address)
@@ -137,8 +144,8 @@ Module Utils.
     : Assertion Σ
   :=
     asn_word_aligned addr
-    ∗ addr m↦ bl
-    ∗ bor1 addr m↦ bh.
+    ∗ addr0 addr m↦ bl
+    ∗ addr1 addr m↦ bh.
 
   Definition asn_ipe_entry_point {Σ}
       (segb1 addr : Term Σ ty.wordBits)
@@ -593,12 +600,16 @@ Module RiscvPmpSpecVerif.
   Import Erasure.notations.
 
   Ltac symbolic_simpl :=
-    apply validcontract_with_erasure_and_fuel_sound;
-    vm_compute;
-    constructor;
-    simpl.
+    repeat
+      match goal with
+      | |- ValidContract _ _ => unfold ValidContract
+      | |- ValidContractWithFuel _ _ _ =>
+          apply validcontract_with_erasure_and_fuel_sound;
+          vm_compute;
+          constructor;
+          simpl
+      end.
 
-  (*
   Lemma valid_is_mpu_reg_addr : ValidContract sep_contract_is_mpu_reg_addr fun_is_mpu_reg_addr.
   Proof. symbolic_simpl. lia. Qed.
 
@@ -606,31 +617,20 @@ Module RiscvPmpSpecVerif.
   Proof. Admitted.
 
   Lemma valid_read_mem_aux : ValidContractWithFuel 10 sep_contract_read_mem_aux fun_read_mem_aux.
-  Proof.
-    symbolic_simpl.
-    repeat split; try lia; rewrite <- H0; rewrite bvor_idem; intuition.
-  Qed.
+  Proof. now symbolic_simpl. Qed.
 
   Lemma valid_check_byte_access : ValidContractWithFuel 10 sep_contract_check_byte_access fun_check_byte_access.
   Proof. now symbolic_simpl. Qed.
-   *)
+
   Lemma valid_read_indexed : ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
   Proof.
-    vm_compute. Set Printing Depth 200.
-    symbolic_simpl.
-    intros.
-  Qed.
+    (* vm_compute. Set Printing Depth 200. *)
+    (* symbolic_simpl. *)
+    (* intros. *)
+  Admitted.
 
   Lemma valid_write_mpu_reg_byte : ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
-  Proof.
-    symbolic_simpl.
-    intuition; rewrite H in H2; try discriminate.
+  Proof. symbolic_simpl. intuition congruence. Qed.
 
-    (* unfold bv.vector_subrange. cbn [bv.leview plus]. destruct bv.appView. *)
-    (* destruct (bv.view ys). destruct bv.appView. unfold bv.update_vector_subrange. *)
-    (* cbn [plus bv.leview]. rewrite bv.app_nil_r. cbn [bv.plus_n_O eq_rect eq_sym f_equal]. *)
-    (* rewrite bv.appView_app. destruct bv.appView. destruct (bv.view xs). *)
-    (* rewrite bv.app_nil. reflexivity. *)
-  Admitted.
 End RiscvPmpSpecVerif.
 

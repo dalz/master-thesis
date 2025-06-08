@@ -242,7 +242,7 @@ Module Examples.
     Proof. now symbolic_simpl. Qed.
 
     Lemma valid_transfer_if_valid_struct : ValidBlockVerifierContract contract_transfer_if_valid_struct.
-    Proof. symbolic_simpl. intros. rewrite H. intuition. Qed.
+    Proof. now symbolic_simpl. Qed.
 
     Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
     Proof.
