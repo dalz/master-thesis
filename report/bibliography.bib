@@ -145,6 +145,65 @@
   file   = {:Armstrong2018 - Detailed Models of Instruction Set Architectures_ from Pseudocode to Formal Semantics.pdf:PDF:https\://www.cl.cam.ac.uk/~pes20/sail/2018-04-12-arw-paper.pdf},
 }
 
+@InProceedings{Bognar2025,
+  author    = {Bognar, Marton and Van Bulck, Jo},
+  booktitle = {10th {IEEE} European Symposium on Security and Privacy (EuroS{\&}P)},
+  date      = {2025},
+  title     = {{openIPE}: An Extensible Memory Isolation Framework for Microcontrollers},
+}
+
+@Article{Keuchel2022,
+  author     = {Keuchel, Steven and Huyghebaert, Sander and Lukyanov, Georgy and Devriese, Dominique},
+  date       = {2022-08-31},
+  title      = {Verified symbolic execution with Kripke specification monads (and no meta-programming)},
+  doi        = {10.1145/3547628},
+  pages      = {194–224},
+  url        = {https://doi.org/10.1145/3547628},
+  abstract   = {Verifying soundness of symbolic execution-based program verifiers is a  
+significant challenge. This is especially true if the resulting tool needs to be  
+usable outside of the proof assistant, in which case we cannot rely on shallowly  
+embedded assertion logics and meta-programming. The tool needs to manipulate  
+deeply embedded assertions, and it is crucial for efficiency to eagerly prune  
+unreachable paths and simplify intermediate assertions in a way that can be  
+justified towards the soundness proof. Only a few such tools exist in the  
+literature, and their soundness proofs are intricate and hard to generalize or  
+reuse. We contribute a novel, systematic approach for the construction and  
+soundness proof of such a symbolic execution-based verifier. We first implement  
+a shallow verification condition generator as an object language interpreter in  
+a specification monad, using an abstract interface featuring angelic and demonic  
+nondeterminism. Next, we build a symbolic executor by implementing a similar  
+interpreter, in a symbolic specification monad. This symbolic monad lives in a  
+universe that is Kripke-indexed by variables in scope and a path condition.  
+Finally, we reduce the soundness of the symbolic execution to the soundness of  
+the shallow execution by relating both executors using a Kripke logical  
+relation. We report on the practical application of these techniques in  
+Katamaran, a tool for verifying security guarantees offered by instruction set  
+architectures (ISAs). The tool is fully verified by combining our symbolic  
+execution machinery with a soundness proof of the shallow verification  
+conditions against an axiomatized separation logic, and an Iris-based  
+implementation of the axioms, proven sound against the operational semantics.  
+Based on our experience with Katamaran, we can report good results on  
+practicality and efficiency of the tool, demonstrating practical viability of  
+our symbolic execution approach.},
+  booktitle  = {Proc. ACM Program. Lang.},
+  day        = {31},
+  file       = {:Keuchel2022 - Verified Symbolic Execution with Kripke Specification Monads (and No Meta Programming).pdf:PDF:https\://dl.acm.org/doi/pdf/10.1145/3547628},
+  groups     = {Katamaran},
+  keywords   = {logical relations, predicate transformers, program verification, refinement, separation logic, symbolic execution},
+  location   = {New York, NY, USA},
+  pagetotal  = {31},
+  publisher  = {Association for Computing Machinery},
+  readstatus = {skimmed},
+}
+
+@Manual{ChipsAlliance,
+  author  = {{Chips Alliance}},
+  title   = {RISC-V VeeR EL2 Programmer's Reference Manual},
+  chapter = {Chapter 21 Physical Memory Protection},
+  url     = {https://chipsalliance.github.io/Cores-VeeR-EL2/html/main/docs_rendered/html/physical-memory-protection.html},
+  urldate = {2025-06-09},
+}
+
 @Comment{jabref-meta: databaseType:biblatex;}
 
 @Comment{jabref-meta: fileDirectory:/home/ale/documenti/uni/magistrale/tesi/ref/pdfs;}
