@@ -3709,38 +3709,39 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                                     ((exp_var "addr"))%exp)
                                                                                                                                                                           (_::_)
                                                                                                                                                                           ((exp_var "ga#178"))%exp))));
-                                                                                                  existT Kword (MkAlt (pat_var "v") (stm_seq (stm_let "addr"
-                                                                                                                                                      (ty.bvec (16))
-                                                                                                                                                      (stm_exp (exp_binop bop.bvand (exp_var "addr") (exp_val (ty.bvec 16) ([bv 65534]))))
-                                                                                                                                                      (stm_let "ga#172"
-                                                                                                                                                               ((ty.union Uwordbyte))
-                                                                                                                                                               (stm_let "ga#171"
-                                                                                                                                                                        (ty.bvec (8))
-                                                                                                                                                                        (stm_exp (exp_unop (uop.vector_subrange 0 8) (exp_var "v")))
-                                                                                                                                                                        (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#171"))))
-                                                                                                                                                               (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                (_::_)
-                                                                                                                                                                                                                ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
-                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                      ((exp_var "addr"))%exp)
-                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                            ((exp_var "ga#172"))%exp))))
-                                                                                                                                             (stm_let "ga#175"
-                                                                                                                                                      (ty.bvec (16))
-                                                                                                                                                      (stm_exp (exp_binop bop.bvadd (exp_var "addr") (exp_val (ty.bvec 16) ([bv 1]))))
-                                                                                                                                                      (stm_let "ga#176"
-                                                                                                                                                               ((ty.union Uwordbyte))
-                                                                                                                                                               (stm_let "ga#174"
-                                                                                                                                                                        (ty.bvec (8))
-                                                                                                                                                                        (stm_exp (exp_unop (uop.vector_subrange 8 8) (exp_var "v")))
-                                                                                                                                                                        (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#174"))))
-                                                                                                                                                               (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil)
-                                                                                                                                                                                                                (_::_)
-                                                                                                                                                                                                                ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
-                                                                                                                                                                                                      (_::_)
-                                                                                                                                                                                                      ((exp_var "ga#175"))%exp)
-                                                                                                                                                                                            (_::_)
-                                                                                                                                                                                            ((exp_var "ga#176"))%exp))))))
+                                                                                                  existT Kword (MkAlt (pat_var "v") (stm_let "addr"
+                                                                                                                                       (ty.bvec (16))
+                                                                                                                                       (stm_exp (exp_binop bop.bvand (exp_var "addr") (exp_val (ty.bvec 16) ([bv 65534]))))
+                                                                                                                                       (stm_seq
+                                                                                                                                         (stm_let "ga#175"
+                                                                                                                                                  (ty.bvec (16))
+                                                                                                                                                  (stm_exp (exp_binop bop.bvadd (exp_var "addr") (exp_val (ty.bvec 16) ([bv 1]))))
+                                                                                                                                                  (stm_let "ga#176"
+                                                                                                                                                           ((ty.union Uwordbyte))
+                                                                                                                                                           (stm_let "ga#174"
+                                                                                                                                                                    (ty.bvec (8))
+                                                                                                                                                                    (stm_exp (exp_unop (uop.vector_subrange 8 8) (exp_var "v")))
+                                                                                                                                                                    (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#174"))))
+                                                                                                                                                           (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil)
+                                                                                                                                                                                                            (_::_)
+                                                                                                                                                                                                            ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
+                                                                                                                                                                                                  (_::_)
+                                                                                                                                                                                                  ((exp_var "ga#175"))%exp)
+                                                                                                                                                                                        (_::_)
+                                                                                                                                                                                        ((exp_var "ga#176"))%exp))))
+                                                                                                                                         (stm_let "ga#172"
+                                                                                                                                                  ((ty.union Uwordbyte))
+                                                                                                                                                  (stm_let "ga#171"
+                                                                                                                                                           (ty.bvec (8))
+                                                                                                                                                           (stm_exp (exp_unop (uop.vector_subrange 0 8) (exp_var "v")))
+                                                                                                                                                           (stm_exp (exp_union Uwordbyte Kbyte (exp_var "ga#171"))))
+                                                                                                                                                  (stm_call writeMem (env.snoc (env.snoc (env.snoc (env.nil)
+                                                                                                                                                                                                   (_::_)
+                                                                                                                                                                                                   ((exp_val (ty.enum Ebw) (BYTE_INSTRUCTION)))%exp)
+                                                                                                                                                                                         (_::_)
+                                                                                                                                                                                         ((exp_var "addr"))%exp)
+                                                                                                                                                                               (_::_)
+                                                                                                                                                                               ((exp_var "ga#172"))%exp))))))
                                                                                                 ]
                                                                                                 Logic.I)
                                         end)).

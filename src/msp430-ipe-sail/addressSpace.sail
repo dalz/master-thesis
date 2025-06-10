@@ -46,9 +46,10 @@ function writeMem(bw, addr, v) = match bw {
 
   WORD_INSTRUCTION => match v {
     Word(v) => {
-      let addr = addr & 0xFFFE in // TODO is this right?
-      writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]));
-      writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]))
+      let addr = addr & 0xFFFE in {
+        writeMem(BYTE_INSTRUCTION, addr + 1, Byte(v[15 .. 8]));
+        writeMem(BYTE_INSTRUCTION, addr, Byte(v[7 .. 0]))
+      }
     },
 
     Byte(v) => writeMem(WORD_INSTRUCTION, addr, Word(sail_zero_extend(v, 16)))

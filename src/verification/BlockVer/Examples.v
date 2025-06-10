@@ -54,7 +54,7 @@ Module Examples.
   Definition ValidBlockVerifierContract {Σ} (c : @BlockVerifierContract Σ) : Prop :=
   match c with
     {| precondition := pre; instrs := i; postcondition := post |} =>
-      (* safeE *) VerificationCondition (postprocess
+      safeE (* VerificationCondition *) (postprocess
                (sblock_verification_condition
                   (minimal_pre ∗ pre)
                   i
@@ -120,7 +120,7 @@ Module Examples.
 
     Definition saved_ptr_loc {Σ} : Term Σ _ := term_val ty.Address [bv 0x4200].
     Definition saved_ptr {Σ} : Term Σ _ := term_val ty.Address [bv 0x4202].
-    Definition conf_ipectl {Σ} : Term Σ _ := term_val ty.Address [bv 0x00CD].
+    Definition conf_ipectl {Σ} : Term Σ _ := term_val ty.Address [bv 0x00C0].
     Definition conf_segb1 {Σ} : Term Σ _ := term_val ty.Address [bv 0x6000].
     Definition conf_segb2 {Σ} : Term Σ _ := term_val ty.Address [bv 0x6100].
 
@@ -134,8 +134,8 @@ Module Examples.
     Definition transfer_if_valid_struct_start {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x4].
     Definition check_struct_start {Σ} : Term Σ _ := term_val ty.wordBits [bv 0xC].
     Definition evaluate_struct_start {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x20].
-    Definition mass_erase_start {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x2A].
-    Definition end_addr {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x38].
+    Definition mass_erase_start {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x34].
+    Definition end_addr {Σ} : Term Σ _ := term_val ty.wordBits [bv 0x100].
 
     Definition asn_flag_valid {Σ} : Assertion Σ :=
       asn_ptsto_word ipe_sig_valid_src (low valid_flag) (high valid_flag).
@@ -210,29 +210,28 @@ Module Examples.
          ∗ R9_reg ↦ MPUIPSEGB1_addr
 
          ∗ asn_ptsto_word (saved_ptr +' 4) (low conf_segb1) (high conf_segb1)
-         (* ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2) *)
-         (* ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl) *)
+         ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2)
+         ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl)
       }}
-        [ mov_ir R6 (bv.of_Z (-2)%Z) R9
-          (* mov_im R6 (bv.of_Z (-2)%Z) R9 *)
-        (* ; mov_im R6 (bv.of_Z (-4)%Z) R8 *)
-        (* ; mov_im R6 (bv.of_Z (-6)%Z) R7 *)
-        (* ; jump JMP [bv 0x7] *) (* end *) ]
-      {{ ⊤
-         (*   asn_fin_pc end_addr *)
+        [ mov_im R6 (bv.of_Z (-2)%Z) R9
+        ; mov_im R6 (bv.of_Z (-4)%Z) R8
+        ; mov_im R6 (bv.of_Z (-6)%Z) R7
+        ; jump JMP [bv 102] (* end *) ]
+      {{
+           asn_fin_pc end_addr
 
-           (* MPUIPC0_reg    ↦ conf_ipectl *)
-         (* ∗ MPUIPSEGB1_reg ↦ conf_segb1 *)
-         (* ∗ MPUIPSEGB2_reg ↦ conf_segb2 *)
+         ∗ MPUIPC0_reg    ↦ conf_ipectl
+         ∗ MPUIPSEGB1_reg ↦ conf_segb1
+         ∗ MPUIPSEGB2_reg ↦ conf_segb2
 
-         (* ∗ R6_reg ↦ saved_ptr +' 6 *)
-         (* ∗ R7_reg ↦ MPUIPC0_addr *)
-         (* ∗ R8_reg ↦ MPUIPSEGB2_addr *)
-         (* ∗ R9_reg ↦ MPUIPSEGB1_addr *)
+         ∗ R6_reg ↦ saved_ptr +' 6
+         ∗ R7_reg ↦ MPUIPC0_addr
+         ∗ R8_reg ↦ MPUIPSEGB2_addr
+         ∗ R9_reg ↦ MPUIPSEGB1_addr
 
-         (* ∗ asn_ptsto_word (saved_ptr +' 4) (low conf_segb1) (high conf_segb1) *)
-         (* ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2) *)
-         (* ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl) *)
+         ∗ asn_ptsto_word (saved_ptr +' 4) (low conf_segb1) (high conf_segb1)
+         ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2)
+         ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl)
       }}.
 
     Lemma valid_start_bootcode : ValidBlockVerifierContract contract_start_bootcode.
@@ -242,14 +241,6 @@ Module Examples.
     Proof. now symbolic_simpl. Qed.
 
     Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
-    Proof.
-      
-      vm_compute. Set Printing Depth 200.
-      (* symbolic_simpl. *)
-      (* repeat right. intuition.  *)
-      (* rewrite H. unfold bv.add. vm_compute. *)
-      (* intuition; discriminate. *)
-    Qed.
-
+    Proof. now symbolic_simpl. Qed.
   End Bootcode.
 End Examples.

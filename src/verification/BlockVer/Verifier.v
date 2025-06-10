@@ -118,7 +118,7 @@ Section BlockVerificationDerived.
 
     Definition sexec_instruction (i : ast_with_args) :
       ⊢ STerm ty.Address -> SHeapSpec (STerm ty.Address) :=
-      let inline_fuel := 10%nat in
+      let inline_fuel := 15%nat in
       fun _ a =>
         ⟨ θ1 ⟩ _ <- produce
                       (exec_instruction_prologue i)
@@ -186,7 +186,7 @@ Section BlockVerificationDerived.
 
     Definition cexec_instruction (i : ast_with_args) :
       Val ty.Address -> CHeapSpec (Val ty.Address) :=
-      let inline_fuel := 10%nat in
+      let inline_fuel := 15%nat in
       fun a =>
         _ <- produce (exec_instruction_prologue i)
                [env].["a"∷_ ↦ a] ;;
