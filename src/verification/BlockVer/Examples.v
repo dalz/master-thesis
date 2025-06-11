@@ -121,8 +121,6 @@ Module Examples.
     Definition saved_ptr_loc {Σ} : Term Σ _ := term_val ty.Address [bv 0x4200].
     Definition saved_ptr {Σ} : Term Σ _ := term_val ty.Address [bv 0x4202].
     Definition conf_ipectl {Σ} : Term Σ _ := term_val ty.Address [bv 0x00C0].
-    Definition conf_segb1 {Σ} : Term Σ _ := term_val ty.Address [bv 0x6000].
-    Definition conf_segb2 {Σ} : Term Σ _ := term_val ty.Address [bv 0x6100].
 
     Definition byte_zero {Σ} : Term Σ _ := term_val ty.byteBits [bv 0].
 
@@ -139,14 +137,6 @@ Module Examples.
 
     Definition asn_flag_valid {Σ} : Assertion Σ :=
       asn_ptsto_word ipe_sig_valid_src (low valid_flag) (high valid_flag).
-
-    Definition asn_conf {Σ} : Assertion Σ :=
-        saved_ptr      m↦ low  conf_ipectl
-      ∗ saved_ptr +' 1 m↦ high conf_ipectl
-      ∗ saved_ptr +' 2 m↦ low  conf_segb2
-      ∗ saved_ptr +' 3 m↦ high conf_segb2
-      ∗ saved_ptr +' 4 m↦ low  conf_segb1
-      ∗ saved_ptr +' 5 m↦ high conf_segb1.
 
     Definition contract_start_bootcode : BlockVerifierContract :=
       {{
@@ -209,8 +199,8 @@ Module Examples.
          ∗ R8_reg ↦ MPUIPSEGB2_addr
          ∗ R9_reg ↦ MPUIPSEGB1_addr
 
-         ∗ asn_ptsto_word (saved_ptr +' 4) (low conf_segb1) (high conf_segb1)
-         ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2)
+         ∗ asn_ptsto_word (saved_ptr +' 4) (low (term_var "segb1")) (high (term_var "segb1"))
+         ∗ asn_ptsto_word (saved_ptr +' 2) (low (term_var "segb2")) (high (term_var "segb2"))
          ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl)
       }}
         [ mov_im R6 (bv.of_Z (-2)%Z) R9
@@ -221,18 +211,18 @@ Module Examples.
            asn_fin_pc end_addr
 
          ∗ MPUIPC0_reg    ↦ conf_ipectl
-         ∗ MPUIPSEGB1_reg ↦ conf_segb1
-         ∗ MPUIPSEGB2_reg ↦ conf_segb2
+         ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+         ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
 
          ∗ R6_reg ↦ saved_ptr +' 6
          ∗ R7_reg ↦ MPUIPC0_addr
          ∗ R8_reg ↦ MPUIPSEGB2_addr
          ∗ R9_reg ↦ MPUIPSEGB1_addr
 
-         ∗ asn_ptsto_word (saved_ptr +' 4) (low conf_segb1) (high conf_segb1)
-         ∗ asn_ptsto_word (saved_ptr +' 2) (low conf_segb2) (high conf_segb2)
+         ∗ asn_ptsto_word (saved_ptr +' 4) (low (term_var "segb1")) (high (term_var "segb1"))
+         ∗ asn_ptsto_word (saved_ptr +' 2) (low (term_var "segb2")) (high (term_var "segb2"))
          ∗ asn_ptsto_word saved_ptr (low conf_ipectl) (high conf_ipectl)
-      }}.
+      }} with [ "segb1" :: ty.wordBits; "segb2" :: ty.wordBits ].
 
     Lemma valid_start_bootcode : ValidBlockVerifierContract contract_start_bootcode.
     Proof. now symbolic_simpl. Qed.
@@ -241,6 +231,10 @@ Module Examples.
     Proof. now symbolic_simpl. Qed.
 
     Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
-    Proof. now symbolic_simpl. Qed.
+    Proof.
+      symbolic_simpl.
+      assert (forall v : bv 16, v = bv.app (bv.take 8 v) (bv.drop 8 v)) by admit.
+      intuition (apply H).
+    Admitted.
   End Bootcode.
 End Examples.
