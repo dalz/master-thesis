@@ -233,8 +233,9 @@ Module Examples.
     Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
     Proof.
       symbolic_simpl.
-      assert (forall v : bv 16, v = bv.app (bv.take 8 v) (bv.drop 8 v)) by admit.
-      intuition (apply H).
-    Admitted.
+      intuition;
+        unfold bv.app; unfold bv.take; unfold bv.drop;
+        destruct bv.appView; reflexivity.
+    Qed.
   End Bootcode.
 End Examples.
