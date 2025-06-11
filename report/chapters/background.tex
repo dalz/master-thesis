@@ -2,7 +2,7 @@
 
 \section[\texorpdfstring{\msp}{MSP430}]{MSP430}
 
-\msp is a family of low-power microcontrollers produced by Texas Instruments. The \msp ISA was chosen to be the target of the verification effort of this thesis for two reasons. Firstly, some models (\msp[FR58xx], \msp[FR59xx], \msp[FR6xx]) implement \intro{Intellectual Property Encapsulation}[IPE], a basic form of TEE; this means that there are meaningful security properties to be verified. Additionally, \msp microcontrollers are widely used in commercial applications, so they serve as a case-study for the applicability of Katamaran to real-world architectures.
+\msp is a family of low-power microcontrollers produced by Texas Instruments. The \msp ISA was chosen to be the target of the verification effort of this thesis for two reasons. Firstly, some models (\msp[FR58xx], \msp[FR59xx], \msp[FR6xx]) implement \intro{Intellectual Property Encapsulation}[IPE], a basic form of TEE; this means that there are meaningful security properties to be verified. Additionally, \msp microcontrollers are widely used in commercial applications, so they serve as a case study for the applicability of Katamaran to real-world architectures.
 
 In short, IPE protects a user-defined memory region from being accessed by untrusted code. Assuming that the attacker can execute arbitrary code on the microcontroller, IPE is meant to:
 \begin{itemize}
@@ -11,42 +11,44 @@ In short, IPE protects a user-defined memory region from being accessed by untru
 \item maintain integrity of the protected region, so that code cannot be tampered with to produce leaks.
 \end{itemize}
 
-\msp microcontrollers include multiple additional hardware and software security features, such as limiting JTAG access, protecting the bootloader with a password \cite{slaa685} and a \intro{Memory Protection Unit}[MPU]. We will focus on IPE for the rest of the thesis.
+\msp microcontrollers include multiple additional hardware and software security features, such as limiting JTAG access, protecting the bootcode with a password \cite{slaa685} and a \intro{Memory Protection Unit}[MPU]. We will focus on IPE for the rest of the thesis.
 
-some general characteristics?
-fram faq https://www.ti.com/lit/wp/slat151/slat151.pdf
+\subsection{General characteristics}
+
+The \msp has a 16-bit architecture, with some models supporting a 20-bit address space via an extended instruction set.
+
+The ISA doesn't have dedicated load and store operations, but includes a rich set of addressing modes that allow access to memory and can be used with almost all instructions. For example, \texttt{add @r4+, 2(r5)} adds the word stored at the address contained in register \reg{r4} to the word stored at the address contained in \reg{R5} plus two, stores the result in the latter location, and increments \reg{R4} by two; the indirect autoincrement mode is used for the source, the indexed mode for the destination.
+
+A peculiarity of the \msp is the adoption of FRAM \cite{slaa628b} to support most of the address space, with limited use of SRAM. FRAM is non-volatile, meaning that writes persist across reboots and losses of power.
 
 \subsection{IPE}
 \label{sec:ipe}
 
-We will now discuss in more detail how IPE works.
+We will now discuss the workings of IPE in more detail.
 
-To protect a region of FRAM, the user writes the 16 most significant bits\footnote{The \msp microcontrollers with IPE support have a 16-bit architecture and 20-bit address space.} of the start and end addresses to two memory-mapped registers, \reg{MPUIPSEGB1} and \reg{MPUIPSEGB2}. Then, IPE must be enabled by setting bit 6 (\regbit{MPUIPENA}) of the \reg{MPUIPC0} control register.
+To protect a region of FRAM, the user writes the start and end addresses without the 4 least significant bits\footnote{To allow the use of IPE on models with a 20-bit address space (and 16-bit registers, as usual). These bits must also be dropped in 16-bit address space models for portability.} to two memory-mapped registers, \reg{MPUIPSEGB1} and \reg{MPUIPSEGB2}. Then, IPE must be enabled by setting bit 6 (\regbit{MPUIPENA}) of the \reg{MPUIPC0} control register.
 
-As long as \regbit{MPUIPENA} is set, read and write accesses to addresses contained in the protected region are only allowed if the program counter is also within the region, \ie the IPE range contains both the protected data and the trusted/privileged code.
+As long as \regbit{MPUIPENA} is set, read and write accesses to addresses contained in the protected region are only allowed if the program counter is also within the region, \ie the IPE range determines both the protected data and the trusted/privileged code.
 
 There are some exceptions to this rule:
 \begin{itemize}
 \item the \intro{Interrupt Vector Table}[IVT] is always readable and writable, even if it overlaps with the IPE region; % actually depends on MPU too, also IVT under IPE is not executable (the IVT contains only pointers to interrupt routines anyway)
-\item code executed from the first 8 bytes of the IPE range does \emph{not} have permission to access the protected region (see next section).
+\item code executed from the first 8 bytes of the IPE range does \emph{not} have permission to access the protected region---the motivation will be explained in the next section.
 \end{itemize}
 
 If a violation occurs the microcontroller performs either a non-maskable interrupt or a \intro{power-up clear}[PUC] (\ie reboots and erases the FRAM), depending on bit 5 (\regbit{MPUIPVS}) of \reg{MPUIPC0}.
 
 After the IPE registers are configured, bit 7 (\regbit{MPUIPLOCK}) of \reg{MPUIPC0} can be set to prevent their further modification. They will not be allowed to change (triggering an IPE violation if a write is attempted) until a \intro{brown-out reset}[BOR] happens. Unlike PUCs, BORs do not clear the memory;
 % Since most of the address space is comprised of non-volatile FRAM,
-untrusted code can disable the protections by causing a BOR and unsetting \regbit{MPUIPENA}. Thus IPE configuration and locking should happen before the execution of application code, \ie in the bootloader.
+untrusted code can disable the protections by causing a BOR and unsetting \regbit{MPUIPENA}. Thus IPE configuration and locking should happen before the execution of application code, \ie in the bootcode.
 
+\subsection{IPE initialization via bootcode}
+\label{sec:bootcode}
 
-% mass erase
-
-\subsection{IPE initialization via bootloader}
-\label{sec:bootloader}
-
-The bootloader shipped with the \msp microcontrollers can read an IPE configuration from memory and apply it before any user code is executed.  It proceeds as follows:
+The bootcode shipped with the \msp microcontrollers can read an IPE configuration from memory and apply it before any user code is executed.  It proceeds as follows:
 \begin{enumerate}
-\item Checks whether the user enabled this feauture by writing \hex{AAAA} to location \addr{FF88} (\intro{IPE Signature 1}). If not, skip the following steps.
-\item Reads the \intro{IPE structure pointer}[ISP] from location \addr{FF8A} (\intro{IPE Signature 2}). The user should have written the IPE configuration to the memory pointed to by the ISP, in the following format: three words for the values of \reg{MPUIPC0}, \reg{MPUIPB2}, \reg{MPUIPB1}; a word-size check code (odd bit-interleaved parity).
+\item Checks whether the user enabled this feauture by writing \hex{AAAA} to location \addr{FF88} (\intro{IPE Signature 1}). If not, skips the following steps.
+\item Reads the \intro{IPE structure pointer}[ISP] from location \addr{FF8A} (\intro{IPE Signature 2}). The user should have written the IPE configuration to the memory pointed to by the ISP, in the following format: three words for the values of \reg{MPUIPC0}, \reg{MPUIPSEGB2}, \reg{MPUIPSEGB1}; a word-size check code (odd bit-interleaved parity).
 \item Stores the ISP in protected non-volatile memory.
 \item Computes parity of the IPE structure to detect corruption. Initiates a full erase of memory if the computed parity isn't consistent with the check code, minimizing the likelihood of memory corruption causing exposure of protected data.
 \item Configures the IPE registers according to the structure.
@@ -54,28 +56,28 @@ The bootloader shipped with the \msp microcontrollers can read an IPE configurat
 
 Since the IPE Signature may not be protected by IPE, reading it at each boot lets the attacker change the IPE settings by overwriting the signature and rebooting. Therefore, on subsequent execution (recognized by the fact that the saved ISP is not null) the IPE Signature is not read. Regardless of its value, the structure pointed to by the saved ISP is checked for parity and used to initialize the registers.  To revert to the first-boot behavior, a special full-erase sequence must be performed through the JTAG interface.
 
-The user can freely choose the location of the IPE structure, but is expected to place within the IPE boundaries to prevent it from being overwritten by attacker code---particularly in the first 8 bytes, that are protected but not considered trusted code. Overall, this affords trusted code the flexibility to change the protected range across reboots (which would not be possible if locking was permanent) in a secure manner.
+The user can freely choose the location of the IPE structure, but is expected to place it within the IPE boundaries---particularly in the first 8 bytes, that are protected but not considered trusted code---to prevent it from being overwritten by attacker code. Overall, this affords trusted code the flexibility to change the protected range across reboots (which would not be possible if locking was truly permanent) in a secure manner.
 
 \subsection{Security}
 \label{sec:ipe-attacks}
 
-Unfortunately, as demonstrated by \cite{Bognar2024}, current implementations of IPE are vulnerable to a number of attacks, both architectural and via side-channels. These attacks assume an attacker that can execute arbitrary untrusted code (\ie can manipulate freely unprotected memory), which is a common threat model in discussions about TEEs \todocite{}.
+As demonstrated by \cite{Bognar2024}, current implementations of IPE are vulnerable to a number of attacks, both architectural and via side-channels. These attacks assume an attacker that can execute arbitrary untrusted code (\ie can manipulate freely unprotected memory), which is a common threat model in discussions about TEEs. % TODO citation?
 
-Given our verification goal, of particular interest to us are the architectural attacks, which arise from inconsistencies in the ISA specification or errors in its hardware implementation. We briefly cover some of the vulnerabilities.
+Given our verification goal, of particular interest to us are the architectural attacks, which arise from inconsistencies in the ISA specification or errors in its hardware implementation. We briefly cover some of the vulnerabilities belonging to this class.
 
 \subsubsection{Controlled call corruption}
 \label{sec:call-corruption}
 
-The \msp architecture provides a \asm{call dst} instruction that saves the current \intro{program counter}[PC] to the stack, whose top element is pointed to by the \reg{SP} register, and jumps to \asm{dst}. IPE's permission checks are implemented erroneusly for this instruction, opening the way for an attack (\cref{fig:call-corruption}):
+The \msp architecture provides a \asm{call} \emph{dst} instruction that saves the current \intro{program counter}[PC] to the stack, whose top element is pointed to by the \reg{SP} register, and jumps to \emph{dst}. IPE's permission checks are implemented erroneusly for this instruction, opening the way for an attack (\cref{lst:call-corruption}):
 
-\begin{figure}
-  \begin{verbatim}
-    mov #protected, SP
-    call #ipefunc
-  \end{verbatim}%asm
-  \caption{Attacker code for controlled call corruption.}
-  \label{fig:call-corruption}
-\end{figure}
+\begin{lstlisting}[
+  language=asm,
+  float=htb, label=lst:call-corruption,
+  caption={Attacker code for controlled call corruption.}
+]
+  mov #protected, SP
+  call #ipefunc
+\end{lstlisting}
 
 \begin{enumerate}
 \item an address (\asm{protected}) contained in the IPE region is written to \reg{SP}, which can be manipulated like a general purpose register;
@@ -84,26 +86,26 @@ The \msp architecture provides a \asm{call dst} instruction that saves the curre
 
 The \asm{call} instruction then attempts to write the return address (current PC) to the stack. The operation should fail, since the \reg{SP} is now in the IPE region and the \asm{call} is performed from untrusted code. Instead, on current models the write goes through successfully; it seems that the program counter is updated \emph{before} performing the access permission check.
 
-This attack grants untrusted code the ability to corrupt protected memory. The values that the attacker can choose to write are restricted to those that are memory addresses from which the \asm{call} can be executed. Still, being able to write a known value is often sufficient to accomplish the attacker's goal (\eg replacing an encryption key), and the writable values include the encoding of many instruction. With enough effort the attacker is likely to be able to dump the whole content of the IPE region; controlled call corruption can break confidentiality as well as integrity of secured data and code.
+This attack grants untrusted code the ability to corrupt protected memory. The values that the attacker can choose to write are restricted to those that are memory addresses from which the \asm{call} can be executed. Still, being able to write a known value is often sufficient to accomplish the attacker's goal (\eg replacing an encryption key), and the writable values include the encoding of many instructions. With enough effort the attacker is likely to be able to dump the whole content of the IPE region; controlled call corruption can break confidentiality as well as integrity of secured data and code.
 
 \subsubsection{Code reuse}
 \label{sec:code-reuse}
 
-The IPE region doesn't have well-defined entry points; jumping to arbitrary protected locations is always allowed. This opens the door to code reuse attacks. As an example, \cref{fig:read-gadget} shows a piece of trusted code that copies a word from memory location \asm{src}  to \asm{dst}. For the attacker, it easily becomes a universal read and write gadget: it is sufficient to write the desired source and destination addresses to \reg{r4} and \reg{r5}, and then jump directly to the third line.
+The IPE region doesn't have well-defined entry points; jumping to arbitrary protected locations is always allowed. This opens the door to code reuse attacks. As an example, \cref{lst:read-gadget} shows a piece of trusted code that copies a word from memory location \asm{src}  to \asm{dst}. For the attacker, it easily becomes a universal read and write gadget: it is sufficient to write the desired source and destination addresses to \reg{r4} and \reg{r5}, and then jump directly to the third line.
 
-\begin{figure}
-  \begin{verbatim}
-    mov #src, r4
-    mov #dst, r5
-    mov 0(r4), 0(r5)
-  \end{verbatim}%asm
-  \caption{An innocuous copy can become a universal read gadget.}
-  \label{fig:read-gadget}
-\end{figure}
+\begin{lstlisting}[
+  language=asm,
+  float=htb, label=lst:read-gadget,
+  caption={An innocuous copy can become a universal read gadget.}
+]
+  mov #src, r4
+  mov #dst, r5
+  mov 0(r4), 0(r5)
+\end{lstlisting}
 
 In isolation, performing this attack is not trivial, since the IPE code is confidential; identifying suitable gadgets may require a lot of trial and error. Other attacks (including side-channel attacks) may be used to aid this search, and finding a universal write gadget turns a vulnerability that breaks confidentiality into one that also breaks integrity.
 
-\subsection{Interrupting IPE code}
+\subsubsection{Interrupting IPE code}
 \label{sec:interrupts}
 
 Interrupts are handled as usual during execution of protected code: the processor consults the interrupt vector table to find the location of the appropriate \intro{interrupt service routine}[ISR], and execution continues from there, until the routine returns to the code that was interrupted. It is the responsibility of the ISR to restore the general purpose registers to their initial value before returning.
@@ -116,31 +118,31 @@ The IVT is always writable, even when inside the IPE boundaries. The attacker ca
 
 One official document \cite{slaa685} suggests disabling interrupts during execution of IPE code to avoid this issue. However, there is no way to disable non-maskable interrupts, and the lack of well-defined entry points allows the attacker to jump over the code that disables the maskable interrupts.
 
-\subsection{Takeaways?}
+% \subsection{Takeaways?}
 
 % we'll want to prove that call can't modify and jumps are only allowed to the entry point
 
 \section{Formal specification of ISAs}
 
-Major hardware vendors specify their architectures with varying degrees of detail and precision. Intel's \cite{Intel2025} and AMD's \cite{AMD2024} x86 manuals are mostly prose, with some pseudocode to aid understanding. Power's specification \cite{OPF2024} is accompanied by comprehensive pseudocode, for which a parser has been developed \cite{libreSOC}. Armv8's semantics is specified precisely using the ASL language \cite{Arm2020}\cite{Reid2016}; the same goes for RISC-V and the Sail language \cite{RVSail}.
+Major hardware vendors specify their architectures with varying degrees of detail and precision. Intel's \cite{Intel2025} and AMD's \cite{AMD2024} x86 manuals are mostly prose, with some pseudocode to aid understanding. Power's specification \cite{OPF2024} is accompanied by comprehensive pseudocode, for which a parser has been developed \cite{libreSOC}. Armv8's semantics is specified precisely using the ASL language \cite{Arm2020}\cite{Reid2016}; the same goes for RISC-V with the Sail language \cite{RVSail}.
 
-Formal machine-readable specifications avoid inconsistencies that can arise in ISA manuals written in natural language. They define exactly the behavior of the architecture without room for ambiguity, and they provide a base for formal (automated) reasoning \cite{Armstrong2018}.
+Compared to natural-language manuals, formal machine-readable specifications define exactly the behavior of the architecture without room for ambiguity, and they provide a base for formal (automated) reasoning \cite{Armstrong2018}.
 
-Texas Instruments does not provide an official formal specification for the \msp microcontrollers. We base our verification work on an extension of the \msp Sail model developed in \todocite{}.
+Texas Instruments does not provide an official formal specification for the \msp microcontrollers. We base our verification work on an extension of the \msp Sail model developed in \cite{mspthesis}.
 
 \subsection{Structure of a Sail specification}
 \label{sec:sail-structure}
 
 Sail \cite{Armstrong} is a language designed for the purpose of specifying ISAs. Its tooling can generate emulators (by translation to C or OCaml) and definitions for theorem provers (\eg Rocq and Lem) to reason about the ISA.
 
-Sail specifications are tipically interptreters of the target architecture's machine code. The main function runs fetch-decode-execute cycle that mirrors that of the hardware:
+Sail specifications are tipically interpreters of the target architecture's machine code. The main function runs a fetch-decode-execute cycle that mirrors that of the hardware:
 \begin{labeling}[~--]{execute}
 \item[fetch] read from memory the word pointed to by the \reg{PC} register;
 \item[decode] parse the result of fetch (a bitvector) into a structured representation;
-\item[execute] pattern match on the instruction to perform the appropriate side effects, such as modifying registers and writing to memory.
+\item[execute] pattern match on the instruction to perform the appropriate side effects, such as modifying registers or writing to memory.
 \end{labeling}
 
-This style facilitates the extraction of executable code from the ISA, and the development of the specification by engineers without further training, as opposed to \eg custom small-step semantics.
+This style facilitates extraction of executable code from the ISA and the development of the specification by engineers without further training, as opposed to \eg custom small-step semantics.
 
 Sail code doesn't usually concern itself with the details of memory. Instead, it is common to declare functions like \sail{read_ram} and \sail{write_ram} as foreign, \ie implemented in a language other than Sail. When extracting an emulator a concrete implementation must be given in C or OCaml.
 
@@ -153,27 +155,28 @@ This section outlines some of Sail's distinctive features.
 \begin{figure}
   \centering
   \includegraphics[width=12cm]{sail-overview}
-  \caption{Overview of the Sail infrastructure.}
+  \caption{Overview of the Sail infrastructure (from Sail's GitHub repository).}
   \label{fig:sail-overview}
 \end{figure}
 
 \subsubsection{Expressive types}
 
 Sail's type system supports user-defined structs, enums and unions (sum types).
-It provides a number of numeric types: arbitrary-precision \sail{nat} and \sail{int}, bounded integers types (\eg \sail{range(0, 15)}), and bitvectors of a given length (\eg \sail{bits(8)}).
+
+The built-in types include arbitrary-precision integers (\sail{nat} and \sail{int}), bounded integers (\eg \sail{range(0, 15)}) and bitvectors of a given length (\eg \sail{bits(8)}).
 
 A limited form of dependent types is available, primarily to rule out the possibility of out-of-bounds accesses to bitvectors. In Sail, types can be of three kinds: \sail{Type}, the kind of enums, structs, \sail{nat}, \sail{bvec(n)}, etc.; \sail{Int}, the kind of integers; \sail{Bool}, of \sail{true} and \sail{false}.
 
-Consequently, integers can be used in types (as seen in \eg \sail{bits(8)}), and polymorphic type variables can range over integers.
+Consequently, integers can be used in types (as seen in \eg \sail{bits(8)}), and polymorphic type variables can range over integers, as they are themselves types.
 
 As an example, a function that repeats a bitvector some number of times could have the following signature:
 
-\begin{verbatim}
-val replicate_bits : forall 'n 'm, 'm >= 1 & 'n >= 1.
-    (int('n), bits('m)) -> bits('n * 'm)
-\end{verbatim}%sail
+\begin{lstlisting}[language=sail]
+  val replicate_bits : forall 'n 'm, 'm >= 1 & 'n >= 1.
+      (int('n), bits('m)) -> bits('n * 'm)
+\end{lstlisting}
 
-\sail{replicate_bits}'s type is parameterized over two type variables \sail{n} and \sail{m}, which are inferred to be of kind \sail{Int}; at each usage site, they will be instantiated by some integer. Next we see two constraints for the integer type variables: they must be at least 1. Finally, we state that \sail{replicate_bits} is a function with:
+\sail{replicate_bits}'s type is parameterized over two type variables \sail{n} and \sail{m}, which are inferred to be of kind \sail{Int}; at each usage site they will be instantiated with some integer. Next we set two constraints for the integer type variables: they must be at least 1. Finally, we state that \sail{replicate_bits} is a function with:
 \begin{description}
 \item[Inputs] an integer and a bitvector. At each call site, the type variable \sail{n} will be instantiated with the integer, and \sail{m} with the size of the bitvector.
 \item[Output] a bitvector of size \(\sail{n} \cdot \sail{m}\).
@@ -189,46 +192,39 @@ Dependent types can be elimininated through monomorphization when exporting to a
 Pattern matching is a pervasive operation in all kind of interpreters, and machine code specifications are no exception. Sail's patterns can be used to match and destruct structs, tuples, unions, enums, bitvectors and more. As usual, patterns double as l-values when they are irrefutable.
 
 Bitvector patterns are a distinctive feature that comes from existing pseudocode conventions. For instance, the following pattern matches the encoding of the RISC-V \texttt{ADDI} instruction:
-\begin{verbatim}
+\begin{lstlisting}[language=sail]
   imm : bits(12) @ rs1 : bits(5) @ 0b000 @ rd : bits(5) @ 0b0010011
-\end{verbatim}%sail
+\end{lstlisting}
 it will bind the first 12 bits to \sail{imm}, the following 5 to \sail{rs1}, then expect 3 zeroes, followed by 5 bits bound to \sail{rd}, and then the sequence \texttt{0010011}.
 
 \subsubsection{Scattered definitions}
 
 A single union, enum or function can have its definition split between multiple locations, possibly in different files. A common use case is to partition decoding and execution by instruction.
 
-\begin{verbatim}
-union clause ast = ADDI : (bits(12), regbits, regbits)
+\begin{lstlisting}[language=sail]
+  union clause ast = ADDI : (bits(12), regbits, regbits)
 
-function clause decode imm : bits(12) @ rs1 : regbits @ 0b000 @ rd : regbits @ 0b0010011
-  = ADDI(imm, rs1, rd)
+  function clause decode(imm : bits(12)
+                         @ rs1 : regbits @ 0b000
+                         @ rd : regbits @ 0b0010011)
+    = ADDI(imm, rs1, rd)
 
-function clause execute (ADDI(imm, rs1, rd)) = ...
-\end{verbatim}%sail
+  function clause execute (ADDI(imm, rs1, rd)) = ...
+\end{lstlisting}
 
 \subsubsection{Overloading}
 
 Sail supports function and operator overloading, as found \eg in ASL \cite{Reid2016}. A common pattern consists in defining two functions \sail{read(reg)} and \sail{write(reg, v)}, and then an overload \sail{overload X = \{read, write\}}, to be used as in \sail{X(R5) = X(R4) + 0x0001}.
 
-\subsection{Considerations for security analysis}
-
-Sail is used to give the \emph{functional} specification of the ISA. The security guarantees that can be found in many architecture manuals have to be expressed separately; we will see in the next section how to do it.
-
-Our goal is to prove that those security properties hold about a microcontroller. We will reason about a \emph{model} of the microcontroller, its Sail ISA specification. We should then wonder whether this model is fit for purpose.
-
-Assuming the specification is implemented faithfully, the answer is positive for architectural attacks, by definition; they don't rely on microarchitecture-specific behavior, so the ISA fully describes the attacker's capabilities. All attacks covered in \cref{sec:ipe-attacks} fall in this category.
-
-On the other hand, reasoning about side-channels requires some level of knowledge of the microarchitecture. In principle, this information (for a specific hardware design) could be added to the ISA specification \todocite{there's some reference in \cite{Huyghebaert2023}}; but...
-
 \section{Security properties as universal contracts}
 \label{sec:universal-contracts}
 
-Once we have a precise account of our architecture's semantics, we likewise need a formal way of expressing security guarantees. Our language of choice for doing so will be separation logic.
+Once we have a precise account of our architecture's semantics, we likewise need a formal way of expressing security guarantees. Our language of choice for doing so is be separation logic.
 
 \subsection{Security contracts}
 
-The basic idea is to verify contracts, or Hoare triples, that encode security property. Take for example the security property: ``a closed door cannot be unlocked without providing the password 123''. It is encoded by the following contract:
+The basic idea is to verify contracts, or Hoare triples, that encode security properties. Take for example the security property: ``a closed door cannot be
+unlocked without providing the password 123''. It is encoded by the following contract:
 \[ \hoare
   {\text{door locked} \wedge \mathit{pwd} \neq 123}
   {\texttt{unlock-door(\(\mathit{pwd}\))}}
@@ -246,7 +242,7 @@ Knowing \texttt{unlock-door}'s implementation, we can prove that the above contr
 \item the attacker can only interact with our program/machine by calling known functions.
 \end{itemize}
 
-Given our threat model, neither of the above assumptions holds true. We want to ensure that the guarantees hold when executing attacker code, which cannot be known a priori. We deal with this by proving the security property for \emph{all} programs, ecompassing all possible attacker behaviors:
+Given our threat model, neither of the above assumptions holds true. We want to ensure that the guarantees hold when executing attacker code, which cannot be known a priori. We deal with this by proving the security property for \emph{all} programs, encompassing all possible attacker behaviors:
 \[ \forall p.\; \hoare{\text{assumptions}}{p}{\text{security guarantees}} \]
 this is known as a \emph{universal contract}.
 
@@ -267,7 +263,7 @@ In the above contract, \(p\) is a \msp machine program. A proof of such contract
   {\texttt{fdeCycle()}}
   {c = \text{current IPE config}} \]
 
-ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instruction (\ie arbitrary program) also leaves them unchanged. We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
+ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged. We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
 \[ \hoare
   {c = \text{current IPE config} \wedge c.\mathrm{locked}}
   {\texttt{execute(\(\mathit{instr}\))}}
@@ -279,9 +275,9 @@ This shift in viewpoint is consequential for machine-assisted proofs of security
 
 So far we have been stating the pre- and postconditions informally. To make them more precise we need a language that can express properties involving memory, registers and access permissions, while being simple enough to facilitate (semi-)automated reasoning. The obvious choice here is a basic separation logic.
 
-Generally speaking, separation logic is a kind of Hoare logic extended with predicates that state ownership of \emph{resources}, such as memory locations and registers. For example, \(\ell \ptom v\)\footnote{Pronounced \(\ell\) points to \(v\).} asserts that we own the location \(\ell\) and that the value stored at that location is \(v\).
+Generally speaking, separation logic is a kind of Hoare logic extended with predicates that state ownership of \emph{resources}, such as memory locations and registers. For example, \(\ell \ptom v\) (pronounced \(\ell\) points to \(v\)) asserts that we own the location \(\ell\) and that the value stored at that location is \(v\).
 
-Separation logic introduces a new connective, the \intro{separating conjunction}. \(P \ast Q\) is true when \(P\) and \(Q\) both hold and have exclusive ownership of the resources they assert. For example, while \(\ell \ptom v \wedge \ell \ptom v\) is true for a memory where location \(\ell\) stores \(v\), \(\ell \ptom v \ast \ell \ptom v\) is always false: the two conjuncts don't have exclusive ownership of \(\ell\). So from the validity of \(\ell_1 \ptom v \ast \ell_2 \ptom v\) we can derive that \(\ell_1 \neq \ell_2\).
+Separation logic introduces a new connective, the \intro{separating conjunction}. \(P \ast Q\) (\(P\) and separately \(Q\)) is true when \(P\) and \(Q\) both hold and have exclusive ownership of the resources they assert. For example, while \(\ell \ptom v \wedge \ell \ptom v\) is true for a memory where location \(\ell\) stores \(v\), \(\ell \ptom v \ast \ell \ptom v\) is always false, as the two conjuncts don't have exclusive ownership of \(\ell\). So from the validity of \(\ell_1 \ptom v \ast \ell_2 \ptom v\) we can derive that \(\ell_1 \neq \ell_2\).
 
 The point of this is to enable modular reasoning in the presence of mutable state. Separation logic's proof system has a key rule in this regard:
 \[ \frac{\hoare{P}{e}{Q}}{\hoare{P \ast R}{e}{Q \ast R}}[\textsc{Frame}] \]
@@ -300,10 +296,38 @@ For that, we assume the following specifications for \texttt{read\_ram} and \tex
   \hoare{\ell \ptom v}{\texttt{write\_ram($\ell$, $v'$)}}{\ell \ptom v'} \\
   \hoare{\ell \ptom v}{\texttt{read\_ram($\ell$)}}[u]{u = v \wedge \ell \ptom v}
 \end{gather*}
-We will then only be allowed to access a location if we own its corresponding predicate.
+we are only ``allowed'' to access a location if we own the corresponding chunk of memory. Concretely, we cannot prove any triple\footnote{Excluding those with an inconsistent precondition.} for a program that reads or writes to memory unless we assume the appropriate points-to predicates in the precondition.
 
- ...
+So if we want to state that the \coq{store} instruction doesn't let the attacker write to protected memory, we do that with the triple:
+\[ \hoare{\bigast_{\smash{\mathrm{unprotected}~\ell}} \exists v.\; \ell \ptom v}{\texttt{execute\_store($l$, $u$)}}{\top}\]
+Since the precondition doesn't include points-to chunks for protected locations, the contract is provable only if \texttt{execute\_store} never attempts to access them, regardless of whether its argument \(l\) is protected.
 
+Thus the implementation \texttt{execute\_store(\(l\), \(u\)) = write\_ram(\(l\), \(u\))} wouldn't satisfy the contract: there is no way to prove any postcondition, not even the trivial one, because \texttt{write\_ram}'s specification requires ownership of \(l\), which we don't have in general.
+
+On the other hand,
+\begin{lstlisting}[language=sail, mathescape]
+  function execute_store($l$, $u$) =
+    if protected $l$ then throw error()
+    else write_ram($l$, $u$)
+\end{lstlisting}
+only invokes \texttt{write\_ram} when we know that \(l\) is unprotected, and thus can prove that we own its chunk. We are able to apply \texttt{write\_ram}'s specification and derive a postcondition about \texttt{execute\_store}, therefore proving the contract. Provability coincides with the implementation being safe, \ie not allowing forbidden accesses at runtime.
 
 \section{Katamaran}
+
+Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verification of ISAs. It is built on top of the Rocq\footnote{Until recently known as Coq.} theorem prover and the Iris separation logic framework.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=12cm]{katamaran.eps}
+  \caption{Katamaran's architecture (from \cite{Huyghebaert2023})}
+  \label{fig:katamaran}
+\end{figure}
+
+\Cref{fig:katamaran} shows the components of a mechanized proof based on Katamaran. First of all, the user needs to provide a \usail (a subset of Sail embedded in Rocq) model of the ISA and the contracts they want to prove. Katamaran's symbolic executor then runs the object code of the contracts under the given preconditions and checks that the postconditions match. If it cannot prove that they do or don't, it leaves some \intro{verification conditions}[VCs] that the user can inspect and verify manually using Rocq's tactic language.
+
+The symbolic executor can only reason about \usail code. For all foreign functions used in the model a specification must be provided. Whenever the foreign function is called, its contract will be applied to determine the effects of the call.
+
+Pre- and postconditions are specified in a simple separation logic that can be extended with user-defined resources. These resources are opaque to the solvers and must be manipulated explicitly by invoking user-provided lemmas, which are essentially contracts that apply to the empty program.
+
+The result of this process is the guarantee that the verified contracts hold up to the validity of the foreign function contracts and lemmas. Lemma correctness can be then proved by instantiating Katamaran's Iris model with a definition of the custom resources in terms of Iris propositions, and carrying out the proof via Iris' tactics. Likewise, foreign function contracts can be verified against a Rocq implementation of those functions. After that we have full assurance that the ISA satisfies the desired properties, as Katamaran itself is also proved correct.
 

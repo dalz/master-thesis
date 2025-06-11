@@ -9,7 +9,9 @@ The contributions of this thesis, as presented in the previous chapters, are:
 \item applying Katamaran's block verifier to prove the \msp bootcode's correctness.
 \end{itemize}
 
-Here we elaborate on the experience of using Katamaran, discuss the next steps toward a more comprehensive verification of the \msp, and briefly go over other approaches to ISA verification.
+The property we proved guarantees that our model is not susceptible to the controlled call corruption and code reuse attacks from \cref{sec:ipe-attacks}, that are instead effective against commercially available \msp models. This suggests that formal verification can be used to \emph{in practice} improve the security of ISAs compared to industry-standard testing methodologies. % In addition, a number of bugs in our Sail model were the discovered during the verification process.
+
+We will now elaborate on the experience of using Katamaran, discuss the next steps toward a more comprehensive verification of the \msp, and briefly go over other approaches to ISA verification.
 
 \section{Experience report}
 
@@ -82,6 +84,18 @@ Finally, currently the proofs are valid up to the correctness of lemmas and fore
 \item instantiate an Iris model of our resources, \ie specify the meaning of custom predicates in terms of Iris proposition, and use it to prove the soundness of the lemmas (\cref{sec:TODO});
 \item implement the foreign functions in Rocq and prove that the contracts hold for them.
 \end{itemize}
+
+\subsection{Considerations for security analysis}
+
+TODO moved from background, make it fit here
+
+Sail is used to give the \emph{functional} specification of the ISA. The security guarantees that can be found in many architecture manuals have to be expressed separately; we will see in the next section how to do it.
+
+Our goal is to prove that those security properties hold in a microcontroller. We will reason about a \emph{model} of the microcontroller, its Sail ISA specification. We should then wonder whether this model is fit for purpose.
+
+Assuming the specification is implemented faithfully, the answer is positive for architectural attacks, by definition; they don't rely on microarchitecture-specific behavior, so the ISA fully describes the attacker's capabilities. All attacks covered in \cref{sec:ipe-attacks} fall in this category.
+
+On the other hand, reasoning about side-channels requires some level of knowledge of the microarchitecture. In principle, this information (for a specific hardware design) could be added to the ISA specification \todocite{there's some reference in \cite{Huyghebaert2023}}; but...
 
 \section{Related work}
 

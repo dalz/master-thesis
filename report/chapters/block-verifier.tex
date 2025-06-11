@@ -9,7 +9,7 @@ In this chapter, we illustrate this process on the bootcode that is shipped with
 
 \section{\msp bootcode}
 
-The purpose of the bootcode was already explained in \cref{sec:bootloader}. As a reminder, its main job is to read the IPE configuration from persistent memory, perform an integrity check, and either update the IPE registers or erase the memory in case it detects corruption.
+The purpose of the bootcode was already explained in \cref{sec:bootcode}. As a reminder, its main job is to read the IPE configuration from persistent memory, perform an integrity check, and either update the IPE registers or erase the memory in case it detects corruption.
 
 The source code of the bootcode is proprietary, but was recently reverse-engineered as part of the openIPE project \cite{Bognar2025}; most of it can be seen in \cref{lst:bootcode}. We will discuss the various parts as we state the properties we want to prove on them.
 
@@ -414,3 +414,11 @@ The symbolic executor leaves a simple verification condition to be proved:
 TODO what does the vc say?
 
 \subsection{Writing of IPE registers}
+
+
+% during verification a bug was found in the specification
+% write_mpu_reg_byte was called first for the lsb
+% which in the case of mpuipc0 contains the lock bit
+% so writes to mpuipc0 that enabled locking would ignore the high byte
+% inconsequential because high byte is reserved, but would have caused problems in case of extensions
+% this was only found because of the precondition of write_mpu_reg_byte that says it must be unlocked

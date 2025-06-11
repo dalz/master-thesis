@@ -417,8 +417,7 @@ Module MSP430BlockVerifShalExecutor :=
 Module MSP430BlockVerifExecutor :=
   MakeExecutor MSP430Base MSP430Signature MSP430Program MSP430BlockVerifSpec.
 
-
-Module RiscvPmpSpecVerif.
+Module MSP430SpecVerif.
   Import MSP430BlockVerifSpec.
   Import MSP430BlockVerifExecutor.Symbolic.
   Import MSP430BlockVerifExecutor.
@@ -443,5 +442,5 @@ Module RiscvPmpSpecVerif.
   Lemma valid_write_mpu_reg_byte : ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
   Proof. symbolic_simpl. intuition congruence. Qed.
 
-End RiscvPmpSpecVerif.
+End MSP430SpecVerif.
 

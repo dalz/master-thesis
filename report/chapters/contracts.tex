@@ -14,7 +14,7 @@ Due to the vulnerabilities covered in \cref{sec:ipe-attacks}, it would be imposs
 
 Texas Instruments doesn't provide a precise, machine-readable description of the \msp's ISA, which we need for our proof. Hence, the first step is to develop a formal specification in Sail, starting from the official user manuals.
 
-The intention is to model the common behavior of the family described in \cite{slau367p}. In some places the specification relies on some model-specific detail (\eg the addresses the MPU registers are mapped to); we refer to the \msp[FR5969]'s manual \cite{slas704g} in such cases. Another source of information about IPE and the bootloader is \cite{slaa685}.
+The intention is to model the common behavior of the family described in \cite{slau367p}. In some places the specification relies on some model-specific detail (\eg the addresses the MPU registers are mapped to); we refer to the \msp[FR5969]'s manual \cite{slas704g} in such cases. Another source of information about IPE and the bootcode is \cite{slaa685}.
 
 The development of a Sail model of the \msp was already started in \cite{mspthesis}, with a number of limitations, including a restricted set of supported addressing modes, lack of interrupt and reset handling and no support for the Memory Protection Unit and IPE. In \cref{sec:sail-ipe} we show how the model is extended with IPE, and in \cref{sec:model-limitations} we discuss the effect of the missing features.
 
@@ -35,7 +35,7 @@ The IPE configuration registers (listed in \cref{tab:ipe-registers}) are part of
     \reg{MPUIPSEGB2} & upper boundary of IPE region* (inclusive) \\
     \reg{MPUIPSEGB1} & lower boundary of IPE region* (exclusive) \\ \bottomrule
   \end{tabular}
-  *16 most significant bits of a 20-bit address (TODO but the model is limited to 16 bit addresses)
+  *without the 4 least significant bits
   \caption{IPE registers.}
   \label{tab:ipe-registers}
 \end{table}
@@ -114,7 +114,7 @@ We need to ensure that all accesses to memory are allowed by the IPE configurati
 \begin{itemize}
 \item IPE is disabled (bit \regbit{MPUIPENA} of \reg{MPUIPC0} is unset) \circref{cia-enabled}, or
 \item the address is unprotected \circref{cia-unprotected}, \ie outside of the region delimited by \sail{MPUIPSEGB1 << 4} and \sail{MPUIPSEGB2 << 4} (see the note in \cref{tab:ipe-registers}), or
-\item we are executing trusted code \circref{cia-trusted}, \ie the PC is inside the IPE region except the first 8 bytes (reserved for the IPE configuration structure, see \cref{sec:bootloader}).
+\item we are executing trusted code \circref{cia-trusted}, \ie the PC is inside the IPE region except the first 8 bytes (reserved for the IPE configuration structure, see \cref{sec:bootcode}).
 \end{itemize}
 
 \startcstep
@@ -137,7 +137,7 @@ We again hook into \sail{readMem} and \sail{writeMem} to call \sail{check_ipe_ac
 \subsubsection{Restricted entry into the IPE region}
 \label{sec:entry-point}
 
-IPE as designed and implemented is susceptible to code reuse attacks (\cref{sec:code-reuse}). In our model we instead define a single entry point, the ninth byte in the IPE region---just after the space dedicated to the IPE configuration structure (\cref{sec:bootloader}). Changing the PC to point to a protected address constitutes an IPE violation if the code performing the change is untrusted (\ie the previous value of PC was outside the protected region).
+IPE as designed and implemented is susceptible to code reuse attacks (\cref{sec:code-reuse}). In our model we instead define a single entry point, the ninth byte in the IPE region---just after the space dedicated to the IPE configuration structure (\cref{sec:bootcode}). Changing the PC to point to a protected address constitutes an IPE violation if the code performing the change is untrusted (\ie the previous value of PC was outside the protected region).
 
 An advantage of the entry point not being the first protected address is that it's not possible to accidentally ``fall through'' to the IPE region when executing the instruction immediatly preceding the lower boundary.
 
@@ -182,7 +182,7 @@ The missing addressing modes add immediate parameters and absolute addresses, th
 
 The MPU is used to further \emph{restrict} access to memory, by dividing it in up to three segments with different permissions. It is intended mostly to prevent accidental modification of memory and not as a security feature, but can be combined with IPE to get stronger guarantees \cite{Bognar2024}. Regardless, \emph{not} including it restricts the attacker \emph{less}, so our verification doesn't lose any value from this.
 
-Resets can be part of an exploit, as they disable register locking. We can exclude this possibility by making sure that IPE gets enabled and locked after every boot; this is a property we can prove about the device's bootloader.
+Resets can be part of an exploit, as they disable register locking. We can exclude this possibility by making sure that IPE gets enabled and locked after every boot; this is a property we can prove about the device's bootcode.
 
 The most significant omission is interrupt handling, which is an essential component of the attack sketched in \cref{sec:interrupts}. ...
 
@@ -280,7 +280,7 @@ Our contract will focus on guaranteeing integrity and confidentiality of the IPE
 \item the IPE registers don't change their value.
 \end{itemize}
 
-It can then be proved separately that the bootloader sets the IPE registers to what is expected by the contract. We are not interested in verifying the security of trusted code, since it always has access to all memory; the only meaningful property we could prove is that it doesn't modify locked registers.
+It can then be proved separately that the bootcode sets the IPE registers to what is expected by the contract. We are not interested in verifying the security of trusted code, since it always has access to all memory; the only meaningful property we could prove is that it doesn't modify locked registers.
 
 We consider a location protected if it lies within the IPE boundaries; there is no reason to have a special case for the IVT (see \cref{sec:ipe}) considering that we don't support interrupts.
 
