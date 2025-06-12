@@ -36,11 +36,12 @@ There are some exceptions to this rule:
 \item code executed from the first 8 bytes of the IPE range does \emph{not} have permission to access the protected region---the motivation will be explained in the next section.
 \end{itemize}
 
-If a violation occurs the microcontroller performs either a non-maskable interrupt or a \intro{power-up clear}[PUC] (\ie reboots and erases the FRAM), depending on bit 5 (\regbit{MPUIPVS}) of \reg{MPUIPC0}.
+If a violation occurs the microcontroller performs either a non-maskable interrupt or a \intro{power-up clear} (a type of device reset), depending on bit 5 (\regbit{MPUIPVS}) of \reg{MPUIPC0}.
 
-After the IPE registers are configured, bit 7 (\regbit{MPUIPLOCK}) of \reg{MPUIPC0} can be set to prevent their further modification. They will not be allowed to change (triggering an IPE violation if a write is attempted) until a \intro{brown-out reset}[BOR] happens. Unlike PUCs, BORs do not clear the memory;
+After the IPE registers are configured, bit 7 (\regbit{MPUIPLOCK}) of \reg{MPUIPC0} can be set to prevent their further modification. They will not be allowed to change (triggering an IPE violation if a write is attempted) until a \intro{brown-out reset}[BOR] happens.
+% Unlike PUCs, BORs do not clear the memory;
 % Since most of the address space is comprised of non-volatile FRAM,
-untrusted code can disable the protections by causing a BOR and unsetting \regbit{MPUIPENA}. Thus IPE configuration and locking should happen before the execution of application code, \ie in the bootcode.
+Untrusted code can disable the protections by causing a BOR and unsetting \regbit{MPUIPENA}, thus IPE configuration and locking should happen before the execution of application code, \ie in the bootcode.
 
 \subsection{IPE initialization via bootcode}
 \label{sec:bootcode}
@@ -148,7 +149,7 @@ Sail code doesn't usually concern itself with the details of memory. Instead, it
 
 \subsection{The Sail language}
 
-At its core, Sail is a first-order imperative language that integrates a number of feature commonly found in vendor-specific pseudocode and specification languages. The result is an expressive set of primitives that ease both manual development of new specifications and automated translations from the pseudocode languages that inspired Sail.
+At its core, Sail is a first-order imperative language that integrates a number of features commonly found in vendor-specific pseudocode and specification languages. The result is an expressive set of primitives that ease both manual development of new specifications and automated translations from the pseudocode languages that inspired Sail.
 
 This section outlines some of Sail's distinctive features.
 
@@ -219,7 +220,7 @@ Sail supports function and operator overloading, as found \eg in ASL \cite{Reid2
 \section{Security properties as universal contracts}
 \label{sec:universal-contracts}
 
-Once we have a precise account of our architecture's semantics, we likewise need a formal way of expressing security guarantees. Our language of choice for doing so is be separation logic.
+Once we have a precise account of our architecture's semantics, we likewise need a formal way of expressing security guarantees. Our language of choice for doing so is separation logic.
 
 \subsection{Security contracts}
 
@@ -263,13 +264,17 @@ In the above contract, \(p\) is a \msp machine program. A proof of such contract
   {\texttt{fdeCycle()}}
   {c = \text{current IPE config}} \]
 
-ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged. We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
+ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged.\footnote{This kind of reasoning is sound when the postcondition of every instruction in the sequence implies the postcondition of the next, which is true here as the configuration is still locked in the postcondition (it hasn't changed).} We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
 \[ \hoare
   {c = \text{current IPE config} \wedge c.\mathrm{locked}}
   {\texttt{execute(\(\mathit{instr}\))}}
   {c = \text{current IPE config}} \]
 
-This shift in viewpoint is consequential for machine-assisted proofs of security contracts. Verification tools need only know about the semantics of the Sail language, which remains fixed, and can be agnostic about the details of the ISAs they are applied to.
+% Repeated application of this contract for the verification of multi-instruction programs is justified by the fact that the postcondition implies the precondition.
+
+% Here the reduction to the single instruction case is justified by the fact that the postcondition implies the precondition: after executing any instruction under the assumption that the configuration is locked we know that the configuration is still locked, therefore we can apply the contract to the next instruction and so on.
+
+The shift in viewpoint from assembly to Sail code is consequential for machine-assisted proofs of security contracts. Verification tools need only know about the semantics of the Sail language, which remains fixed, and can be agnostic about the details of the ISAs they are applied to.
 
 \subsection{Separation logic}
 
@@ -313,6 +318,7 @@ On the other hand,
 only invokes \texttt{write\_ram} when we know that \(l\) is unprotected, and thus can prove that we own its chunk. We are able to apply \texttt{write\_ram}'s specification and derive a postcondition about \texttt{execute\_store}, therefore proving the contract. Provability coincides with the implementation being safe, \ie not allowing forbidden accesses at runtime.
 
 \section{Katamaran}
+\label{sec:katamaran}
 
 Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verification of ISAs. It is built on top of the Rocq\footnote{Until recently known as Coq.} theorem prover and the Iris separation logic framework.
 

@@ -140,30 +140,10 @@ Module Import MSP430Specification <: Specification MSP430Base MSP430Signature MS
       ∗ ∃ "MPUSEGB1_reg"   , MPUSEGB1_reg   ↦ term_var "MPUSEGB1_reg"
       ∗ ∃ "MPUSAM_reg"     , MPUSAM_reg     ↦ term_var "MPUSAM_reg".
 
-    (*
-    Definition asn_own_sample_regs {Σ} : Assertion Σ :=
-        ∃ "SP"    , SP_reg               ↦ term_var "SP"
-      ∗ ∃ "SRCG1" , SRCG1_reg            ↦ term_var "SRCG1"
-      ∗ ∃ "CG2"   , CG2_reg              ↦ term_var "CG2"
-      ∗ ∃ "R4"    , R4_reg               ↦ term_var "R4"
-      ∗ ∃ "R5"    , R5_reg               ↦ term_var "R5"
-      ∗ ∃ "R6"    , R6_reg               ↦ term_var "R6"
-      ∗ ∃ "R7"    , R7_reg               ↦ term_var "R7"
-      ∗ ∃ "R8"    , R8_reg               ↦ term_var "R8"
-      ∗ ∃ "R9"    , R9_reg               ↦ term_var "R9"
-      ∗ ∃ "R10"   , R10_reg              ↦ term_var "R10"
-      ∗ ∃ "R11"   , R11_reg              ↦ term_var "R11"
-      ∗ ∃ "R12"   , R12_reg              ↦ term_var "R12"
-      ∗ ∃ "R13"   , R13_reg              ↦ term_var "R13"
-      ∗ ∃ "R14"   , R14_reg              ↦ term_var "R14"
-      ∗ ∃ "R15"   , R15_reg              ↦ term_var "R15"
-      ∗ ∃ "LIF"   , LastInstructionFetch ↦ term_var "LIF".
-    *)
-
     Definition asn_own_sample_regs {Σ} : Assertion Σ :=
       (* actual sample registers (except PC) *)
-        ∃ "SRCG1" , SRCG1_reg            ↦ term_var "SRCG1"
-      ∗ ∃ "R4"    , R4_reg               ↦ term_var "R4"
+        ∃ "SRCG1" , SRCG1_reg ↦ term_var "SRCG1"
+      ∗ ∃ "R4"    , R4_reg    ↦ term_var "R4"
 
       (* often needed *)
       ∗ ∃ "SP"    , SP_reg               ↦ term_var "SP"
