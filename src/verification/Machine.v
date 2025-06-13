@@ -5,7 +5,8 @@ From Coq Require Import Lists.List
                         Strings.String
                         ZArith.BinInt.
 
-From Katamaran Require Import Semantics.Registers
+From Katamaran Require Import Semantics
+                              Semantics.Registers
                               Bitvector
                               Program.
 
@@ -12464,3 +12465,6 @@ Module Import MSP430Program <: Program MSP430Base.
 
   Include ProgramMixin MSP430Base.
 End MSP430Program.
+
+Module MSP430Semantics <: Semantics MSP430Base MSP430Program :=
+  MakeSemantics MSP430Base MSP430Program.

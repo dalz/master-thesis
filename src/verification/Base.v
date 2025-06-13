@@ -798,6 +798,19 @@ end.
       |}.
   End RegDeclKit.
 
+  Section Inhabited.
+    #[export] Instance val_inhabited σ: Inhabited (Val σ).
+    Proof. generalize dependent σ.
+           induction σ as [| | | | | | | E | | | U | R]; try apply _; cbn.
+           - exact (populate "").
+           - destruct E; repeat constructor.
+           - induction σs; first apply _.
+             cbn. inversion IH. apply prod_inhabited; [apply IHσs |]; auto.
+           - destruct U;  repeat constructor. all: try apply bv.bv_inhabited.
+           - destruct R;  repeat constructor.
+    Qed.
+  End Inhabited.
+
   Section MemoryModel.
     Definition Memory := Address -> byteBits.
   End MemoryModel.
