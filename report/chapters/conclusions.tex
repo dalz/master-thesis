@@ -2,16 +2,16 @@
 
 The contributions of this thesis, as presented in the previous chapters, are:
 \begin{itemize}
-\item an extended version of the Sail model of the \msp from \cite{mspthesis} that includes the Intellectual Property Encapsulation mechanism;
+\item an extended version of \cite{mspthesis}'s Sail model of the \msp that includes the Intellectual Property Encapsulation mechanism;
 \item a translation of said model to \usail, starting from a generated base to which fixes and adjustments were applied;
-\item a statement of the security guarantees of IPE under the form of a universal contract;
+\item a statement of the security guarantees of IPE as a universal contract;
 \item a semi-automated proof of the universal contract aided by Katamaran;
-\item applying Katamaran's block verifier to prove the \msp bootcode's correctness.
+\item a proof of correctness of the \msp bootcode, via Katamaran's block verifier.
 \end{itemize}
 
 The property we proved guarantees that our model is not susceptible to the controlled call corruption and code reuse attacks from \cref{sec:ipe-attacks}, that are instead effective against commercially available \msp models. This suggests that formal verification can be used to \emph{in practice} improve the security of ISAs compared to industry-standard testing methodologies. % In addition, a number of bugs in our Sail model were the discovered during the verification process.
 
-We will now elaborate on the experience of using Katamaran, discuss the next steps toward a more comprehensive verification of the \msp, and briefly go over other approaches to ISA verification.
+We will now elaborate on the experience of using Katamaran and discuss the next steps toward a more comprehensive verification of the \msp.
 
 \section{Experience report}
 
@@ -21,14 +21,14 @@ The final proofs presented in \cref{sec:uc-verification} are mostly trivial. Ind
 
 Firstly, the contracts have to be actually provable, or the verification will fail for obvious reasons. This \emph{will} happen during the development. Chiefly because of oversights in the specification; after all, there would be no point in verifying the ISA if we were completely sure of the absence of bugs in it. See \cref{sec:pc-mod-order} for an example of this in our \msp model.
 
-Other times the security property doesn't hold in some edge cases (\eg in the presence of overflows or misconfigurations) which can be expected not to occur in practice; this is dealt with by strengthening the precondition. For instance we added the assumption that the lower boundary of the IPE region is actually less than the upper after finding out it was needed to verify \sail{read_autoincrement}.
+Other times the security property doesn't hold in some edge cases (\eg in the presence of overflows or misconfigurations) which can be expected not to occur in practice; this is dealt with by strengthening the precondition. For instance we added the assumption that the lower boundary of the IPE region is less than the upper after finding out it was needed to verify \sail{read_autoincrement}.
 
 It may happen that a contract \emph{would} be provable by pure symbolic execution (assuming no time constraints), but isn't if the executor takes advantage of other contracts we specified instead of unfolding function calls. In other words, the user's specification of an auxiliary function isn't sufficiently precise to carry out the caller's verification. In our case we had to go back and update \sail{write_register}'s contract to support the verification of \sail{read_autoincrement}. This was already discussed in \cref{sec:read-autoincrement-proof}, but in short \sail{write_register}'s original postcondition abstracted away some information about the PC that was later found to be necessary. Similar situations are bound to happen as the user tries to strike a balance between the strength of the properties (pushing \eg toward more complex and precise postconditions) and amenability to automated reasoning (simpler, more vague postconditions).
 
 Another key requirement for a sucessful verification is simplicity of the target code. Symbolic execution of complex functions runs into combinatorial explosion of the state space, leading to unreasonable verification times and out-of-memory errors. The needed reduction in complexity is usually achieved by means of supporting contracts that replace the unfolding of functions; there are many examples of this in \cref{sec:uc-verification}. Sometimes a change to the model is called for, particularly when a function:
 \begin{itemize}
 \item Has a \usail translation so complex that Rocq has a hard time type-checking it. This is a consequence of the approach employed by \usail to ensure that a well-typed (according to Rocq's type system) \usail term represents a well-typed piece of Sail code, which is very slow with large typing contexts.
-\item Performs a large number of operations itself, without delegating via function calls. Such monolithic functions lack opportunities of easing the executor's workload via supporting contracts, and must either be split up into simpler procedures or possibly enhanced with some lemma invokations that implement the less trivial reasoning steps.
+\item Performs a large number of operations itself, without delegating via function calls. Such monolithic functions lack opportunities of easing the executor's workload via supporting contracts, and must either be split up into simpler procedures or possibly enhanced with some lemma invocations that implement the less trivial reasoning steps.
 \end{itemize}
 The original Sail model included very complex \sail{read} and \sail{write} functions, which we had to split into one read/write function per addressing mode.
 
@@ -67,10 +67,23 @@ Katamaran's executor is itself verified to be correct, so naturally we didn't ru
 
 % solver not sofisticated because verified
 
+\section{Limitations}
+
+% Sail is used to give the \emph{functional} specification of the ISA. The security guarantees that can be found in many architecture manuals have to be expressed separately; we will see in the next section how to do it.
+
+The high-level objective of this project is to protect a microcontroller from cyberattacks. The methodology relies on reasoning about a \emph{model} of the \emph{ISA specification} of the microcontroller. We are at least two steps removed from the hardware, and no amount of proofs on the model can ensure that no vulnerabily sneaks in at any of the later stages.
+
+The first disconnection could be easily removed if the ISA designers provided formal specifications for their architectures; there would then be no need to develop an independent Sail model based on pieced-together information from manuals and reverse-engineering. In \cref{sec:formal-isa} we remarked that some vendors are already doing this, and ISA specification languages are likely to become more widespread as the tools built on top of them start to prove their usefulness.
+
+The latter is a matter of certifying that the physical design of the microcontroller implements the ISA faithfully. There are again multiple abstraction levels separating the two; a successful approach in obtaining a correctness guarantee would combine several tools, each specialized for a specific verification task. To start, Sail supports generation of a Verilog model from the ISA. Even if it may not be desirable to use this directly, the official (hand-designed) model of the microarchitecture could be verified against the generated one via equivalence checking.
+
+Nevertheless there is value in verifying the ISA even without rigorous results about the rest of the chain: hardware that implements a correct specification may have vulnerabilities, but hardware implementing a flawed specification will have them almost surely.
+
+Side-channel attacks represent another significant blind spot of our work. They cannot be identifyied by reasoning purely about the ISA, which is by nature microarchitecture-agnostic. The notion of \intro{augmented ISA}[aISA] proposed by \cite{Ge2018} extends the architectural specification with a highly-abstracted model of the microarchitecture, and could conceivably be integrated in Sail and Katamaran or similar tools. However as of now no practical (semi-)automated verification tool supports reasoning about aISAs, and even if they did, developing a microarchitectural model of the \msp would require significant reverse-engineering effort. This puts side-channel attacks firmly out of the scope of this thesis.
 
 \section{Future work}
 
-A complete verification of the \msp ISA's security is an ambitious project, so in this thesis we focused on proving a core property with simplifying assumptions. The next steps towards the final goal would be to:
+A complete verification of the \msp ISA's security is an ambitious project, so in this work we focused on proving a core property with simplifying assumptions. The next steps towards the final goal would be to:
 \begin{itemize}
 \item Extend the model to have full coverage of the \msp ISA, including all addressing modes, the memory protection unit (MPU) and especially interrupt handling. Implement the proper behavior on IPE violations (interrupt or reset) instead of throwing an exception.
 \item Add the MPU guarantees to the universal contract.
@@ -79,35 +92,8 @@ A complete verification of the \msp ISA's security is an ambitious project, so i
 
 An interesting direction to pursue would be to model and verify the microcontroller's behavior across reboots. The \msp is unique in this regard in that its memory is persistent (FRAM), and the effects of executing the bootcode differ between the first and subsequent boots.
 
-Finally, currently the proofs are valid up to the correctness of lemmas and foreign function contracts. While it is unlikely to find an error there given their simplicity, to obtain full assurance we should:
-\begin{itemize}
-\item instantiate an Iris model of our resources, \ie specify the meaning of custom predicates in terms of Iris proposition, and use it to prove the soundness of the lemmas (\cref{sec:TODO});
-\item implement the foreign functions in Rocq and prove that the contracts hold for them.
-\end{itemize}
-
-\subsection{Considerations for security analysis}
-
-TODO moved from background, make it fit here
-
-Sail is used to give the \emph{functional} specification of the ISA. The security guarantees that can be found in many architecture manuals have to be expressed separately; we will see in the next section how to do it.
-
-Our goal is to prove that those security properties hold in a microcontroller. We will reason about a \emph{model} of the microcontroller, its Sail ISA specification. We should then wonder whether this model is fit for purpose.
-
-Assuming the specification is implemented faithfully, the answer is positive for architectural attacks, by definition; they don't rely on microarchitecture-specific behavior, so the ISA fully describes the attacker's capabilities. All attacks covered in \cref{sec:ipe-attacks} fall in this category.
-
-On the other hand, reasoning about side-channels requires some level of knowledge of the microarchitecture. In principle, this information (for a specific hardware design) could be added to the ISA specification \todocite{there's some reference in \cite{Huyghebaert2023}}; but...
-
-% modello con fix
-
-\section{Related work}
-
-\subsection{Katamaran case studies}
-
-Katamaran has been applied to two case studies before this \cite{Huyghebaert2023}: MinimalCaps, a custom capability-based architecture, and a simplified version of RISC-V with the Physical Memory Protection (PMP) extension.
-
-While there are open-source chip designs with PMP support \cite{ChipsAlliance}, they have limited or no commercial availability. So this work marks the first time Katamaran has been applied to a widely used architecture.
-
-Moreover, the \usail models of both MinimalCaps and RISC-V PMP were developed by hand alongside the proof of the security properties. Here we instead started from an existing Sail specification, automatically translated to \usail, which will likely be the preferred flow for future verification of non-toy architectures.
-
-\subsection{Other ISA verification frameworks}
-
+Finally, currently the proofs are valid up to the correctness of lemmas and foreign function contracts. While it is unlikely to find an error there given their simplicity, to obtain full assurance we should prove their validity in the underlying Iris model. % TODO reference section
+% \begin{itemize}
+% \item instantiate an Iris model of our resources, \ie specify the meaning of custom predicates in terms of Iris proposition, and use it to prove the soundness of the lemmas (\cref{sec:});
+% \item implement the foreign functions in Rocq and prove that the contracts hold for them.
+% \end{itemize}

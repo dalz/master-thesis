@@ -1,0 +1,13 @@
+\chapter{Related work}
+
+\section{Katamaran case studies}
+
+Katamaran has been applied to two case studies before this \cite{Huyghebaert2023}: MinimalCaps, a custom capability-based architecture, and a simplified version of RISC-V with the Physical Memory Protection (PMP) extension.
+
+While there are open-source chip designs with PMP support \cite{ChipsAlliance}, they have limited or no commercial availability. So this work marks the first time Katamaran has been applied to a widely used architecture.
+
+Moreover, the \usail models of both MinimalCaps and RISC-V PMP were developed by hand alongside the proof of the security properties. Here we instead started from an existing Sail specification, automatically translated to \usail, which will likely be the preferred flow for future verification of non-toy architectures.
+
+\section{Other ISA verification frameworks}
+
+% islaris
