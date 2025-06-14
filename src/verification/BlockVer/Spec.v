@@ -346,9 +346,9 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
       sep_contract_localstore := [term_var "bw"; term_var "reg"];
 
       sep_contract_precondition :=
-          ( term_var "pc_old" = term_val ty.wordBits [bv 0x22]
-          ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x28]
-          ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x2E])
+          ( term_var "pc_old" = term_val ty.wordBits [bv 0x1C]
+          ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x22]
+          ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x28])
         ∗ term_var "bw" = term_enum Ebw WORD_INSTRUCTION
         ∗ term_var "reg" = term_enum Eregister R6
         ∗ term_var "addr" = term_val ty.wordBits [bv 0x4208] (* saved_ptr + 6 *)
@@ -385,10 +385,96 @@ Module MSP430BlockVerifSpec <: Specification MSP430Base MSP430Signature MSP430Pr
             (term_var "vl") (term_var "vh");
     |}.
 
+  (*
+  Definition sep_contract_read_autoincrement : SepContractFun read_autoincrement :=
+    {|
+      sep_contract_logic_variables :=
+        [ "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+        ; "pc" :: ty.wordBits
+        ; "bw" :: ty.enum Ebw; "reg" :: ty.enum Eregister
+        ; "addr" :: ty.wordBits
+        ; "vl" :: ty.byteBits; "vh" :: ty.byteBits
+        ];
+
+      sep_contract_localstore := [term_var "bw"; term_var "reg"];
+
+      sep_contract_precondition :=
+          term_var "bw" = term_enum Ebw WORD_INSTRUCTION
+        ∗ term_var "reg" = term_enum Eregister R6
+
+        ∗ PC_reg         ↦ term_var "pc"
+        ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+        ∗ R6_reg ↦ term_var "addr"
+
+        ∗ asn_ptsto_word (term_var "addr") (term_var "vl") (term_var "vh")
+        ∗ asn_not_mpu_reg_addr (term_var "addr");
+
+      sep_contract_result          := "v";
+      sep_contract_postcondition   :=
+          PC_reg ↦ term_var "pc"
+        ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+        ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
+        ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+        ∗ R6_reg ↦ term_var "addr" +' 2
+
+        ∗ asn_ptsto_word (term_var "addr") (term_var "vl") (term_var "vh");
+    |}.
+  *)
+
+  Definition sep_contract_xor_inst : SepContractFun xor_inst :=
+  {|
+    sep_contract_logic_variables :=
+      [ "segb1" :: ty.wordBits; "segb2" :: ty.wordBits
+      ; "pc" :: ty.wordBits; "bw" :: ty.enum Ebw
+      ; "src_reg" :: ty.enum Eregister; "dest_reg" :: ty.enum Eregister
+      ; "src_am" :: ty.enum Eam; "dest_am" :: ty.enum Eam
+      ; "addr" :: ty.wordBits; "vl" :: ty.byteBits; "vh" :: ty.byteBits
+      ];
+
+    sep_contract_localstore :=
+      [ term_var "bw"
+      ; term_var "src_reg"; term_var "src_am"
+      ; term_var "dest_reg"; term_var "dest_am" ];
+
+    sep_contract_precondition :=
+        term_var "bw" = term_enum Ebw WORD_INSTRUCTION
+      ∗ term_var "src_reg" = term_enum Eregister R6
+      ∗ term_var "dest_reg" = term_enum Eregister R14
+      ∗ term_var "src_am" = term_enum Eam INDIRECT_AUTOINCREMENT_MODE
+      ∗ term_var "dest_am" = term_enum Eam REGISTER_MODE
+
+      ∗ PC_reg           ↦ term_var "pc"
+      ∗ MPUIPC0_reg      ↦ term_val ty.wordBits [bv 0]
+      ∗ MPUIPSEGB1_reg   ↦ term_var "segb1"
+      ∗ MPUIPSEGB2_reg   ↦ term_var "segb2"
+      ∗ ∃ "v", SRCG1_reg ↦ term_var "v"
+      ∗ R6_reg           ↦ term_var "addr"
+      ∗ ∃ "v", R14_reg   ↦ term_var "v"
+
+      ∗ asn_ptsto_word (term_var "addr") (term_var "vl") (term_var "vh")
+      ∗ asn_not_mpu_reg_addr (term_var "addr");
+
+    sep_contract_result          := "v";
+    sep_contract_postcondition   :=
+        PC_reg           ↦ term_var "pc"
+      ∗ MPUIPC0_reg      ↦ term_val ty.wordBits [bv 0]
+      ∗ MPUIPSEGB1_reg   ↦ term_var "segb1"
+      ∗ MPUIPSEGB2_reg   ↦ term_var "segb2"
+      ∗ ∃ "v", SRCG1_reg ↦ term_var "v"
+      ∗ R6_reg           ↦ term_var "addr" +' 2
+      ∗ ∃ "v", R14_reg   ↦ term_var "v"
+
+      ∗ asn_ptsto_word (term_var "addr") (term_var "vl") (term_var "vh");
+  |}.
+
   Definition CEnv : SepContractEnv :=
     fun Δ τ f =>
       match f with
       | read_indexed => Some sep_contract_read_indexed
+      (* | read_autoincrement => Some sep_contract_read_autoincrement *)
+      | xor_inst => Some sep_contract_xor_inst
       | write_mpu_reg_byte => Some sep_contract_write_mpu_reg_byte
       | _ => None
       end.
@@ -438,6 +524,14 @@ Module MSP430SpecVerif.
 
   Lemma valid_read_indexed : ValidContractWithFuel 10 sep_contract_read_indexed fun_read_indexed.
   Proof. now symbolic_simpl. Qed.
+
+  (*
+    Lemma valid_read_autoincrement : ValidContractWithFuel 10 sep_contract_read_autoincrement fun_read_autoincrement.
+    Proof. symbolic_simpl. intuition; lia. Qed.
+  *)
+
+  Lemma valid_xor_inst : ValidContractWithFuel 10 sep_contract_xor_inst fun_xor_inst.
+  Proof. symbolic_simpl. intuition; lia. Qed.
 
   Lemma valid_write_mpu_reg_byte : ValidContract sep_contract_write_mpu_reg_byte fun_write_mpu_reg_byte.
   Proof. symbolic_simpl. intuition congruence. Qed.
