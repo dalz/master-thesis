@@ -264,7 +264,7 @@ In the above contract, \(p\) is a \msp machine program. A proof of such contract
   {\texttt{fdeCycle()}}
   {c = \text{current IPE config}} \]
 
-ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged.\footnote{This kind of reasoning is sound when the postcondition of every instruction in the sequence implies the postcondition of the next, which is true here as the configuration is still locked in the postcondition (it hasn't changed).} We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
+ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged.\footnote{This kind of reasoning is sound when the postcondition of every instruction in the sequence implies the precondition of the next, which is true here: if the configuration is locked at the beginning of \sail{execute} and it unchanged at the end, it is also locked at the end, so we can apply again the contract to the next instruction.} We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
 \[ \hoare
   {c = \text{current IPE config} \wedge c.\mathrm{locked}}
   {\texttt{execute(\(\mathit{instr}\))}}

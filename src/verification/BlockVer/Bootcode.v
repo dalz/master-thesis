@@ -30,15 +30,14 @@ Import Erasure.notations.
 Module Bootcode.
   Import Utils.
 
-  Definition asn_ipe_registers_zero {Σ} : Assertion Σ :=
-      MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
-    ∗ MPUIPSEGB1_reg ↦ term_val ty.wordBits [bv 0]
-    ∗ MPUIPSEGB2_reg ↦ term_val ty.wordBits [bv 0].
+  Definition asn_ipe_registers_init {Σ} : Assertion Σ :=
+      MPUIPC0_reg           ↦ term_val ty.wordBits [bv 0]
+    ∗ ∃ "v", MPUIPSEGB1_reg ↦ term_var "v"
+    ∗ ∃ "v", MPUIPSEGB2_reg ↦ term_var "v".
 
   Definition minimal_pre {Σ} : Assertion Σ :=
       ∃ "lif", LastInstructionFetch ↦ term_var "lif"
     ∗ ∃ "srcg1", SRCG1_reg ↦ term_var "srcg1"
-    (* ∗ asn_mpu_registers *)
     ∗ MPUCTL0_reg ↦ term_val ty.wordBits [bv 0xA500].
 
   Definition minimal_post {Σ} : Assertion Σ :=
@@ -114,7 +113,7 @@ Module Bootcode.
   Definition contract_start_bootcode : BlockVerifierContract :=
     {{
           asn_init_pc start_bootcode_start
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
 
         ∗ R10_reg ↦ saved_ptr
         ∗ (asn_ptsto_word saved_ptr byte_zero byte_zero
@@ -124,7 +123,7 @@ Module Bootcode.
       ; jnz [bv 4] (* check_struct *)]
     {{
           R10_reg ↦ saved_ptr
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
         ∗ ( asn_ptsto_word saved_ptr byte_zero byte_zero
               ∗ asn_fin_pc transfer_if_valid_struct_start
             ∨ asn_ptsto_word saved_ptr (low isp) (high isp)
@@ -135,7 +134,7 @@ Module Bootcode.
     {{
           asn_init_pc transfer_if_valid_struct_start
 
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
         ∗ R10_reg ↦ saved_ptr
         ∗ R11_reg ↦ valid_flag
         ∗ R12_reg ↦ ipe_sig_valid_src
@@ -146,12 +145,12 @@ Module Bootcode.
         ∗ asn_ptsto_word saved_ptr byte_zero byte_zero
     }}
       [ cmp_rm R11 R12
-      ; jnz [bv 0x34] (* TODO end *)
+      ; jnz [bv 0x7B] (* end *)
       ; mov_mm R13 R10 ]
     {{
           asn_fin_pc check_struct_start
 
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
         ∗ R10_reg ↦ saved_ptr
         ∗ R11_reg ↦ valid_flag
         ∗ R12_reg ↦ ipe_sig_valid_src
@@ -166,7 +165,7 @@ Module Bootcode.
     {{
           asn_init_pc check_struct_start
 
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
         ∗ R10_reg ↦ saved_ptr
         ∗ R15_reg ↦ term_val ty.wordBits [bv 0xFFFF]
         ∗ ∃ "v", R6_reg  ↦ term_var "v"
@@ -190,7 +189,7 @@ Module Bootcode.
           ( asn_fin_pc evaluate_struct_start
           ∨ asn_fin_pc mass_erase_start)
 
-        ∗ asn_ipe_registers_zero
+        ∗ asn_ipe_registers_init
         ∗ R10_reg ↦ saved_ptr
         ∗ R15_reg ↦ term_val ty.wordBits [bv 0xFFFF]
         ∗ R6_reg ↦ isp +' 6
@@ -211,7 +210,7 @@ Module Bootcode.
     {{
          asn_init_pc evaluate_struct_start
 
-       ∗ asn_ipe_registers_zero
+       ∗ asn_ipe_registers_init
        ∗ R6_reg ↦ isp +' 6
        ∗ R7_reg ↦ MPUIPC0_addr
        ∗ R8_reg ↦ MPUIPSEGB2_addr
@@ -224,7 +223,7 @@ Module Bootcode.
       [ mov_im R6 (bv.of_Z (-2)%Z) R9
       ; mov_im R6 (bv.of_Z (-4)%Z) R8
       ; mov_im R6 (bv.of_Z (-6)%Z) R7
-      ; jump JMP [bv 105] (* end *) ]
+      ; jump JMP [bv 0x69] (* end *) ]
     {{
          asn_fin_pc end_addr
 
