@@ -239,13 +239,14 @@ Incidentally, the same must be done for \coq{open_ptsto_instr} and \coq{close_pt
 
 The last missing piece is a way to execute a basic block via \coq{cexec_block_addr} under a contract's precondition and to check that its postcondition holds at the end. The function \coq{cexec_triple_addr} in \cref{lst:cexec-triple} is responsible for this.
 
+% TODO fix triangles
 \begin{listing}[htb]
   \startcstep
   \begin{minted}[escapeinside=??]{coq}
     Definition cexec_triple_addr {Σ : LCtx}
-      (req : Assertion (Σ ▻ "a" ∷ ty.Address))
+      (req : Assertion (Σ ?\(\triangleright\)? "a" ∷ ty.Address))
       (b : list ast_with_args)
-      (ens : Assertion (Σ ▻ "a" ∷ ty.Address ▻ "an" ∷ ty.Address)) :
+      (ens : Assertion (Σ ?\(\triangleright\)? "a" ∷ ty.Address ?\(\triangleright\)? "an" ∷ ty.Address)) :
       CHeapSpec unit
     :=
       lenv <- demonic_ctx Σ ;;
