@@ -1,4 +1,5 @@
 \chapter{Conclusions}
+\label{ch:conclusions}
 
 The contributions of this thesis, as presented in the previous chapters, are:
 \begin{itemize}
@@ -11,61 +12,7 @@ The contributions of this thesis, as presented in the previous chapters, are:
 
 The property we proved guarantees that our model is not susceptible to the controlled call corruption and code reuse attacks from \cref{sec:ipe-attacks}, that are instead effective against commercially available \msp models. This suggests that formal verification can be used to \emph{in practice} improve the security of ISAs compared to industry-standard testing methodologies. % In addition, a number of bugs in our Sail model were the discovered during the verification process.
 
-We will now elaborate on the experience of using Katamaran and discuss the next steps toward a more comprehensive verification of the \msp.
-
-\section{Experience report}
-
-\subsection{Effective design of contracts}
-
-The final proofs presented in \cref{sec:uc-verification} are mostly trivial. Indeed, Katamaran showed itself to be very effective at proving our contracts once they were properly specified, with ``properly'' meaning a combination of multiple factors.
-
-Firstly, the contracts have to be actually provable, or the verification will fail for obvious reasons. This \emph{will} happen during the development. Chiefly because of oversights in the specification; after all, there would be no point in verifying the ISA if we were completely sure of the absence of bugs in it. See \cref{sec:pc-mod-order} for an example of this in our \msp model.
-
-Other times the security property doesn't hold in some edge cases (\eg in the presence of overflows or misconfigurations) which can be expected not to occur in practice; this is dealt with by strengthening the precondition. For instance we added the assumption that the lower boundary of the IPE region is less than the upper after finding out it was needed to verify \sail{read_autoincrement}.
-
-It may happen that a contract \emph{would} be provable by pure symbolic execution (assuming no time constraints), but isn't if the executor takes advantage of other contracts we specified instead of unfolding function calls. In other words, the user's specification of an auxiliary function isn't sufficiently precise to carry out the caller's verification. In our case we had to go back and update \sail{write_register}'s contract to support the verification of \sail{read_autoincrement}. This was already discussed in \cref{sec:read-autoincrement-proof}, but in short \sail{write_register}'s original postcondition abstracted away some information about the PC that was later found to be necessary. Similar situations are bound to happen as the user tries to strike a balance between the strength of the properties (pushing \eg toward more complex and precise postconditions) and amenability to automated reasoning (simpler, more vague postconditions).
-
-Another key requirement for a sucessful verification is simplicity of the target code. Symbolic execution of complex functions runs into combinatorial explosion of the state space, leading to unreasonable verification times and out-of-memory errors. The needed reduction in complexity is usually achieved by means of supporting contracts that replace the unfolding of functions; there are many examples of this in \cref{sec:uc-verification}. Sometimes a change to the model is called for, particularly when a function:
-\begin{itemize}
-\item Has a \usail translation so complex that Rocq has a hard time type-checking it. This is a consequence of the approach employed by \usail to ensure that a well-typed (according to Rocq's type system) \usail term represents a well-typed piece of Sail code, which is very slow with large typing contexts.
-\item Performs a large number of operations itself, without delegating via function calls. Such monolithic functions lack opportunities of easing the executor's workload via supporting contracts, and must either be split up into simpler procedures or possibly enhanced with some lemma invocations that implement the less trivial reasoning steps.
-\end{itemize}
-The original Sail model included very complex \sail{read} and \sail{write} functions, which we had to split into one read/write function per addressing mode.
-
-Further, the target property itself may be the cause of excessive slowdowns. If that is the case, predicates can be introduced to turn the heavier propositions into opaque objects, that are then manipulated or unpacked as needed through the use of lemmas.
-
-Finally, the user should be aware of the way Katamaran consumes chunks. By default, it looks for a chunk in the heap with syntactically equal inputs, and generates an error (discussed in the next section) if it can't find any. The user can instead use angelic chunks, which are consumed nondeterministically by continuing the execution with each of the possible choices from the heap, until in one branch the symbolic executor can prove that the consumed chunk matched the requested one. Angelic chunks have negative performance implications, so they should be used only when strictly necessary. Additionally, angelic chunks may still fail to be consumed even if they are in the heap, if the solver isn't smart enough to match them.
-
-\subsection{Debugging of verification failures}
-
-It doesn't come as a surprise that most of the effort is spent getting the contracts into the good state described in the previous section. Katamaran provides some facilities to navigate the many verification failures that occur during this process.
-
-We can distinguish two kinds of failures: unprovable verification conditions (VCs) and actual errors.
-
-When an error occurs, we are left with a VC that, in the simplest case, looks like:
-\[ \forall \text{variables},\; \text{path conditions} \to \texttt{error}~\text{debug record}, \]
-where \(\texttt{error}~r\) is equivalent to false. The debug record contains information about the executor's state at the time the error occurred: program context (list of program variables and their types), local store (values bound to the program variables), path condition (expressions that must be true for this branch to be executed), heap, and the cause of the error. The latter may be either an assertion failure (\eg an equality in the precondition of a supporting contract is not satisfied) or a failure to consume a chunk from the heap (\eg reading from a register whose ownership was not assumed in the precondition).
-
-If we instead end up with an unprovable VC, we can ask for such debug nodes to be inserted at arbitrary points by adding \coq{stm_debugk} statements to the \usail code. With some practice, this information can be used to nail down the source of the problem effectively.
-
-The verification condition can be much more complex than the pattern shown above, with multiple disjunctions and conjunctions. Various times we were faced with thousands and tens of thousands of lines of verification conditions. This happens in particular when Katamaran's solver is not smart enough to prune or unify enough branches. Even though they are not too hard to inspect by hand, these verification conditions slow down the tooling (on both the Rocq/Proof General and Katamaran sides) to a crawl, if they don't cause out-of-memory crashes outright.
-
-Katamaran's answer to this is an optional \emph{erasure} pass that transforms the \usail code into an untyped representation, which is much less expensive to handle. We used erasure on all our proofs for the significant speedup, reducing processing times from multiple minutes to a few seconds for simple functions, and from hours to minutes in the most complex.
-
-Unfortunately, useful debugging information is lost in the process. Variables lose their names from the \usail specification, and are replaced with generated Rocq identifiers like \coq{v7}. This makes it harder to guess where an unprovable VC may have originated from. Additionally, debug nodes are replaced with \coq{False}, at which point identifying errors requires either disabling erasure (only possible for simple functions) or a lot of trial and error (\eg giving trivial preconditions to supporting contracts or commenting out parts of the code). Either way, iterating on the contract becomes slow and tedious.
-
-\subsection{Improvements to Katamaran}
-
-This work led to the identification of some bugs, inefficiencies and missing capabilities of the solver, that needed to be handled before the verification could proceed.
-
-Katamaran's executor is itself verified to be correct, so naturally we didn't run into any soundness bug. However, there were some issues with the wrong error being reported in certain cases, regressions where previously working proofs generated errors after an improvement to the solver, and subtle mistakes in the generated \usail, stemming \eg from \usail's bitvector concatenation's arguments being reversed with respect to Sail's.
-
-% first contact with a specification that was not developed for verification with katamaran
-
-
-% for another chapter maybe: this is the happy path, figuring out what's wrong/whether the contract is provable at all takes more effort, with giant VCs etc
-
-% solver not sofisticated because verified
+We will now elaborate on the limitations of our result and outline the next steps toward a more comprehensive verification of the \msp.
 
 \section{Limitations}
 
@@ -76,6 +23,8 @@ The high-level objective of this project is to protect a microcontroller from cy
 The first disconnection could be easily removed if the ISA designers provided formal specifications for their architectures; there would then be no need to develop an independent Sail model based on pieced-together information from manuals and reverse-engineering. In \cref{sec:formal-isa} we remarked that some vendors are already doing this, and ISA specification languages are likely to become more widespread as the tools built on top of them start to prove their usefulness.
 
 The latter is a matter of certifying that the physical design of the microcontroller implements the ISA faithfully. There are again multiple abstraction levels separating the two; a successful approach in obtaining a correctness guarantee would combine several tools, each specialized for a specific verification task. To start, Sail supports generation of a Verilog model from the ISA. Even if it may not be desirable to use this directly, the official (hand-designed) model of the microarchitecture could be verified against the generated one via equivalence checking.
+
+% TODO Reid2016a
 
 Nevertheless there is value in verifying the ISA even without rigorous results about the rest of the chain: hardware that implements a correct specification may have vulnerabilities, but hardware implementing a flawed specification will have them almost surely.
 
@@ -97,3 +46,9 @@ Finally, currently the proofs are valid up to the correctness of lemmas and fore
 % \item instantiate an Iris model of our resources, \ie specify the meaning of custom predicates in terms of Iris proposition, and use it to prove the soundness of the lemmas (\cref{sec:});
 % \item implement the foreign functions in Rocq and prove that the contracts hold for them.
 % \end{itemize}
+
+
+
+
+% TODO statistics, clarify research question
+% update offsets and contract names (start with s) in block verifier

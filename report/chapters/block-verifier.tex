@@ -46,7 +46,7 @@ evaluate_struct:
 
 \section{Instantiation of the block verifier}
 
-Katamaran's component for the verification of assembly code is called the \intro{block verifier}. As the name suggests it can only be applied to basic blocks: sequences of instructions that don't contain branching but at the very end, and that don't include jump targets except to the first instruction. The contracts proved by the block verifier can then be combined with a proof in the underlying Iris model to obtain an end-to-end correctness result of the bootcode.
+Katamaran's component for the verification of assembly code is called the \intro{block verifier}. As the name suggests it can only be applied to basic blocks: sequences of instructions that don't contain branching but at the very end, and that don't include jump targets except to the first instruction. The contracts proved by the block verifier can then be combined with a proof in the underlying Iris model to obtain an end-to-end correctness result.
 
 The block verifier is set up by providing an instance of the symbolic executor,
 with a distinct contract set from the one used in the UC verification, and some code to glue the repeated calls to \sail{execute}.
@@ -499,3 +499,7 @@ Katamaran leaves a verification condition that essentially amounts to proving th
 Incidentally, initially the verification was failing because of a mistake in the Sail model. When a word was written to an IPE register, \sail{write_mpu_reg_byte} would be called on the low byte first. If the target was \reg{MPUIPC0}, whose low byte contains the \reg{MPUIPLOCK} flag, the write of the high byte would have no effect if the first write enabled locking. Since our contract for \sail{write_mpu_reg_byte} requires the IPE registers to be unlocked we weren't able to satisfy its precondition.
 
 This bug would have gone unnoticed if we limited ourself to testing, as the high byte of \reg{MPUIPC0} is reserved for future extensions---meaning that the bug is not observable now but could have caused problems in the future.
+
+% \section{boh}
+
+% The results about the basic block can be connected together to obtain a guarantee about the whole bootcode. This must be done in the Iris model, without the help of Katamaran's executor and solver.

@@ -10,7 +10,31 @@ Identifying such inconsistencies is a hard problem. Security properties assert w
 
 % Such security guarantees are essentially a \emph{promise} by the hardware designers to the users, like the rest of the ISA. However, while it is possible to test whether or not the functional properties hold (\eg by executing one instruction and inspecting the registers), the same approach is not sufficient in the case of security properties. The root of the problem is that functional properties say what the CPU \emph{does} in a given state, while security properties assert what the CPU does \emph{not} do in an \emph{arbitrary} (attacker-controlled) state (e.g. the value stored at a protected location is never leaked to unprivileged code).
 
+A promising answer comes from the field of formal methods. The gap between the functional and security aspects of the ISA can be bridged by means of a formal proof, thus eliminating in principle all vulnerabilities arising from ill-specified architectures.
 
-A promising answer comes from the field of formal methods. The gap between the functional and security aspects of the ISA can be bridged by means of a formal proof, thus eliminating in principle all vulnerabilities arising from ill-specified architectures. Such proofs, if developed manually, require a large time investment and are not robust to changes to the ISA. Fortunately, (semi-)automated verification is feasible in this space, as demostrated by tools like \intro{Katamaran} \cite{Huyghebaert2023}.
+Until recently verification efforts on industrial architectures have targeted abstract or incomplete models \cite{Georges2021}\cite{Jensen2013}\cite{Guanciale2016}, due to ambiguities and complexity in vendor-provided manuals; this meant that even formal proofs didn't inspire definitive trust in the correctness of the architecture. The situation has changed with the availability of complete, authoritative, machine-readable ISA specifications \cite{Armstrong2019} for major architectures (Arm and RISC-V) written in purpose-designed languages such as Sail \cite{Armstrong}.
 
-The objective of this thesis is to apply Katamaran to a real-world architecture (namely Texas Instruments' \msp microcontrollers), proving that its ISA properly ensures integrity and confidentiality of data in the presence of a simple memory protection mechanism.
+Verification of these specifications is generally performed with the aid of a theorem prover like Rocq or Isabelle. One approach is to translate the ISA to the prover's language and conduct the proof via tactics \cite{Armstrong2019}\cite{Bauereiss2022}. The size and complexity of production architectures renders some level of automation necessary, and it is sensible to make said automation reusable for different verification projects. This is the idea behind tools like \intro{Islaris} \cite{Sammler2022} and \intro{Katamaran} \cite{Huyghebaert2023} which perform symbolic execution on Sail code and leave simplified verification conditions for the user to prove in Rocq.
+
+% Such proofs, if developed manually, require a large time investment and are not robust to changes to the ISA. Fortunately, (semi-)automated verification is feasible in this space, as demostrated by tools like \intro{Katamaran} \cite{Huyghebaert2023}.
+
+
+The objective of this thesis is to apply Katamaran to a real-world architecture, namely Texas Instruments' \msp, proving that its ISA properly ensures integrity and confidentiality of data in the presence of a simple memory protection mechanism.
+
+\paragraph{Contributions}
+We claim the following contributions:
+\begin{itemize}
+\item a model of the \msp's security features in the Sail specification language;
+\item a formal statement of the security guarantees of the ISA as a universal contract;
+\item a mechanized proof of the universal contract via Katamaran;
+\item a proof of correctness of the \msp bootcode, again aided by Katamaran.
+\end{itemize}
+
+\paragraph{Structure of the thesis}
+
+% The rest of the thesis is structured as follows.
+\Cref{ch:background} introduces the \msp microcontrollers, universal contracts as a means of specifying security properties of ISAs, and Katamaran. Chapters \ref{ch:contracts} and \ref{ch:block-verifier} contain our original contributions: the definition and verification of a universal contract for the \msp in the former, and verification of the \msp's bootcode in the latter. \Cref{ch:evaluation} reports on the experience of using Katamaran. \Cref{ch:related-work} surveys other approaches to ISA verification and compares them against ours. Finally, \cref{ch:conclusions} highlights the limitations of our result and sketches future directions toward a full security guarantee.
+
+\paragraph{Acknowledgements}
+
+The present work was conducted under the supervision of \prof Dominique Devriese, \dr Steven Keuchel, \dr Marton Bognar and Sander Huyghebaert, in the DistriNet research group at KU Leuven.
