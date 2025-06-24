@@ -28,6 +28,9 @@ Import MSP430Base.
 Module Import MSP430Program <: Program MSP430Base.
   Section FunDeclKit.
     Inductive Fun : PCtx -> Ty -> Set :=
+      | step : Fun ctx.nil ty.unit
+      | loop : Fun ctx.nil ty.unit
+
       | neg_vec4                             : Fun[
                                                     "v"  ∷  ty.bvec (4)
                                                   ](ty.bvec (4))
@@ -12268,11 +12271,22 @@ Module Import MSP430Program <: Program MSP430Base.
                                                                                                                                                                                                                                                                                                 ((exp_int 16%Z))%exp))
                                                                                                                                                                                                                                                         (stm_write_register MPUIPSEGB1_reg (exp_var "ж4245")))
                                                                                                                                                                                                                                                (stm_exp (exp_val (ty.unit) (tt)))))))))))))))))))))))))))).
-    
+
+
+    Definition fun_step : Stm ctx.nil ty.unit :=
+      let: "f" := call fetch (exp_val ty.unit tt) in
+      let: "ast" := foreign decode (exp_var "f") in
+      call execute (exp_var "ast").
+
+    Definition fun_loop : Stm ctx.nil ty.unit :=
+      call step;; call loop.
+
     Definition FunDef {Δ}
                       {τ}
                       (f : Fun Δ τ) : Stm Δ τ :=
       match f in Fun Δ τ return Stm Δ τ with
+      | step => fun_step
+      | loop => fun_loop
       | neg_vec4                             => fun_neg_vec4
       | bitmaping_forwards                   => fun_bitmaping_forwards
       | bitmaping_backwards                  => fun_bitmaping_backwards

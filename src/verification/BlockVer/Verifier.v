@@ -30,10 +30,9 @@ From iris.program_logic Require weakestpre adequacy.
 From iris.proofmode Require string_ident tactics.
 From stdpp Require namespaces.
 
-From MSP430 Require Import Machine Sig BlockVer.Spec.
+From MSP430 Require Import Machine Sig BlockVer.Spec IrisModel IrisInstance.
 
-Import MSP430Program.
-Import Assembly.
+Import MSP430Program Assembly MSP430IrisBase MSP430IrisInstance.
 
 Set Implicit Arguments.
 Import ctx.resolution.
@@ -240,4 +239,52 @@ Section BlockVerificationDerived.
       Monotonic (MHeapSpec eq) (cexec_block_addr instrs ainstr apc).
     Proof. revert ainstr apc. induction instrs; cbn; typeclasses eauto. Qed.
   End Shallow.
+
+  Section Soundness.
+    Import iris.base_logic.lib.iprop iris.proofmode.tactics.
+    Import MSP430IrisInstanceWithContracts.
+    Import ProgramLogic.
+    Import CHeapSpec.
+
+    Context {Σ} {GS : sailGS Σ}.
+
+    Fixpoint ptsto_instrs (a : Val ty.wordBits) (instrs : list ast_with_args) : iProp Σ :=
+      match instrs with
+      | instr :: instrs =>
+          interp_ptstoinstr a (I (instr_without_args instr)) ∗
+          match instr with
+          | I0 _ =>
+              ptsto_instrs (a + [bv 2]) instrs
+          | I1 _ x =>
+              interp_ptstoinstr (a + [bv 2]) (D x) ∗
+              ptsto_instrs (a + [bv 4]) instrs
+          | I2 _ x y =>
+              interp_ptstoinstr (a + [bv 2]) (D x) ∗
+              interp_ptstoinstr (a + [bv 4]) (D y) ∗
+              ptsto_instrs (a + [bv 6]) instrs
+          end%bv
+      | [] => True%I
+      end%list%I.
+
+    #[local] Notation "a '↦' t" := (reg_pointsTo a t) (at level 70).
+
+    Definition semTripleBlock
+      (PRE : bv 16 -> iProp Σ) (instrs : list ast_with_args)
+      (POST : bv 16 -> bv 16 -> iProp Σ) : iProp Σ
+    :=
+      (∀ a,
+          (PRE a ∗ PC_reg ↦ a ∗ ptsto_instrs a instrs) -∗
+          (∀ an, PC_reg ↦ an ∗ ptsto_instrs a instrs ∗ POST a an -∗ WP_loop) -∗
+          WP_loop)%I.
+    #[global] Arguments semTripleBlock PRE%_I instrs POST%_I.
+
+    Lemma sound_sblock_verification_condition {Γ pre post instrs} :
+      safeE (postprocess (sblock_verification_condition pre instrs post wnil)) ->
+      forall ι : Valuation Γ,
+      ⊢ semTripleBlock (fun a => asn.interpret pre (ι.[("a"::ty.Address) ↦ a]))
+          instrs
+          (fun a an => asn.interpret post (ι.[("a"::ty.Address) ↦ a].[("an"::ty.Address) ↦ an])).
+    Admitted.
+
+  End Soundness.
 End BlockVerificationDerived.

@@ -54,8 +54,8 @@ Module MSP430IrisBase <: IrisBase MSP430Base MSP430Program MSP430Semantics.
 
   Import iris.program_logic.weakestpre.
 
-  (* Definition WP_loop `{sg : sailGS Σ} : iProp Σ := *)
-  (*   semWP (FunDef loop) (fun _ _ => True%I) env.nil. *)
+  Definition WP_loop `{sg : sailGS Σ} : iProp Σ :=
+    semWP env.nil (FunDef loop) (fun _ _ => True%I).
 
   (* Useful instance for some of the Iris proofs *)
   #[export] Instance state_inhabited : Inhabited State.

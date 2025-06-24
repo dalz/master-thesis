@@ -992,3 +992,4 @@ Proof. now apply validcontract_reflect_fuel_sound. Qed.
 
 Lemma valid_contract_execute_call : Symbolic.ValidContractWithFuel 10 sep_contract_execute_call fun_execute.
 Proof. now apply validcontract_reflect_fuel_sound. Qed.
+

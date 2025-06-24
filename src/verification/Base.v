@@ -9,6 +9,25 @@ From Equations Require Import Equations.
 From Katamaran Require Import Base
                               Bitvector.
 
+
+Section LiveAddrs.
+  Require Import Lists.List.
+
+  Import ListNotations.
+  Import bv.notations.
+
+  Definition minAddr : nat := 0.
+  Definition lenAddr : nat := 200.
+  Definition maxAddr : nat := minAddr + lenAddr.
+  Definition liveAddrs :=
+    bv.seqBv (@bv.of_nat 16 minAddr) lenAddr
+      (* IPE saved pointer and configuration struct  *)
+      ++ bv.seqBv [bv [16] 0x4200] 10
+      (* IPE signature *)
+      ++ bv.seqBv [bv [16] 0xFF88] 4.
+
+End LiveAddrs.
+
 (*
   Registers' initial values
   

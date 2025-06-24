@@ -18,7 +18,7 @@ From Katamaran Require Import
      MicroSail.RefineExecutor
      MicroSail.Soundness.
 
-From MSP430 Require Import Machine Sig.
+From MSP430 Require Import Machine Sig IrisModel IrisInstance.
 
 Import MSP430Program.
 Import ListNotations.
@@ -34,9 +34,12 @@ Open Scope ctx_scope.
 Open Scope Z_scope.
 
 Module Assembly.
-  Definition MPUIPC0_addr {Σ} : Term Σ _ := term_val ty.Address [bv 0x05AA].
-  Definition MPUIPSEGB2_addr {Σ} : Term Σ _ := term_val ty.Address [bv [16] 0x05AC].
-  Definition MPUIPSEGB1_addr {Σ} : Term Σ _ := term_val ty.Address [bv [16] 0x05AE].
+  Definition MPUIPC0_addr_bv : bv 16 := [bv 0x05AA].
+  Definition MPUIPSEGB2_addr_bv : bv 16 := [bv 0x05AC].
+  Definition MPUIPSEGB1_addr_bv : bv 16 := [bv 0x05AE].
+  Definition MPUIPC0_addr {Σ} : Term Σ _ := term_val ty.Address MPUIPC0_addr_bv.
+  Definition MPUIPSEGB2_addr {Σ} : Term Σ _ := term_val ty.Address MPUIPSEGB2_addr_bv.
+  Definition MPUIPSEGB1_addr {Σ} : Term Σ _ := term_val ty.Address MPUIPSEGB1_addr_bv.
 
   Inductive ast_with_args :=
   | I0 (i : ast)
@@ -90,6 +93,7 @@ Module Assembly.
   Definition jnz := jump JNE.
   Definition jmp := jump JMP.
 
+  Definition FAIL := I0 (DOESNOTUNDERSTAND [bv 0x0]).
 End Assembly.
 
 Module Utils.
@@ -537,4 +541,34 @@ Module MSP430SpecVerif.
   Proof. symbolic_simpl. intuition congruence. Qed.
 
 End MSP430SpecVerif.
+
+
+Module MSP430IrisInstanceWithContracts.
+  Include ProgramLogicOn MSP430Base MSP430Signature MSP430Program
+    MSP430BlockVerifSpec.
+  Include IrisInstanceWithContracts MSP430Base MSP430Signature
+    MSP430Program MSP430Semantics MSP430BlockVerifSpec MSP430IrisBase
+    MSP430IrisAdeqParameters
+    MSP430IrisInstance.
+  Include MicroSail.ShallowSoundness.Soundness MSP430Base MSP430Signature
+    MSP430Program MSP430BlockVerifSpec MSP430BlockVerifShalExecutor.
+  Include MicroSail.RefineExecutor.RefineExecOn MSP430Base MSP430Signature
+    MSP430Program MSP430BlockVerifSpec MSP430BlockVerifShalExecutor
+    MSP430BlockVerifExecutor.
+
+  Import MSP430IrisBase.
+  Import MSP430IrisInstance.
+  (* Import MSP430.Model. *)
+
+  Import iris.bi.interface.
+  Import iris.bi.big_op.
+  Import iris.base_logic.lib.iprop.
+  Import iris.program_logic.weakestpre.
+  Import iris.program_logic.total_weakestpre.
+  Import iris.base_logic.lib.gen_heap.
+  Import iris.proofmode.string_ident.
+  Import iris.proofmode.tactics.
+
+  (* ... soundness proofs of lemmas *)
+End MSP430IrisInstanceWithContracts.
 
