@@ -463,7 +463,7 @@ Section Bootcode.
   iApply (sound_sblock_verification_condition valid_mass_erase [env]
             $! mass_erase_start with "[Hpre] [Hk]").
   - unfold mass_erase_pre, minimal_pre. cbn -[ptsto_instrs].
-    iDestruct "Hpre" as "((% & ? & % & ? & ?) & ? & ? & ?)".
+    iDestruct "Hpre" as "(? & ? & ? & ?)".
     now iFrame.
   - cbn. by iIntros (an) "(? & ? & ? & % & ?)".
   Qed.
@@ -480,6 +480,92 @@ Section Bootcode.
     ∗ (∃ v, MPUSEGB1_reg ↦ v)
     ∗ (∃ v, MPUSAM_reg ↦ v)
     ∗ (∃ v, LastInstructionFetch ↦ v).
+
+  Fixpoint code_size (instrs : list ast_with_args) : nat :=
+    match instrs with
+    | []                 => 0
+    | I0 _     :: instrs => 2 + code_size instrs
+    | I1 _ _   :: instrs => 4 + code_size instrs
+    | I2 _ _ _ :: instrs => 6 + code_size instrs
+    end%list%nat.
+
+  (*
+  Lemma ptstomem_to_ptstoSth_2 `{sailGS Σ} : forall a w,
+      @interp_ptstomem _ _ 2 a w ⊢ ptstoSth a ∗ ptstoSth ([bv [16] 1] + a)%bv.
+  Proof.
+    iIntros (a w) "Hmem".
+    unfold interp_ptstomem.
+    repeat destruct bv.appView.
+    iDestruct "Hmem" as "(Ha & Ha1 & _)".
+    iSplitL "Ha". by iExists xs. by iExists xs0.
+  Qed.
+
+  Lemma ptsto_instrs_extract_ptsto `{sailGS Σ} : forall s c,
+      ptsto_instrs s c ⊢ ptstoSthL (bv.seqBv s (code_size c)).
+  Proof.
+    iIntros (s c) "Hinstrs".
+    iInduction c as [|[i|i|i]]
+forall (s).
+    by rewrite bv.seqBv_zero.
+
+       - simpl. rewrite !bv.seqBv_succ.
+         unfold ptstoSthL. rewrite !big_sepL_cons.
+         unfold interp_ptstoinstr.
+         iDestruct "Hinstrs" as "[(% & Hs & _) Hinstrs]".
+         rewrite ptstomem_to_ptstoSth_2.
+         iDestruct "Hs" as "[$ $]".
+         iApply "IHc".
+         rewrite bv.add_assoc.
+         change (@bv.one 16 + @bv.one 16)%bv with [bv [16] 0x2].
+         by rewrite bv.add_comm.
+       - simpl. rewrite !bv.seqBv_succ.
+         unfold ptstoSthL. rewrite !big_sepL_cons.
+         unfold interp_ptstoinstr.
+         iDestruct "Hinstrs" as "((% & Hs & _) & (% & Hs2 & _) & Hinstrs)".
+         rewrite !ptstomem_to_ptstoSth_2.
+         iDestruct "Hs" as "[$ $]".
+         rewrite !bv.add_assoc !(@bv.add_comm _ _ s).
+         cbn.
+         change ([bv [16] 0x1] + [bv 0x1])%bv with [bv [16] 0x2].
+         change ([bv [16] 0x2] + [bv 0x1])%bv with [bv [16] 0x3].
+         change ([bv [16] 0x3] + [bv 0x1])%bv with [bv [16] 0x4].
+         rewrite -bv.add_assoc.
+         change ([bv [16] 0x1] + [bv 0x2])%bv with [bv [16] 0x3].
+         iDestruct "Hs2" as "[$ $]".
+         iApply "IHc".
+         by rewrite bv.add_comm.
+       - simpl. rewrite !bv.seqBv_succ.
+         unfold ptstoSthL. rewrite !big_sepL_cons.
+         unfold interp_ptstoinstr.
+         iDestruct "Hinstrs" as "((% & Hs & _) & (% & Hs2 & _) & (% & Hs4 & _) & Hinstrs)".
+         rewrite !ptstomem_to_ptstoSth_2.
+         iDestruct "Hs" as "[$ $]".
+         rewrite !bv.add_assoc !(@bv.add_comm _ _ s).
+         cbn.
+         change ([bv [16] 0x1] + [bv 0x1])%bv with [bv [16] 0x2].
+         change ([bv [16] 0x2] + [bv 0x1])%bv with [bv [16] 0x3].
+         change ([bv [16] 0x3] + [bv 0x1])%bv with [bv [16] 0x4].
+         rewrite -!bv.add_assoc.
+         change ([bv [16] 0x1] + [bv 0x2])%bv with [bv [16] 0x3].
+         change ([bv [16] 0x1] + [bv 0x4])%bv with [bv [16] 0x5].
+         change ([bv [16] 0x4] + [bv 0x1])%bv with [bv [16] 0x5].
+         iDestruct "Hs2" as "[$ $]".
+         iDestruct "Hs4" as "[$ $]".
+         iApply "IHc".
+         by rewrite bv.add_comm.
+  Qed.
+   *)
+
+  Lemma intro_accessible_addresses `{sailGS Σ} :
+    ptsto_instrs start_bootcode_start block_start_bootcode ∗
+    ptsto_instrs transfer_if_valid_struct_start block_transfer_if_valid_struct ∗
+    ptsto_instrs check_struct_start block_check_struct ∗
+    ptsto_instrs evaluate_struct_start block_evaluate_struct ∗
+    ptsto_instrs mass_erase_start block_mass_erase ∗
+    ptstoSthL advAddrs
+    ⊢ interp_accessible_addresses segb1 segb2.
+  Admitted.
+
 
   Lemma evaluate_struct_safe `{sailGS Σ} :
     ⊢
@@ -524,12 +610,31 @@ Section Bootcode.
     -∗ WP_loop.
   Proof.
     Local Opaque ptstoSthL ptsto_word.
-    iIntros_anon.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28)".
     iApply (evaluate_struct_verified ipectl segb1 segb2 with "[$]").
-    iIntros_anon.
+    iIntros "(H29 & H30 & H31 & H32 & H33 & H34 & H35 & H36 & H37 & H38 & H39 & H40 & H41)".
     iApply fupd_wp.
     iAssert (loop_pre end_addr ipectl segb1 segb2) with "[-]" as "?".
-    { do 2 iFrame. auto. }
+    { iPoseProof (intro_accessible_addresses with "[$H23 $H24 $H25 $H31 $H27 $H22]") as "H42".
+      unfold loop_pre, registers_not_in_bootcode.
+      iFrame "H30 H32 H33 H34 H42 H8 H9 H10 H11 H12 H35 H36 H37 H38 H28 H4 H13".
+      repeat iSplitR; try iLeft; done. }
+      (* do 2 iFrame. *)
+      (* iSplitR. done. iSplitR. done. iSplitR. iLeft. done. *)
+      (* rewrite !ptsto_instrs_extract_ptsto. *)
+      (* unfold interp_accessible_addresses, liveAddrs. *)
+      (* iSimpl. *)
+      (* change (bv.unsigned (bv.of_nat minAddr)) with 0%Z. *)
+      (* repeat (unfold bv.of_Z, Z.add, bv.unsigned, Z.of_nat, Nat.add, Pos.succ, Nat.mul, bv.bin, Z.of_N, Pos.add, Pos.mul, Z.mul, Z.shiftl, untrusted, bv.shiftl, bv.of_N, bv.ult, bv.ule, N.lt, N.le, Pos.compare, MSP430IrisInstance.is_mpu_reg_addr; simpl). *)
+
+      (* assert (Gt = Gt <-> True) as -> by done. *)
+      (* assert (Lt = Lt <-> True) as -> by done. *)
+      (* assert (Gt = Lt <-> False) as -> by done. *)
+      (* assert (Lt = Gt <-> False) as -> by done. *)
+      (* assert (Gt ≠ Gt <-> False) as -> by done. *)
+      (* assert (Lt ≠ Lt <-> False) as -> by done. *)
+      (* assert (Lt ≠ Lt <-> True) as -> by done. *)
+      (* assert (Gt ≠ Gt <-> True) as -> by done. *)
     iPoseProof (valid_semTriple_loop $! end_addr ipectl segb1 segb2 with "[$]") as "H".
     iModIntro. cbn. unfold semWP.
     iApply (wp_mono with "H"). auto.
@@ -697,14 +802,6 @@ Section Bootcode.
     - iApply (transfer_if_valid_struct_safe with "[$H34 $H32 $H28 $H2 $H3 $H4 $H5 $H6 $H30 $H8 $H9 $H10 $H11 $H12 $H31 $H14 $H15 $H16 $H17 $H18 $H19 $H29 $H21 $H22 $H23 $H24 $H25 $H26 $H27]").
     - iApply (check_struct_safe with "[$H34 $H32 $H28 $H2 $H3 $H4 $H5 $H6 $H30 $H8 $H9 $H10 $H11 $H12 $H31 $H14 $H15 $H16 $H17 $H18 $H19 $H29 $H21 $H22 $H23 $H24 $H25 $H26 $H27]").
   Qed.
-
-  Fixpoint code_size (instrs : list ast_with_args) : nat :=
-    match instrs with
-    | []                 => 0
-    | I0 _     :: instrs => 2 + code_size instrs
-    | I1 _ _   :: instrs => 4 + code_size instrs
-    | I2 _ _ _ :: instrs => 6 + code_size instrs
-    end%list%nat.
 
   Lemma intro_ptsto_word `{sailGS Σ} v0 v1 (a : bv 16) :
     interp_ptsto (bv.of_Z (0 + bv.unsigned a)) v0 ∗
@@ -1081,7 +1178,9 @@ Qed.
   Lemma bootcode_endToEnd
     {γ γ' : RegStore} {μ μ' : Memory} {δ δ' : CStore [ctx]} {s' : Stm [ctx] ty.unit} :
 
-    (* TODO require whole machine state *)
+    (* TODO require whole machine state
+     doesn't make much sense as we don't have chunks for protected addrs
+     maybe require ipe configuration? *)
     (forall `{sailGS Σ}, ⊢ (PC_reg ↦ (segb1 + [bv 0x8])%bv -∗ WP_loop) : iProp Σ) ->
 
     mem_has_instrs μ start_bootcode_start block_start_bootcode ->

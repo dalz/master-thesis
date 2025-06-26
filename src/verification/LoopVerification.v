@@ -92,8 +92,7 @@ Section Loop.
     ∗ (⌜(bv.unsigned pc < bv.unsigned segb1 * 16)%Z⌝
        ∨ ⌜(bv.unsigned segb2 * 16 <= bv.unsigned pc)%Z⌝)
 
-    (* TODO *)
-    (* ∗ asn_accessible_addresses "segb1" "segb2" *)
+    ∗ interp_accessible_addresses segb1 segb2
 
     ∗ own_registers
 

@@ -269,14 +269,14 @@ Section BlockVerificationDerived.
     #[local] Notation "a '↦' t" := (reg_pointsTo a t) (at level 70).
 
     Definition semTripleBlock
-      (PRE : bv 16 -> iProp Σ) (instrs : list ast_with_args)
-      (POST : bv 16 -> bv 16 -> iProp Σ) : iProp Σ
+      (pre : bv 16 -> iProp Σ) (instrs : list ast_with_args)
+      (post : bv 16 -> bv 16 -> iProp Σ) : iProp Σ
     :=
       (∀ a,
-          (PRE a ∗ PC_reg ↦ a ∗ ptsto_instrs a instrs) -∗
-          (∀ an, PC_reg ↦ an ∗ ptsto_instrs a instrs ∗ POST a an -∗ WP_loop) -∗
+          (pre a ∗ PC_reg ↦ a ∗ ptsto_instrs a instrs) -∗
+          (∀ an, PC_reg ↦ an ∗ ptsto_instrs a instrs ∗ post a an -∗ WP_loop) -∗
           WP_loop)%I.
-    #[global] Arguments semTripleBlock PRE%_I instrs POST%_I.
+    #[global] Arguments semTripleBlock pre%_I instrs post%_I.
 
     Lemma sound_sblock_verification_condition {Γ pre post instrs} :
       safeE (postprocess (sblock_verification_condition pre instrs post wnil)) ->

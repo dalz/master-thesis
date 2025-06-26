@@ -102,30 +102,8 @@ Module MSP430IrisInstance <:
 
   Section WithSailGS.
     Context `{sailRegGS Σ} `{invGS Σ} `{mG : mcMemGS Σ}.
-    (* Variable (live_addrs : list Address). *)
 
     Definition reg_file : gset (bv 5) := list_to_set (bv.finite.enum 5).
-
-    (* Definition interp_ptsreg (r : registerAddressBits) (v : wordBits) : iProp Σ := *)
-    (*   match reg_convert r with *)
-    (*   | Some x => reg_pointsTo x v *)
-    (*   | None => True *)
-    (*   end. *)
-
-    (* Definition interp_gprs : iProp Σ := *)
-    (*   [∗ set] r ∈ reg_file, (∃ v, interp_ptsreg r v)%I. *)
-
-    (* Definition PmpEntryCfg : Set := Pmpcfg_ent * Xlenbits. *)
-
-    (* Definition interp_pmp_entries (entries : list PmpEntryCfg) : iProp Σ := *)
-    (*   match entries with *)
-    (*   | (cfg0, addr0) :: (cfg1, addr1) :: [] => *)
-    (*       reg_pointsTo pmp0cfg cfg0 ∗ *)
-    (*                    reg_pointsTo pmpaddr0 addr0 ∗ *)
-    (*                    reg_pointsTo pmp1cfg cfg1 ∗ *)
-    (*                    reg_pointsTo pmpaddr1 addr1 *)
-    (*   | _ => False *)
-    (*   end. *)
 
     Definition addr_inc (x : bv 32) (n : nat) : bv 32 :=
       bv.add x (bv.of_nat n).
@@ -142,7 +120,6 @@ Module MSP430IrisInstance <:
             end
       end.
 
-    
     Definition is_mpu_reg_addr (addr : Address) : Prop :=
       bv.ule [bv [16] 0x05A0] addr /\ bv.ult addr [bv 0x05B0].
 
@@ -173,26 +150,17 @@ Module MSP430IrisInstance <:
     Definition ptsto_word (addr w : bv 16) :=
       @interp_ptstomem 2 addr w.
 
-    (*
-    Definition interp_addr_access_byte (a : Address) : iProp Σ :=
-      if decide (a ∈ mmio_addrs) then False%I (* Creates a proof obligation that the adversary cannot access MMIO. TODO: Change this to a trace filter to grant the adversary access to MMIO *)
-      else if decide (a ∈ live_addrs) then ptstoSth a
-      else True%I. (* Could be `False` as well *)
-    Definition interp_addr_access (base : Address) (width : nat): iProp Σ :=
-      [∗ list] a ∈ bv.seqBv base width, interp_addr_access_byte a.
-     *)
-
-    Definition all_addrs_def : list Address := bv.seqBv bv.zero (Nat.pow 2 16).
-    Definition all_addrs_aux : seal (@all_addrs_def). Proof using Type. by eexists. Qed.
-    Definition all_addrs : list Address := all_addrs_aux.(unseal).
-    Lemma all_addrs_eq : all_addrs = all_addrs_def. Proof using Type. rewrite -all_addrs_aux.(seal_eq) //. Qed.
+    (* Definition all_addrs_def : list Address := bv.seqBv bv.zero (Nat.pow 2 16). *)
+    (* Definition all_addrs_aux : seal (@all_addrs_def). Proof using Type. by eexists. Qed. *)
+    (* Definition all_addrs : list Address := all_addrs_aux.(unseal). *)
+    (* Lemma all_addrs_eq : all_addrs = all_addrs_def. Proof using Type. rewrite -all_addrs_aux.(seal_eq) //. Qed. *)
 
     Definition untrusted (segb1 segb2 addr : wordBits) : Prop :=
       bv.ult addr (bv.shiftl segb1 [bv [3] 4])
       \/ bv.ule (bv.shiftl segb2 [bv [3] 4]) addr.
 
     Definition interp_accessible_addresses (segb1 segb2 : wordBits) : iProp Σ :=
-      [∗ list] a ∈ all_addrs,
+      [∗ list] a ∈ liveAddrs,   (* TODO all_addrs *)
         (⌜untrusted segb1 segb2 a /\ ¬ is_mpu_reg_addr a⌝ -∗ ptstoSth a)%I.
 
     Definition interp_accessible_addresses_without (segb1 segb2 addr : wordBits) : iProp Σ :=

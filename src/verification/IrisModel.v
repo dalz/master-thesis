@@ -25,25 +25,16 @@ Module MSP430IrisBase <: IrisBase MSP430Base MSP430Program MSP430Semantics.
     Definition Byte : Set := bv 8.
     Definition MemVal : Set := Byte.
 
-    (* NOTE: no resource present for current `State`, since we do not wish to reason about it for now *)
     Class mcMemGS Σ :=
-      McMemGS {
-          (* ghost variable for tracking state of heap *)
-          mc_ghGS : gen_heapGS Address byteBits Σ;
-          (* tracking traces *)
-          (* mc_gtGS : traceG Trace Σ; *)
-        }.
+      McMemGS { mc_ghGS : gen_heapGS Address byteBits Σ; }.
     #[export] Existing Instance mc_ghGS.
-    (* #[export] Existing Instance mc_gtGS. *)
 
     Definition memGS : gFunctors -> Set := mcMemGS.
 
     Definition mem_inv : forall {Σ}, mcMemGS Σ -> Memory -> iProp Σ :=
       fun {Σ} hG μ =>
         (∃ memmap, gen_heap_interp memmap
-           ∗ ⌜ map_Forall (fun a v => μ a = v) memmap ⌝
-           (* ∗ tr_auth1 (memory_trace μ) *)
-        )%I.
+           ∗ ⌜ map_Forall (fun a v => μ a = v) memmap ⌝)%I.
 
   End MSP430IrisParams.
 
@@ -62,7 +53,6 @@ Module MSP430IrisBase <: IrisBase MSP430Base MSP430Program MSP430Semantics.
   Proof. repeat constructor.
           - intros ty reg. apply val_inhabited.
           - intro. apply bv.bv_inhabited.
-          (* - apply state_inhabited. *)
   Qed.
 
 End MSP430IrisBase.
