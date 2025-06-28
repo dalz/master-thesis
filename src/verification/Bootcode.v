@@ -151,7 +151,7 @@ Section Bootcode.
     iApply (sound_sblock_verification_condition valid_start_bootcode [env]
               $! start_bootcode_start with "[Hpre] [Hk]").
     - unfold start_bootcode_pre, minimal_pre. cbn -[ptsto_instrs].
-      iDestruct "Hpre" as "((% & ? & % & ? & ?) & ? & ? & ? & ? & H0)".
+      iDestruct "Hpre" as "(? & ? & ? & ? & ? & H0)".
       iFrame.
       rewrite !bi.sep_True !bi.and_emp.
       cbv [bv.app bv.fold_right bv.bv_case bv.cons bv.wf_double].
@@ -200,7 +200,7 @@ Section Bootcode.
     iApply (sound_sblock_verification_condition valid_transfer_if_valid_struct [env]
               $! transfer_if_valid_struct_start with "[Hpre] [Hk]").
     - unfold transfer_if_valid_struct_pre, minimal_pre. cbn -[ptsto_instrs].
-      iDestruct "Hpre" as "((% & ? & % & ? & ?) &? & ? & ? & ? & ? & ? & ? & [? ?] & [? ?] & ? & [? ?])".
+      iDestruct "Hpre" as "(? & ? & ? & ? & ? & ? & ? & ? & [? ?] & [? ?] & ? & [? ?])".
       now iFrame.
     - cbn.
       iIntros (an) "(? & (? & ? & ? & ? & _) & (? & ? & ?) & [-> _] & (? & ? & ?) & ? & ? & ? & ? & (? & [? _] & [? _]) & (? & [? _] & [? _]) & (? & [? _] & [? _]))".
@@ -470,16 +470,13 @@ Section Bootcode.
 
   Definition registers_not_in_bootcode `{sailGS Σ} : iProp Σ :=
       (∃ v, SP_reg ↦ v)
-    ∗ (∃ v, SRCG1_reg ↦ v)
     ∗ (∃ v, CG2_reg ↦ v)
     ∗ (∃ v, R4_reg ↦ v)
     ∗ (∃ v, R5_reg ↦ v)
-    ∗ (∃ v, MPUCTL0_reg ↦ v)
     ∗ (∃ v, MPUCTL1_reg ↦ v)
     ∗ (∃ v, MPUSEGB2_reg ↦ v)
     ∗ (∃ v, MPUSEGB1_reg ↦ v)
-    ∗ (∃ v, MPUSAM_reg ↦ v)
-    ∗ (∃ v, LastInstructionFetch ↦ v).
+    ∗ (∃ v, MPUSAM_reg ↦ v).
 
   Fixpoint code_size (instrs : list ast_with_args) : nat :=
     match instrs with
@@ -616,8 +613,11 @@ forall (s).
     iApply fupd_wp.
     iAssert (loop_pre end_addr ipectl segb1 segb2) with "[-]" as "?".
     { iPoseProof (intro_accessible_addresses with "[$H23 $H24 $H25 $H31 $H27 $H22]") as "H42".
-      unfold loop_pre, registers_not_in_bootcode.
-      iFrame "H30 H32 H33 H34 H42 H8 H9 H10 H11 H12 H35 H36 H37 H38 H28 H4 H13".
+      unfold loop_pre, registers_not_in_bootcode, minimal_post, minimal_pre, own_registers.
+      iDestruct "H13" as "(H43 & H44 & H45 & H46 & H47 & H48 & H49 & H50)".
+      iDestruct "H29" as "(H51 & H52 & H53)".
+      iFrame.
+      (* iFrame "H30 H32 H33 H34 H42 H8 H9 H10 H11 H12 H35 H36 H37 H38 H28 H4 H13". *)
       repeat iSplitR; try iLeft; done. }
       (* do 2 iFrame. *)
       (* iSplitR. done. iSplitR. done. iSplitR. iLeft. done. *)
@@ -1178,9 +1178,6 @@ Qed.
   Lemma bootcode_endToEnd
     {γ γ' : RegStore} {μ μ' : Memory} {δ δ' : CStore [ctx]} {s' : Stm [ctx] ty.unit} :
 
-    (* TODO require whole machine state
-     doesn't make much sense as we don't have chunks for protected addrs
-     maybe require ipe configuration? *)
     (forall `{sailGS Σ}, ⊢ (PC_reg ↦ (segb1 + [bv 0x8])%bv -∗ WP_loop) : iProp Σ) ->
 
     mem_has_instrs μ start_bootcode_start block_start_bootcode ->
@@ -1200,6 +1197,7 @@ Qed.
 
     read_register γ PC_reg = start_bootcode_start ->
     read_register γ MPUIPC0_reg = [bv 0] ->
+    read_register γ MPUCTL0_reg = [bv 0xa500] ->
 
     (* work around unsupported immediate/absolute addressing *)
     read_register γ R7_reg = MPUIPC0_addr_bv ->
@@ -1222,7 +1220,7 @@ Qed.
       μstart μtransfer μcheck μeval μerase
       μsaved μvalid μisp
       μipectl μsegb1 μsegb2
-      γpc γipectl
+      γpc γipectl γmpuctl0
       γr7 γr8 γr9 γr10 γr11 γr12 γr13 γr15
       μft
       steps.
@@ -1231,7 +1229,7 @@ Qed.
     unfold own_regstore.
     cbn.
     iIntros "(Hmem & H')".
-    rewrite γpc γipectl γr7 γr8 γr9 γr10 γr11 γr12 γr13 γr15.
+    rewrite γpc γipectl γmpuctl0 γr7 γr8 γr9 γr10 γr11 γr12 γr13 γr15.
     iMod (bootcode_splitMemory with "Hmem")
       as "(Hstart & Htransfer & Hcheck & Heval & Herase
            & Hsaved & Hvalid & Hisp & Hipectl & Hsegb2 & segb1 & Hchksum & #Hft & Hadv)";

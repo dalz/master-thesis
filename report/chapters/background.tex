@@ -295,6 +295,7 @@ There is also another new connective, the \intro{magic wand}, written \(P \wand 
 The postcondition of a triple can refer to the value returned by the expression with the notation \(\hoare{P}{e}[v]{Q}\). We consider the triple to hold also when \(e\) doesn't terminate or throws an exception, irrespective of the validity of \(Q\).
 
 \subsection{Memory access permissions with separation logic}
+\label{sec:sep-logic-permissions}
 
 It is possible to use separation logic to express the property that a piece of code only has access to a limited region of memory.
 

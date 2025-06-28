@@ -96,6 +96,7 @@ Section Loop.
 
     ∗ own_registers
 
+    (* TODO add other registers, memory etc. to the lhs *)
     ∗ ▷ (PC_reg ↦ segb1 + [bv 8] -∗ WP_loop).
 
   Definition semTriple_loop : iProp Σ :=

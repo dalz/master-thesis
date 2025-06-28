@@ -201,6 +201,7 @@ The \usail implementation of \sail{fetch} must be modified to invoke the lemma b
 The \coq{encodes_instr} resource is declared to be \emph{duplicable} so it is not consumed by \coq{close_ptsto_instr}; it stays on the heap and is used later to decode the instruction. On the other hand, \coq{instr_arg}'s only purpose is to be able to select the right branch of the disjunction in \coq{close_ptsto_instr}'s precondition. If it wasn't there, opening and then closing \coq{a i↦ I i} could yield both \coq{a i↦ I i} itself and \coq{a i↦ D w} with \coq{w ≡ i}. \coq{encodes_instr} and \coq{instr_arg} serve as tokens to ensure the choice in \coq{close_ptsto_instr} is bound to that of the previous \coq{open_ptsto_instr}.
 
 \subsection{Decoding}
+\label{sec:block-verifier-decode}
 
 There are significant performance issues with trying to parse the binary representation of an instruction into the \sail{ast} union via the model's \sail{encdec} function. The way to do that would be to compute the encoding of \coq{i} in \coq{open_ptsto_instr}, and return \coq{ptstomem} chunks pointing to that instead of the existentially quantified variables \coq{bl} and \coq{bh}. The symbolic executor would then have enough information to perform the decoding with \sail{encdec}.
 
@@ -261,7 +262,7 @@ The last missing piece is a way to execute a basic block via \coq{cexec_block_ad
 
 The computation reads as: for all addresses of the PC/first instruction \circref{cexec-triple-a}, if the precondition holds for that address \circref{cexec-triple-pre}, then after execution of the block \circref{cexec-triple-block} the postcondition (which is given the original and new PC) holds \circref{cexec-triple-post}.
 
-Since the pre- and postconditions get the value of the PC, they can constrain it to a specific value: to the starting location of the basic block in the precondition, and to a disjunction of the possible branch targets in the postcondition. This must be done by an equality on the \coq{a} and \coq{an} variables, and not a \coq{ptstoreg} chunk: the latter would clash with the one introduced in the prologue and epilogue, always falsifying the precondition and making all postconditions provable.
+Since the pre- and postconditions get the value of the PC, they can constrain it to a specific value: to the starting location of the basic block in the precondition, and to a disjunction of the possible branch targets in the postcondition. This must be done by an equality on the \coq{a} and \coq{an} variables, and not a points-to chunk: the latter would clash with the one introduced in the prologue and epilogue, always falsifying the precondition and making all postconditions provable.
 
 \section{Function contracts}
 
@@ -484,6 +485,7 @@ As a last step the bootcode copies the first three words at the ISP to the \reg{
 The contract is straightforward. We assume ownership of register \reg{R6} with the value left by the previous block (\coq{isp + 6}), of the memory locations we are going to read (with arbitrary values), of the IPE registers, and of a few other registers storing the addresses the IPE registers are mapped to. In the postcondition the IPE registers are returned with the values read from memory.
 
 \subsubsection{Proof}
+\label{sec:valid_evaluate_struct}
 
 Katamaran leaves a verification condition that essentially amounts to proving that \coq{v = bv.app (bv.take 8 v) (bv.drop 8 v)}\footnote{\coq{bv.app} is bitvector concatenation, \coq{drop} discards the first 8 (least significant) bits and \coq{take} all but the first 8.}, which is achieved with the following proof script:
 
@@ -501,6 +503,6 @@ Incidentally, initially the verification was failing because of a mistake in the
 
 This bug would have gone unnoticed if we limited ourself to testing, as the high byte of \reg{MPUIPC0} is reserved for future extensions---meaning that the bug is not observable now but could have caused problems in the future.
 
-% \section{boh}
-
-% The results about the basic block can be connected together to obtain a guarantee about the whole bootcode. This must be done in the Iris model, without the help of Katamaran's executor and solver.
+\section{Summary}
+TODO
+% scaffolding

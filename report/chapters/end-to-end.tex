@@ -1,0 +1,397 @@
+\chapter{End-to-end verification}
+
+It is possible to connect the basic blocks and the universal contract to constrain the attacker's capabilities after boot. This result cannot be obtained via Katamaran's symbolic executor, and instead involves a manual proof in the Iris model.
+
+In this chapter we prove a simple security property to illustrate the process. In particular we verify that a value initially stored in a protected location cannot be modified until the IPE entry point is reached. We suppose execution starts with IPE disabled, so part of the verification consists in proving that the IPE registers are correctly set up by the bootcode.
+
+\section{Instantiation of the Iris model}
+
+Katamaran operates on its own deeply-embedded separation logic, which is to say that the propositions we worked with so far are Rocq values that have no intrinsic semantics in terms of Rocq's types/logic.
+
+The meaning of Katamaran's logic is established by an interpretation into Iris propositions. The framework provides translations for all built-in operators, like the separating conjunction, that corresponds directly to Iris', and points-to-register chunk, which turns into an Iris resource. The denotation of memory and custom predicates is instead provided by the user; we will now see how this is done in our case.
+
+\subsection{Memory}
+
+In \cref{sec:usail-translation} we defined memory as a map from addresses to bytes:
+\begin{minted}{coq}
+  Definition Memory := Address -> byteBits.
+\end{minted}
+We now introduce an invariant that states that our memory model agrees with Iris', \ie that if Iris' heap has an \coq{a m↦ v} chunk and \texttt{\small μ} is the current memory, then \coq{μ a = v}:
+\begin{minted}{coq}
+  Definition mem_inv : forall {Σ}, mcMemGS Σ -> Memory -> iProp Σ :=
+      fun {Σ} hG μ =>
+        (∃ memmap, gen_heap_interp memmap
+           ∗ ⌜ map_Forall (fun a v => μ a = v) memmap ⌝)%I.
+\end{minted}
+
+We could use Iris' heap directly in this case, but separating the two types opens the possibility of having a richer \coq{Memory}. For example in Katamaran's RISC-V PMP case study \coq{Memory} is a record that remembers the history of read/write events for MMIO addresses in addition to the values currently held in RAM.
+
+The interpretation of Katamaran's memory points-to chunk (\coq{m↦}) is the Iris equivalent plus an assertion that the address is not that of a memory mapped register:
+\begin{minted}{coq}
+  Definition interp_ptsto (addr : Address) (b : Byte) : iProp Σ :=
+    pointsto addr (DfracOwn 1) b ∗ ⌜¬ is_mpu_reg_addr addr⌝.
+\end{minted}
+This assertion avoids the possibility of having both a points-to-register and a points-to-memory chunk for a register and its address.
+% FIXME lemma_extract_accessible_ptsto cannot be verified since it doesn't require its argument to not be a mpu register
+
+We can now prove that if \(\mu\) is the current memory and \(a\) points to \(v\), then \(\mu~a = v\):
+\begin{minted}{coq}
+  Lemma interp_ptsto_valid `{sailGS Σ} {μ a v} :
+    ⊢ mem_inv _ μ -∗ interp_ptsto a v -∗ ⌜μ a = v⌝.
+  Proof. (* omitted *) Qed.
+\end{minted}
+
+We define a number of convenience wrappers around \coq{interp_ptsto}, among which: \coq{ptsto_word} takes a 16-bit bitvector as input and generates two \coq{interp_ptsto}s, \coq{interp_ptstomem} does the same with an arbitrary number of bytes, \coq{ptstoSth} returns a \coq{interp_ptsto} with an existentially quantified value for the given address, \coq{ptstoSthL} for a list of addresses.
+
+% TODO line break
+We also need to provide an interpretation for the \coq{accessible_addresses} and \\ \coq{accessible_addresses_without} predicates. The intended meaning of the former is that it gives access to all untrusted locations, so we interpret it as:
+\begin{minted}{coq}
+  Definition interp_accessible_addresses (segb1 segb2 : wordBits) : iProp Σ :=
+    [∗ list] a ∈ liveAddrs,
+      (⌜untrusted segb1 segb2 a /\ ¬ is_mpu_reg_addr a⌝ -∗ ptstoSth a)%I.
+\end{minted}
+while the latter turns into an \coq{accessible_addresses} when given the missing chunk:
+\begin{minted}{coq}
+  Definition interp_accessible_addresses_without (segb1 segb2 addr : wordBits) :=
+    (ptstoSth addr -∗ interp_accessible_addresses segb1 segb2)%I.
+  \end{minted}
+
+In the definition of \coq{interp_accessible_addresses} memory locations range over the list \coq{liveAddrs}. This is defined as the addresses from \hex{0} to \hex{200}, \(1/128\) of the complete address space. The reason is to simplify the proofs: we sometimes verify properties about \coq{liveAddrs} by explicit computation that would be unfeasible on a list of \(2^{16}\) elements. This restriction could be eliminated by replacing computation with implicit manipulation; it is purely a matter of putting more work into the proof.
+
+\subsection{Instructions}
+
+A \coq{ptstoinstr} (\texttt{\small i↦}) chunk states that a location correponds to some data or to the encoding of an instruction. We denote it in Iris as follows:
+\begin{minted}{coq}
+  Definition interp_ptstoinstr (addr : Address) (id : instr_or_data) : iProp Σ :=
+      (∃ v, ptsto_word addr v
+              ∗ ⌜ match id with
+                  | D v' => v = v'
+                  | I i => pure_decode (Word v) = inr i
+                  end ⌝)%I.
+\end{minted}
+we don't define \coq{pure_decode}, just postulate its existence, like we did with the foreign function \coq{decode}:
+\begin{minted}{coq}
+  Axiom pure_decode : WordByte -> string + ast.
+\end{minted}
+this is sufficient as we never need to actually compute it, just keep track of the fact that some word encodes a certain instruction.
+
+Likewise the \coq{encodes_instr} (\texttt{\small ≡}) predicate becomes \coq{⌜pure_decode (Word code) = inr instr⌝}.
+
+Finally, we translate \coq{instr_arg} to \coq{True}: its purpose in the block verifier is to guide the symbolic executor into picking the correct branch when the \coq{open_close_instr} lemma is invoked---otherwise an \coq{a i↦ I i} could become \coq{a i↦ D v ∗ v ≡ i}---which is not a concern in manual proofs as we select the branch ourselves.
+
+We define a helper function \coq{ptsto_instrs} that given an address and a list of \coq{ast_with_args} generates \coq{interp_ptstoinstr} chunks for the instructions and their arguments.
+
+\section{Expressing properties of non-terminating programs}
+\label{sec:doubles}
+
+So far we have dealt with pieces of code with a definite end point: Sail functions that perform side effects and then return a value in \cref{ch:contracts} and finite sequences of assembly instructions in \cref{ch:block-verifier}.
+
+However that is very much \emph{not} the nature of CPUs and machine code: the Sail model specifies a fetch-decode-execute cycle that runs forever or until an exception is thrown. As such any Hoare triple on this cycle will either not be derivable, \ie because of missing ownership of required resources, or trivially true, as both non-termination and exceptions immediatly validate the triple. Either way the postcondition is not taken into account, so having it as anything other than \(\top\) is meaningless. We can refer to these degenerate triples as \intro{Hoare doubles} and use the notation \(\hoared{P}{c}\) for \(\hoare{P}{c}{\top}\).
+
+Hoare doubles are entirely suitable for the properties we are interested in. Back in \cref{sec:sep-logic-permissions} we introduced the idea---which we applied in the subsequent chapters---of verifying that a piece of code doesn't access a location by \emph{not} asserting ownership of that location in the precondition; a trivial postcondition suffices. For another example, we can prove that a readable location is never modified by using a resource that doesn't allow changing its value, the obvious choice being the usual points-to chunk wrapped in an Iris invariant.
+
+Concretely, we express this kind of safety property of the fetch-decode-execute cycle via the following Iris proposition:
+\begin{minted}{coq}
+  Definition WP_loop `{sg : sailGS Σ} : iProp Σ :=
+    semWP env.nil (FunDef loop) (fun _ _ => True%I).
+\end{minted}
+\coq{WP_loop} stands for the weakest \(W\) such that the double \(\hoared{W}{\text{\coq{loop}}}\) holds. Consequently the proposition \coq{P -∗ WP_loop} asserts that \coq{loop} is safe under the assumption \coq{P}.
+
+The \coq{loop} function is not exactly the model's fetch-decode-execute cycle. Its definition (\cref{lst:fun_loop}) differs from the original mainly in the replacement of the \coq{encdec} Sail function with the foreign function \coq{decode}, for the reasons discussed in \cref{sec:block-verifier-decode}.
+
+\begin{listing}[tb]
+  \begin{minted}{coq}
+    Definition fun_step : Stm ctx.nil ty.unit :=
+      let: "f" := call fetch (exp_val ty.unit tt) in
+      let: "ast" := foreign decode (exp_var "f") in
+      call execute (exp_var "ast").
+
+    Definition fun_loop : Stm ctx.nil ty.unit :=
+      call step;; call loop.
+  \end{minted}
+  \caption{Fetch-decode-execute cycle with foreign \coq{decode}.}
+  \label{lst:fun_loop}
+\end{listing}
+
+In proving the end-to-end result we will need to reason about the bootcode, reusing the basic block contracts we already verified. To do that we need to express such contracts---triples on finite sequences of instructions---as doubles on \coq{loop}.
+
+We start from the translation of \(\hoare{\text{\coq{P}}}{\text{\coq{c}}}{\top}\). Clearly \coq{P -∗ WP_loop} is not enough, as we lose all information about the code we are executing. We restore it by assuming that \coq{loop} is about to run the instructions in \coq{c}; more precisely we choose an address \coq{a} and assume that \coq{c} is in memory starting from \coq{a} and that the current value of the PC is \coq{a}:
+\begin{minted}{coq}
+  PC ↦ a ∗ ptsto_instrs a c ∗ P
+  -∗ WP_loop
+\end{minted}
+This proposition represents a stronger (possibly invalid) property than the initial contract: if \coq{P} holds then \coq{c} \emph{and all code that follows} are both safe. We capture more precisely the meaning of the initial contract by considering safety up to the moment the PC reaches the end of \coq{c} (address \coq{an}):
+\begin{minted}{coq}
+  PC ↦ a ∗ ptsto_instrs a c ∗ P -∗
+  (PC ↦ an -∗ WP_loop) -∗
+  WP_loop
+\end{minted}
+If the contract has a non-trivial postcondition \coq{Q} we can weaken the assumption about the program's continuation: since \coq{Q} will hold after \coq{c}, we just need to assume that the rest of the execution is safe knowing that \coq{Q} holds:
+\begin{minted}{coq}
+  PC ↦ a ∗ ptsto_instrs a c ∗ P -∗
+  (PC ↦ an ∗ Q -∗ WP_loop) -∗
+  WP_loop
+\end{minted}
+
+A side effect of this process is that we conceptually reverse the order of compositions of contracts. With triples one starts with a precondition and applies the contract of each block/instruction until a final postcondition is obtained. With doubles we instead start with safety of the last block, then prove the safety of the second-to-last knowing that the last is safe, and so on.
+
+We conclude by defining a convenience function that turns Hoare triples into doubles in this style:
+\begin{minted}{coq}
+  Definition semTripleBlock
+      (pre    : bv 16 -> iProp Σ)
+      (instrs : list ast_with_args)
+      (post   : bv 16 -> bv 16 -> iProp Σ)
+      : iProp Σ
+    :=
+      (∀ a,
+        (pre a ∗ PC_reg ↦ a ∗ ptsto_instrs a instrs) -∗
+        (∀ an, PC_reg ↦ an ∗ ptsto_instrs a instrs ∗ post a an -∗ WP_loop) -∗
+        WP_loop)%I.
+\end{minted}
+Here \coq{a} and \coq{an} are universally quantified, but it is expected that they will be constrained to one (or multiple in the case of \coq{an}) specific value(s); recall that the bock verifier contracts contained equalities like \coq{term_var "a" = evaluate_struct_start} instead of the chunk \coq{PC_reg ↦ evaluate_struct_start}.
+
+% To be more precise we define soundness in terms of a notion of safety. A program is safe under some assumptions if the corresponding Hoare double---a triple with true as the postcondition---is derivable. We do away with postconditions because they are meaningless when we consider whole executions of assembly programs: the model keeps running the fetch-decode-execute cycle forever or until an exception is thrown; either way the postcondition is irrelevant.
+
+% One may then object to the use of postconditions in the block verifier. Indeed they are a fiction enabled by replacing the cycle with scaffolding (\cref{lst:sexec-block}) that halts execution at the end of each basic block. This is necessary to break down the program into tractable chunks for the symbolic executor to verify, while for the end-to-end result we need to stick more closely to the structure of the Sail specification.
+
+\section{Soundness of the block verifier}
+
+Katamaran's block verifier comes with a template for proving its soundness. The user just needs to fill in correctness proofs for all lemmas and foreign functions. In particular, the former consist in proving that the semantic interpretation of the lemma's precondition implies (\(\wand\)) the postcondition. Soundness guarantees that all contracts proved by the block verifier have valid interpretations in the Iris model; this enables the use of results obtained via semi-automated verification in Iris proofs.
+
+The statement can be found in \file{BlockVer/Verifier.v}: % \cref{lst:bv-soundness}.
+% \begin{listing}[tb]
+\startcstep
+\begin{minted}[escapeinside=??]{coq}
+    Lemma sound_sblock_verification_condition {Γ pre post instrs} :
+      ValidBlockVerifierContract ({{ pre }} instrs {{ post }}) ?$\circdef{bv-sound-scontract}$? ->
+      forall ι : Valuation Γ,
+      ⊢ semTripleBlock ?$\circdef{bv-sound-semtripleblock}$?
+          (fun a => asn.interpret pre (ι.[("a"::ty.Address) ↦ a])) ?$\circdef{bv-sound-pre}$?
+          instrs
+          (fun a an => asn.interpret post (ι.[("a"::ty.Address)  ↦ a]
+                                            .[("an"::ty.Address) ↦ an])) ?$\circdef{bv-sound-post}$?.
+    Admitted.
+\end{minted}
+%   \caption{Statement of soundness of the block verifier.}
+%   \label{lst:bv-soundness}
+% \end{listing}
+Given a proof of the contract \mintinline{coq}|{{ pre }} instrs {{ post }}| in Katamaran's logic \circref{bv-sound-scontract}, it computes the interpretation of \coq{pre} \circref{bv-sound-pre} and \coq{post} \circref{bv-sound-post} as Iris propositions, applies \coq{semTripleBlock} \circref{bv-sound-semtripleblock} to turn them and \coq{instr} into a Hoare double over \coq{loop}, and asserts the validity of that double.
+
+We admit this lemma for now, and leave its verification as future work.
+
+\section{Interpretation of block contracts}
+
+Applying \coq{asn.interpret} to a Katamaran proposition produces an Iris on that is large and hard to work with. It is more convenient to define manual interpretations of the block contracts and prove that they agree with the ones computed by \coq{asn.interpret}.
+
+\begin{listing}
+  \begin{minted}{coq}
+    Definition start_bootcode_pre `{sailGS Σ} : iProp Σ :=
+      PC_reg ↦ start_bootcode_start
+      ∗ ptsto_instrs start_bootcode_start block_start_bootcode
+      ∗ ipe_register_init
+      ∗ R10_reg ↦ saved_ptr_bv
+      ∗ (ptsto_word saved_ptr_bv [bv 0]
+         ∨ ptsto_word saved_ptr_bv isp_bv).
+
+    Definition start_bootcode_post `{sailGS Σ} : iProp Σ :=
+      ipe_register_init
+      ∗ ptsto_instrs start_bootcode_start block_start_bootcode
+      ∗ R10_reg ↦ saved_ptr_bv
+      ∗ (ptsto_word saved_ptr_bv [bv 0] ∗ PC_reg ↦ transfer_if_valid_struct_start
+         ∨ ptsto_word saved_ptr_bv isp_bv ∗ PC_reg ↦ check_struct_start).
+
+    Definition contract_start_bootcode `{sailGS Σ} : iProp Σ :=
+      make_contract start_bootcode_pre start_bootcode_post.
+
+    Lemma start_bootcode_verified `{sailGS Σ} : ⊢ contract_start_bootcode.
+    Proof.
+      iIntros "Hpre Hk".
+      iApply (sound_sblock_verification_condition valid_start_bootcode [env]
+                $! start_bootcode_start with "[Hpre] [Hk]").
+      - unfold start_bootcode_pre, minimal_pre. cbn -[ptsto_instrs].
+        iDestruct "Hpre" as "((% & ? & % & ? & ?) & ? & ? & ? & ? & H0)".
+        iFrame.
+        rewrite !bi.sep_True !bi.and_emp.
+        cbv [bv.app bv.fold_right bv.bv_case bv.cons bv.wf_double].
+        iDestruct "H0" as "[H0 | H0]".
+        + iSplitL "". done. iLeft. by iSplitR.
+        + iSplitL "". done. iRight. by iSplitR.
+      - cbn.
+        iIntros (an) "(? & [? ?] & (? & ? & ?) & (? & ?
+                       & [ ((_ & [? _] & [? _]) & -> & _)
+                         | ((_ & [? _] & [? _]) & -> & _)]))";
+          iApply ("Hk" with "[-]"); iFrame; [iLeft | iRight]; iFrame.
+    Qed.
+  \end{minted}
+  \caption{Manual interpretation of a block contract and proof of its soundness.}
+  \label{lst:start_bootcode_verified}
+\end{listing}
+
+\Cref{lst:start_bootcode_verified} shows the process for the first basic block of the bootcode. We define the semantic pre- and postcondition, build a Hoare double out of them via an helper function \coq{make_contract}, and prove it valid by applying the \coq{sound_sblock_verification_condition} lemma from the previous section.
+
+\section{Interpretation of the universal contract}
+
+We will apply the universal contract to prove safety of the unknown code that is executed at the end of the boot process. But first we must encode the UC in the Iris model, again as a safety property. \Cref{lst:loop-verification} defines the Hoare double. The precondition follows closely \cref{lst:universal-contract}, with the addition of \coq{PC_reg ↦ segb1 + [bv 8] -∗ WP_loop}\footnote{To be more precise we should add registers and memory to the left-hand side of the magic wand; we don't for the sake of conciseness. This is inconsequential as we never prove \coq{PC_reg ↦ segb1 + [bv 8] -∗ WP_loop} nor \coq{valid_semTriple_loop} in our development.} that replaces the postcondition; the UC in this form asserts safety of untrusted code up to the first entry into the IPE region.
+
+\begin{listing}
+  \begin{minted}[escapeinside=??]{coq}
+    Definition loop_pre (pc ipectl segb1 segb2 : bv 16) : iProp Σ :=
+        PC_reg         ↦ pc
+      ∗ MPUIPC0_reg    ↦ ipectl
+      ∗ MPUIPSEGB1_reg ↦ segb1
+      ∗ MPUIPSEGB2_reg ↦ segb2
+
+      (* all other registers *)
+      ∗ own_registers
+
+      (* ipe configured *)
+      ∗ ⌜bv.drop 6 ipectl = [bv 0x3]⌝
+      ∗ ⌜bv.ult segb1 segb2⌝
+
+      (* pc untrusted *)
+      ∗ (⌜(bv.unsigned pc < bv.unsigned segb1 * 16)%Z⌝
+         ∨ ⌜(bv.unsigned segb2 * 16 <= bv.unsigned pc)%Z⌝)
+
+      ∗ interp_accessible_addresses segb1 segb2
+
+      ∗ (PC_reg ↦ segb1 + [bv 8] -∗ WP_loop).
+
+    Definition semTriple_loop : iProp Σ :=
+      (∀ pc ipectl segb1 segb2,
+          semTriple env.nil
+            (loop_pre pc ipectl segb1 segb2)
+            (FunDef loop)
+            (fun _ _ => True))%I.
+
+    Lemma valid_semTriple_loop : ⊢ semTriple_loop.
+    Admitted.
+  \end{minted}
+  \caption{Interpretation of the universal contract in the Iris model, from \file{LoopVerification.v}.}
+  \label{lst:loop-verification}
+\end{listing}
+
+We defer the verification of this lemma to future work. It requires proving soundness of the distinct set of lemmas employed in the semi-automated verification of the universal contract, to then obtain a soundness result for this instantiation of the symbolic executor. From there the various specializations of the UC to different instructions (\coq{sep_contract_execute_move}, \coq{sep_contract_execute_call}...) can be combined in the unified \coq{valid_semTriple_loop} result.
+
+\section{End-to-end statement and proof}
+
+All the required pieces are in place for us to state and prove the end-to-end security property. As anticipated we want to prove that the value of a protected location is unchanged by attacker code executed after the bootcode.
+
+We work under a few assumptions:
+\begin{itemize}
+\item the bootcode is in memory starting at address 0;
+\item the \coq{saved_ptr} stores either 0 or a constant \coq{isp_bv};
+\item the IPE signature is valid and specifies \coq{isp_bv} as the ISP;
+\item the contents of the IPE configuration structure is known;
+\item IPE is initially disabled and unlocked (the latter is always true after a reset);
+\item registers \reg{r7} to \reg{r15} store various constants, as in the block contracts;
+\item a specific location \coq{data_addr} within the boundaries contained in the IPE configuration structure stores the value 42;
+\item \coq{WP_loop} holds after we reach the IPE entry point---again the verification is up to the first jump into the IPE region,
+\end{itemize}
+and the specific property we target (\cref{lst:e2e}) is that according to the small-step operational semantics of \usail, all states that can be reached from an initial configuration that satisfies these assumptions store 42 at \coq{data_addr}.
+
+\begin{listing}
+  \begin{minted}{coq}
+      Lemma bootcode_endToEnd
+        {γ γ' : RegStore} {μ μ' : Memory} {δ δ' : CStore [ctx]}
+        {s' : Stm [ctx] ty.unit} :
+
+        (forall `{sailGS Σ},
+          ⊢ (PC_reg ↦ (segb1 + [bv 0x8])%bv -∗ WP_loop) : iProp Σ) ->
+
+        mem_has_instrs μ start_bootcode_start block_start_bootcode ->
+        mem_has_instrs μ transfer_if_valid_struct_start
+                         block_transfer_if_valid_struct ->
+        mem_has_instrs μ check_struct_start block_check_struct ->
+        mem_has_instrs μ evaluate_struct_start block_evaluate_struct ->
+        mem_has_instrs μ mass_erase_start block_mass_erase ->
+
+        (mem_has_word μ saved_ptr_bv [bv 0]
+         \/ mem_has_word μ saved_ptr_bv isp_bv) ->
+        mem_has_word μ ipe_sig_valid_src_bv valid_flag_bv ->
+        mem_has_word μ ipe_struct_pointer_src_bv isp_bv ->
+
+        mem_has_word μ isp_bv ipectl ->
+        mem_has_word μ (isp_bv + [bv 2])%bv segb2 ->
+        mem_has_word μ (isp_bv + [bv 4])%bv segb1 ->
+
+        read_register γ PC_reg = start_bootcode_start ->
+        read_register γ MPUIPC0_reg = [bv 0] ->
+
+        (* work around unsupported immediate/absolute addressing *)
+        read_register γ R7_reg = MPUIPC0_addr_bv ->
+        read_register γ R8_reg = MPUIPSEGB2_addr_bv ->
+        read_register γ R9_reg = MPUIPSEGB1_addr_bv ->
+        read_register γ R10_reg = saved_ptr_bv ->
+        read_register γ R11_reg = valid_flag_bv ->
+        read_register γ R12_reg = ipe_sig_valid_src_bv ->
+        read_register γ R13_reg = ipe_struct_pointer_src_bv ->
+        read_register γ R15_reg = [bv 0xFFFF] ->
+
+        μ data_addr = [bv 42] ->
+
+        ⟨ γ, μ, δ, fun_loop ⟩ --->* ⟨ γ', μ', δ', s' ⟩ ->
+
+        μ' data_addr = [bv 42].
+  \end{minted}
+  \caption{Statement of the end-to-end security property.}
+  \label{lst:e2e}
+\end{listing}
+
+The proof, which we don't include in full here, hinges on four lemmas:
+\begin{itemize}
+\item In \cref{lst:e2e} \coq{mem_has_instrs} and \coq{mem_has_word} are utility functions that simplify to equalities on \texttt{\small μ} (a \coq{Memory}, \ie function from addresses to bytes). The \coq{bootcode_splitMemory} lemma turns the memory into a separating conjunction of points-to predicates that agree with such equalities, plus other points-to chunks with existentially quantified values for residual addresses. It also generates an Iris invariant for the chunk \coq{data_addr m↦ [bv 42]}, which essentially makes it read-only.
+\item \coq{start_bootcode_safe} guarantees safety of the fetch-decode-execute cycle (\ie \coq{WP_loop}) assuming the initial configuration as outlined above. We will discuss the details of this lemma shortly.
+\item \coq{interp_ptsto_valid} asserts that if we own the chunk \coq{a m↦ v} and \texttt{\small μ} is the current memory then \coq{μ a = v}. This is in a way the dual of \coq{bootcode_splitMemory}, bridging the memory model with Iris resources in the opposite direction.
+\item \coq{adequacy_gen} is provided by Katamaran. It  asserts that if a configuration is reachable according to the operational semantics, the initial code is safe according to the logic, and some pure proposition is satisfied assuming ownership (as an Iris resource) of the final memory, then that proposition is valid.
+
+  \begin{minted}{coq}
+    Lemma adequacy_gen
+        {Γ σ} (s : Stm Γ σ) {γ γ'} {μ μ'} {δ δ' : CStore Γ} {s' : Stm Γ σ}
+        {Q : forall `{sailGS Σ}, IVal σ -> CStore Γ -> iProp Σ}
+        (φ : Prop) :
+      ⟨ γ, μ, δ, s ⟩ --->* ⟨ γ', μ', δ', s' ⟩ ->
+      (forall `{sailGS Σ'},
+          mem_res μ ∗ own_regstore γ ⊢ |={⊤}=> semWP δ s Q
+            ∗ (mem_inv μ' ={⊤,∅}=∗ ⌜φ⌝)
+      )%I -> φ.
+  \end{minted}
+
+  Intuitively this tells us that any information we can derive about the final memory using the logic is true independently from it. So \texttt{\small φ} is some property of \coq{μ'} that we are able to prove in Iris. In our case \texttt{\small φ} will be \coq{μ' data_addr = [bv 0x2a]} and we will have as an hypothesis that \coq{data_addr m↦ [bv 0x2a]}; we derive the latter from the former via \coq{interp_ptsto_valid}. Then \coq{adequacy_gen} tells us that \coq{μ' data_addr = [bv 0x2a]}---a property of the pure function \coq{μ'}---is true independently of the ownership of the resource \coq{data_addr m↦ [bv 0x2a]}.
+\end{itemize}
+The proof is structured as follows:
+\begin{minted}{coq}
+  Proof.
+    intros ...
+    refine (adequacy_gen (Q := fun _ _ _ _ => True%I) _ steps _). ...
+    iMod (bootcode_splitMemory with "Hmem") as "(...)"; ...
+    - ...
+      iPoseProof (start_bootcode_safe with "[-]") as "H".
+      ...
+    - iIntros "Hmem".
+      iInv "Hft" as ">Hptsto" "_".
+      iDestruct (interp_ptsto_valid with "Hmem Hptsto") as "$".
+      ...
+  Qed.
+\end{minted}
+we start by applying \coq{adequacy_gen} to turn the statement about the operational semantics into an Iris proposition. We then introduce the points-to chunks via \coq{bootcode_splitMemory}. At this point we solve the two goals generated by \coq{adequacy_gen}. First we prove safety of the loop via \coq{start_bootcode_safe}; since we only own a read-only chunk for \coq{data_addr} we get assurance that that location is not modified. The second goal requires proving that \coq{μ' data_addr = [bv 42]}, where \coq{μ'} is the final memory. We open the invariant---which \coq{start_bootcode_safe} returns as-is---to obtain the \coq{data_addr m↦ [bv 42]} chunk and apply \coq{interp_ptsto_valid} to deduce from it the equality on \coq{μ'}.
+
+Coming back to \coq{start_bootcode_safe}, it is one of five similar lemmas, one for each basic block of the bootcode. It has the form \coq{P -∗ WP_loop}, \ie a Hoare double on the fetch-decode-execute cycle, where \coq{P} includes the precondition of \coq{start_bootcode}'s contract.
+
+To prove it, we apply:
+\begin{itemize}
+\item \coq{start_bootcode_verified} (\cref{lst:start_bootcode_verified}) to obtain the block's postcondition. The PC will now be pointing to the start address of either \coq{transfer_if_valid_struct} or \coq{check_struct}.
+\item \coq{transfer_if_valid_struct_safe} or \coq{check_struct_safe}, whose preconditions will be satisfied after the execution of \coq{start_bootcode}, to derive \coq{WP_loop}.
+\end{itemize}
+The verification of \coq{transfer_if_valid_struct_safe} and \coq{check_struct_safe} follows the same structure. This is the backwards composition described in \cref{sec:doubles}.
+
+The \coq{check_struct} block jumps to \coq{mass_erase} if the checksum is incorrect. We don't model the effects of \coq{mass_erase} and instead assume safety if it is reached. We do this by replacing the erase implementation with an invalid instruction that causes an exception to be thrown by the model, proving \coq{WP_loop} immediately.
+
+Another special case is \coq{evaluate_struct}, being the last block of the bootcode. Since it jumps to unknown code we apply \coq{valid_semTriple_loop}, \ie the universal contract, whose preconditions (particularly that IPE is enabled) are now satisfied and from which we obtain loop safety. This wraps up the proof.
+
+\section{Conclusions}
+
+In this chapter we illustrated the process of proving a security property about the complete system, combining reasoning on known code via the block verifier and attacker-controlled code via the universal contract.
+
+Our proof is of a simple property---a protected location is not modified---and only covers code executed until the first jump to the IPE region. It provides the basis for the verification of more complex programs with a known trusted component: the block verifier can be applied to the IPE code too to verify that it mantains the desired invariant, and the resulting contract can be plugged into the proof in the same way as the other \coq{*_safe} lemmas.
+
+Obtaining full assurance via a complete verification of the symbolic executor's soundness---which would involve filling in the two admitted proofs---is left as future work.

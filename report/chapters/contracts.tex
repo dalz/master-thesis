@@ -35,8 +35,8 @@ The IPE configuration registers (listed in \cref{tab:ipe-registers}) are part of
   \begin{tabular}{ll} \toprule
     Register & Function \\ \midrule
     \reg{MPUIPC0} & control register: enabled (\regbit{MPUIPENA}, bit 6), locked (\regbit{MPUIPLOCK}, bit 7) \\
-    \reg{MPUIPSEGB2} & upper boundary of IPE region* (inclusive, 4 LSBs omitted) \\
-    \reg{MPUIPSEGB1} & lower boundary of IPE region* (exclusive, 4 LSBs omitted) \\ \bottomrule
+    \reg{MPUIPSEGB2} & upper boundary of IPE region (exclusive, 4 LSBs omitted) \\
+    \reg{MPUIPSEGB1} & lower boundary of IPE region (inclusive, 4 LSBs omitted) \\ \bottomrule
   \end{tabular}
   \caption{IPE registers.}
   \label{tab:ipe-registers}
@@ -162,7 +162,7 @@ Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:di
       ...
 \end{lstlisting}
 
-To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \texttt{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. The base model has no function that is called sistematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
+To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \sail{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. The base model has no function that is called sistematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
 
 \subsubsection{Ensuring proper PC modification order}
 \label{sec:pc-mod-order}
@@ -185,6 +185,7 @@ Resets can be part of an exploit, as they disable register locking. We can exclu
 The most significant omission is interrupt handling, which is an essential component of the attack sketched in \cref{sec:interrupts}. Indeed we are not able to guarantee that data is not leaked via this channel without modeling it; we leave such extension as future work.
 
 \section{Translation to \texorpdfstring{\usail}{μSail}}
+\label{sec:usail-translation}
 
 Katamaran works with \usail, a subset of Sail embedded in Rocq. We were able to generate a \usail version of the specification using the conversion tool provided by Katamaran,\footnote{\url{https://github.com/katamaran-project/sail-backend/}} after removing uses of features not supported by the core calculus.
 
@@ -487,8 +488,6 @@ There is however some nuance in the way the auxiliary predicates are defined. \c
 \end{listing}
 
 \subsection{Pure predicates and \texttt{asn\_untrusted}}
-
-\emph{TODO please someone fact-check this :)}
 
 Auxiliary predicates given as normal Rocq definitions are completely transparent to Katamaran: they are always expanded to their meaning. Complex preconditions that include disjunctions or many variables impact negatively the performance of the symbolic executor. Pure predicates are an answer to this: they are defined in terms of the usual assertion language, but must be unfolded manually by the user rather than Katamaran doing it automatically. This way the performance cost of the precondition is only paid when it is actually needed to solve a verification condition.
 
