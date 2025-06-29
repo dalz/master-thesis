@@ -1,6 +1,7 @@
 \chapter{End-to-end verification}
+\label{ch:end-to-end}
 
-It is possible to connect the basic blocks and the universal contract to constrain the attacker's capabilities after boot. This result cannot be obtained via Katamaran's symbolic executor, and instead involves a manual proof in the Iris model.
+It is possible to connect the basic block contracts and the universal contract to constrain the attacker's capabilities after boot. This result cannot be obtained via Katamaran's symbolic executor, and instead involves a manual proof in the Iris model.
 
 In this chapter we prove a simple security property to illustrate the process. In particular we verify that a value initially stored in a protected location cannot be modified until the IPE entry point is reached. We suppose execution starts with IPE disabled, so part of the verification consists in proving that the IPE registers are correctly set up by the bootcode.
 
@@ -388,7 +389,7 @@ The \coq{check_struct} block jumps to \coq{mass_erase} if the checksum is incorr
 
 Another special case is \coq{evaluate_struct}, being the last block of the bootcode. Since it jumps to unknown code we apply \coq{valid_semTriple_loop}, \ie the universal contract, whose preconditions (particularly that IPE is enabled) are now satisfied and from which we obtain loop safety. This wraps up the proof.
 
-\section{Conclusions}
+\section{Summary}
 
 In this chapter we illustrated the process of proving a security property about the complete system, combining reasoning on known code via the block verifier and attacker-controlled code via the universal contract.
 

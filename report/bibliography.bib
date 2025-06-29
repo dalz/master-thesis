@@ -153,13 +153,13 @@
 }
 
 @Article{Keuchel2022,
-  author     = {Keuchel, Steven and Huyghebaert, Sander and Lukyanov, Georgy and Devriese, Dominique},
-  date       = {2022-08-31},
-  title      = {Verified symbolic execution with Kripke specification monads (and no meta-programming)},
-  doi        = {10.1145/3547628},
-  pages      = {194–224},
-  url        = {https://doi.org/10.1145/3547628},
-  abstract   = {Verifying soundness of symbolic execution-based program verifiers is a  
+  author    = {Keuchel, Steven and Huyghebaert, Sander and Lukyanov, Georgy and Devriese, Dominique},
+  date      = {2022-08-31},
+  title     = {Verified symbolic execution with Kripke specification monads (and no meta-programming)},
+  doi       = {10.1145/3547628},
+  pages     = {194–224},
+  url       = {https://doi.org/10.1145/3547628},
+  abstract  = {Verifying soundness of symbolic execution-based program verifiers is a  
 significant challenge. This is especially true if the resulting tool needs to be  
 usable outside of the proof assistant, in which case we cannot rely on shallowly  
 embedded assertion logics and meta-programming. The tool needs to manipulate  
@@ -185,15 +185,14 @@ implementation of the axioms, proven sound against the operational semantics.
 Based on our experience with Katamaran, we can report good results on  
 practicality and efficiency of the tool, demonstrating practical viability of  
 our symbolic execution approach.},
-  booktitle  = {Proc. ACM Program. Lang.},
-  day        = {31},
-  file       = {:Keuchel2022 - Verified Symbolic Execution with Kripke Specification Monads (and No Meta Programming).pdf:PDF:https\://dl.acm.org/doi/pdf/10.1145/3547628},
-  groups     = {Katamaran},
-  keywords   = {logical relations, predicate transformers, program verification, refinement, separation logic, symbolic execution},
-  location   = {New York, NY, USA},
-  pagetotal  = {31},
-  publisher  = {Association for Computing Machinery},
-  readstatus = {skimmed},
+  booktitle = {Proc. ACM Program. Lang.},
+  day       = {31},
+  file      = {:Keuchel2022 - Verified Symbolic Execution with Kripke Specification Monads (and No Meta Programming).pdf:PDF:https\://dl.acm.org/doi/pdf/10.1145/3547628},
+  groups    = {Katamaran},
+  keywords  = {logical relations, predicate transformers, program verification, refinement, separation logic, symbolic execution},
+  location  = {New York, NY, USA},
+  pagetotal = {31},
+  publisher = {Association for Computing Machinery},
 }
 
 @Manual{ChipsAlliance,
@@ -440,6 +439,108 @@ our symbolic execution approach.},
   pages     = {42--58},
   publisher = {Springer International Publishing},
   abstract  = {Despite 20+ years of research on processor verification, it remains hard to use formal verification techniques in commercial processor development. There are two significant factors: scaling issues and return on investment. The scaling issues include the size of modern processor specifications, the size/complexity of processor designs, the size of design/verification teams and the (non)availability of enough formal verification experts. The return on investment issues include the need to start catching bugs early in development, the need to continue catching bugs throughout development, and the need to be able to reuse verification IP, tools and techniques across a wide range of design styles.},
+}
+
+@InProceedings{Dam2013,
+  author    = {Dam, Mads and Guanciale, Roberto and Khakpour, Narges and Nemati, Hamed and Schwarz, Oliver},
+  booktitle = {Proceedings of the 2013 ACM SIGSAC Conference on Computer \& Communications Security},
+  date      = {2013},
+  title     = {Formal verification of information flow security for a simple arm-based separation kernel},
+  doi       = {10.1145/2508859.2516702},
+  isbn      = {9781450324779},
+  location  = {Berlin, Germany},
+  pages     = {223–234},
+  publisher = {Association for Computing Machinery},
+  series    = {CCS '13},
+  url       = {https://doi.org/10.1145/2508859.2516702},
+  abstract  = {A separation kernel simulates a distributed environment using a single physical machine by executing partitions in isolation and appropriately controlling communication among them. We present a formal verification of information flow security for a simple separation kernel for ARMv7. Previous work on information flow kernel security leaves communication to be handled by model-external means, and cannot be used to draw conclusions when there is explicit interaction between partitions. We propose a different approach where communication between partitions is made explicit and the information flow is analyzed in the presence of such a channel. Limiting the kernel functionality as much as meaningfully possible, we accomplish a detailed analysis and verification of the system, proving its correctness at the level of the ARMv7 assembly. As a sanity check we show how the security condition is reduced to noninterference in the special case where no communication takes place. The verification is done in HOL4 taking the Cambridge model of ARM as basis, transferring verification tasks on the actual assembly code to an adaptation of the BAP binary analysis tool developed at CMU.},
+  address   = {New York, NY, USA},
+  keywords  = {separation kernel, information flow security, hypervisor, formal verification},
+  numpages  = {12},
+}
+
+@InProceedings{Brumley2011,
+  author    = {Brumley, David and Jager, Ivan and Avgerinos, Thanassis and Schwartz, Edward J.},
+  booktitle = {Computer Aided Verification},
+  date      = {2011},
+  title     = {BAP: A Binary Analysis Platform},
+  editor    = {Gopalakrishnan, Ganesh and Qadeer, Shaz},
+  isbn      = {978-3-642-22110-1},
+  location  = {Berlin, Heidelberg},
+  pages     = {463--469},
+  publisher = {Springer Berlin Heidelberg},
+  abstract  = {BAP is a publicly available infrastructure for performing program verification and analysis tasks on binary (i.e., executable) code. In this paper, we describe BAP as well as lessons learned from previous incarnations of binary analysis platforms. BAP explicitly represents all side effects of instructions in an intermediate language (IL), making syntaxdirected analysis possible. We have used BAP to routinely generate and solve verification conditions that are hundreds of megabytes in size and encompass 100,000's of assembly instructions.},
+}
+
+@InProceedings{Fox2010,
+  author    = {Fox, Anthony and Myreen, Magnus O.},
+  booktitle = {Interactive Theorem Proving},
+  date      = {2010},
+  title     = {A Trustworthy Monadic Formalization of the ARMv7 Instruction Set Architecture},
+  editor    = {Kaufmann, Matt and Paulson, Lawrence C.},
+  isbn      = {978-3-642-14052-5},
+  location  = {Berlin, Heidelberg},
+  pages     = {243--258},
+  publisher = {Springer Berlin Heidelberg},
+  abstract  = {This paper presents a new HOL4 formalization of the current ARM instruction set architecture, ARMv7. This is a modern RISC architecture with many advanced features. The formalization is detailed and extensive. Considerable tool support has been developed, with the goal of making the model accessible and easy to work with. The model and supporting tools are publicly available -- we wish to encourage others to make use of this resource. This paper explains our monadic specification approach and gives some details of the endeavours that have been made to ensure that the sizeable model is valid and trustworthy. A novel and efficient testing approach has been developed, based on automated forward proof and communication with ARM development boards.},
+}
+
+@InProceedings{Griffin2025,
+  author     = {Griffin, Matt and Dongol, Brijesh and Raad, Azalea},
+  booktitle  = {39th European Conference on Object-Oriented Programming (ECOOP 2025)},
+  date       = {2025},
+  title      = {{IsaBIL: A Framework for Verifying (In)correctness of Binaries in Isabelle/HOL}},
+  doi        = {10.4230/LIPIcs.ECOOP.2025.14},
+  editor     = {Aldrich, Jonathan and Silva, Alexandra},
+  isbn       = {978-3-95977-373-7},
+  location   = {Dagstuhl, Germany},
+  pages      = {14:1--14:30},
+  publisher  = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  series     = {Leibniz International Proceedings in Informatics (LIPIcs)},
+  url        = {https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.ECOOP.2025.14},
+  volume     = {333},
+  annotation = {Keywords: Binary Analysis Platform, Isabelle/HOL, Hoare Logic, Incorrectness Logic},
+  issn       = {1868-8969},
+  urn        = {urn:nbn:de:0030-drops-233070},
+}
+
+@Article{Hammond2025,
+  author       = {Hammond, Angus and Almeida, Ricardo and Bauereiss, Thomas and Campbell, Brian and Stark, Ian and Sewell, Peter},
+  date         = {2025-06},
+  journaltitle = {Proc. ACM Program. Lang.},
+  title        = {Morello-Cerise: A Proof of Strong Encapsulation for the Arm Morello Capability Hardware Architecture},
+  doi          = {10.1145/3729329},
+  number       = {PLDI},
+  url          = {https://doi.org/10.1145/3729329},
+  volume       = {9},
+  abstract     = {When designing new architectural security mechanisms, a key question is whether they actually provide the intended security, but this has historically been very hard to assess. One cannot gain much confidence by testing, as such mechanisms should provide protection in the presence of arbitrary unknown code. Previously, one also could not gain confidence by mechanised proof, as the scale of production instruction-set architecture (ISA) designs, many tens or hundreds of thousands of lines of specification, made that prohibitive.    We focus in this paper especially on the secure encapsulation of software components, as supported by CHERI architectures in general and by the Arm Morello prototype architecture and hardware design in particular. Secure encapsulation is an essential security mechanism, for fault isolation and to constrain untrusted third-party code. It has previously often been implemented using virtual memory, but that does not scale to large numbers of compartments. Morello provides capability-based mechanisms that do scale, within a single address space.     We prove a strong secure encapsulation property for an example of encapsulated code running on Morello, that holds in the presence of arbitrary untrusted code, above a full-scale sequential model of the Morello ISA. To do so, we build on, extend, and unify three orthogonal lines of previous work: the Cerise proof of such an encapsulation property for a highly idealised capability machine, expressed using a logical relation in Iris; the Islaris approach for reasoning about known code in production-scale ISAs; and the T-CHERI security properties of arbitrary Morello code, previously proved only for executions up to domain crossing.    This demonstrates how one can prove such strong properties of security mechanisms for full-scale industry architectures.},
+  articleno    = {226},
+  issue_date   = {June 2025},
+  keywords     = {CHERI, Capability machines, instruction set architectures, mechanised proof, program logic, separation logic},
+  location     = {New York, NY, USA},
+  numpages     = {23},
+  publisher    = {Association for Computing Machinery},
+}
+
+@Online{XuanTie,
+  author  = {XuanTie},
+  title   = {XuanTie C910},
+  url     = {https://www.xrvm.com/product/xuantie/C910},
+  urldate = {2025-06-29},
+}
+
+@InProceedings{Bognar2022,
+  author    = {Marton Bognar and Jo Van Bulck and Frank Piessens},
+  booktitle = {43rd {IEEE} Symposium on Security and Privacy, {SP} 2022, San Francisco, CA, USA, May 22-26, 2022},
+  date      = {2022},
+  title     = {Mind the Gap: Studying the Insecurity of Provably Secure Embedded Trusted Execution Architectures},
+  doi       = {10.1109/SP46214.2022.9833735},
+  pages     = {1638--1655},
+  publisher = {{IEEE}},
+  url       = {https://doi.org/10.1109/SP46214.2022.9833735},
+  bibsource = {dblp computer science bibliography, https://dblp.org},
+  biburl    = {https://dblp.org/rec/conf/sp/BognarBP22.bib},
+  timestamp = {Thu, 21 Sep 2023 15:57:28 +0200},
 }
 
 @Comment{jabref-meta: databaseType:biblatex;}

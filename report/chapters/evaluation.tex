@@ -1,7 +1,7 @@
 \chapter{Experience report}
 \label{ch:evaluation}
 
-Katamaran is a relatively recent research project, and while it is approaching maturity, it hasn't been extensively put to the test yet. Indeed the \msp ISA is the largest Sail specification it has been applied to. As such we find it valuable to report our experience with Katamaran, noting what works and what needs to be improved, some insights to keep in mind to make good use of the tool, and some metrics (line count and verification time) of the final codebase.
+Katamaran is a relatively recent research project, and while it is approaching maturity, it hasn't been extensively put to the test yet. As such we find it valuable to report our experience with Katamaran, noting what works and what needs to be improved, some insights to keep in mind to make good use of the tool, and some metrics (line count and verification time) of the final codebase.
 
 \section{Effective design of contracts}
 
@@ -76,37 +76,81 @@ This work led to the identification of some bugs, inefficiencies and missing cap
 
 Katamaran's executor is itself verified to be correct, so naturally we didn't run into any soundness bug. However, there were some issues with the wrong error being reported in certain cases, regressions where previously working proofs generated errors after an improvement to the solver, and subtle mistakes in the generated \usail, stemming \eg from \usail's bitvector concatenation's arguments being reversed with respect to Sail's.
 
-\section{Code size}
+\section{Code size and compilation time}
 
-\Cref{tab:cloc} counts the number of significant lines of code of the main parts of the \msp verification. They are in the same range as the case studies discussed in \cite{Huyghebaert2023}.
-
-Most of \texttt{Base.v} and \texttt{Machine.v} were initially generated and then updated as needed. Counting with \texttt{diff -y -{}-suppress-common-lines <file-1> <file-2> | wc -l}, the current version of \file{Base.v} differs by 85 lines from one generated from the current version of the Sail specification, and the number rises to \(3\,228\) for \file{Machine.v}; note though that the latter includes changes in generated identifiers and comment.
-
-There are only 9 lines of non-trivial proofs in \file{Contracts.v} (with 2-3 tactics per line) and 3 in \file{BlockVer/}. More manual proofs were initially needed, but were then deleted after Katamaran was updated to solve the corresponding verification conditions automatically.
-
-The core of the IPE implementation has 139 significant lines of code, plus around a dozen of changes to the rest of the specification.
+\Cref{tab:cloc} counts the number of significant lines of code of the main parts of the \msp verification.
 
 \begin{table}[tb]
   \centering
-  \begin{tabular}{lll} \toprule
-    File & Content & Lines \\ \midrule
-    \file{Base.v}, \file{Machine.v} & \usail model & \(11\,236\) \\
-    \file{BlockVer/} & bootcode blocks verification & 844 \\
-    \file{Contracts.v} & universal contract verification & 753 \\
-    \file{Sig.v} & custom predicates & 95 \\ \midrule
-    \file{msp430-ipe-sail/} & Sail model (without tests) & 1187 \\ \bottomrule
+  \begin{minipage}{\linewidth}
+  \renewcommand\footnoterule{}
+  \begin{tabular}{llr}
+    \toprule
+    Component                         & Files                           & Lines       \\
+    \midrule
+    Sail model (without tests)      & \file{msp430-ipe-sail/}         & \(1\,187\)  \\
+    \usail model                    & \file{Base.v}, \file{Machine.v} & \(11\,236\) \\
+    \midrule
+    universal contract verification & \file{Contracts.v}              & 753         \\
+    bootcode blocks verification    & \file{BlockVer/}                & 844         \\
+    custom predicates               & \file{Sig.v}                    & 95          \\
+    \midrule
+    Iris model\footnote{Including soundness statements of the universal contract and symbolic executor.}
+    &
+      \begin{tabular}{l}
+        \file{IrisModel.v}, \file{IrisInstance.v}, \file{Model.v},\\
+        \file{LoopVerification.v}, \file{BlockVer/Verifier.v}
+      \end{tabular}
+    & 336 \\
+    End-to-end result & \file{Bootcode.v} & 1011 \\
+    \bottomrule
   \end{tabular}
+  \end{minipage}
   \caption{Lines of code of various parts of the project, excluding whitespace and comments, as computed by the \texttt{cloc} utility.}
   \label{tab:cloc}
 \end{table}
 
+Some observations:
+\begin{itemize}
+\item Most of \texttt{Base.v} and \texttt{Machine.v} were initially generated and then updated as needed. Counting with \texttt{diff -y -{}-suppress-common-lines <file-1> <file-2> | wc -l}, the current version of \file{Base.v} differs by 85 lines from one generated from the current version of the Sail specification, and the number rises to \(3\,228\) for \file{Machine.v}; note though that the latter includes changes in generated identifiers and comment.
 
-TODO verification time
-CPU time
-Base 23s
-Machine 44s
-Contracts 10m
+\item A direct comparison with the size of the previous Katamaran case studies is difficult, as both the MinimalCaps and RISC-V PMP used handwritten \usail specifications, respectively \(1\,096\) and \(2\,025\) lines long. MinimalCaps also has a Sail model which is 571 lines long; from all this we could extrapolate that \msp's ISA is 0.5--2× \(\times\) the size of the simplified version of RISC-V PMP.
 
-Iris model
+\item There are only 9 lines of non-trivial proofs in \file{Contracts.v} (with 2-3 tactics per line) and 3 in \file{BlockVer/}. More manual proofs were initially needed, but were then deleted after Katamaran was updated to solve the corresponding verification conditions automatically.
+
+\item The core of the IPE implementation has 139 significant lines of code, plus around a dozen of changes to the rest of the specification.
+\end{itemize}
+
+Finally, \cref{tab:times} reports on the compilation/verification times.
+
+\begin{table}[tbh]
+  \centering
+  \begin{tabular}{lr}
+    \toprule
+    Component & Time (s) \\
+    \midrule
+    \usail model & 67 \\
+    universal contract verification & 316 \\
+    bootcode blocks verification & 219 \\
+    Iris model and end-to-end result & 248 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Compilation time of various parts of the project.}
+  \label{tab:times}
+\end{table}
+
+
+% Base 23s
+% Machine 44s
+% Contracts 316
+% Spec 15s
+% Verifier 13
+% bootcodeblocks 3m11s
+% irismodel 4
+% irisintance 9
+% model 7
+% loopverification 6
+% bootcode 3m42
+
 
 %  we found the general structure of the proof to carry over well from riscvpmp, so maybe framework could help

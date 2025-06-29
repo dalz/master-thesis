@@ -63,7 +63,7 @@ The user can freely choose the location of the IPE structure, but is expected to
 \subsection{Security}
 \label{sec:ipe-attacks}
 
-As demonstrated by \cite{Bognar2024}, current implementations of IPE are vulnerable to a number of attacks, both architectural and via side-channels. These attacks assume an attacker that can execute arbitrary untrusted code (\ie can manipulate freely unprotected memory), which is a common threat model in discussions about TEEs. % TODO citation?
+As demonstrated by \cite{Bognar2024}, current implementations of IPE are vulnerable to a number of attacks, both architectural and via side-channels. These attacks assume an attacker that can execute arbitrary untrusted code (\ie can manipulate freely unprotected memory), which is a common threat model in discussions about TEEs.
 
 Given our verification goal, of particular interest to us are the architectural attacks, which arise from inconsistencies in the ISA specification or errors in its hardware implementation. We briefly cover some of the vulnerabilities belonging to this class.
 
@@ -120,10 +120,6 @@ The IVT is always writable, even when inside the IPE boundaries. The attacker ca
 
 One official document \cite{slaa685} suggests disabling interrupts during execution of IPE code to avoid this issue. However, there is no way to disable non-maskable interrupts, and the lack of well-defined entry points allows the attacker to jump over the code that disables the maskable interrupts.
 
-% \subsection{Takeaways?}
-
-% we'll want to prove that call can't modify and jumps are only allowed to the entry point
-
 \section{Formal specification of ISAs}
 \label{sec:formal-isa}
 
@@ -138,7 +134,7 @@ Texas Instruments does not provide an official formal specification for the \msp
 
 Sail \cite{Armstrong} is a language designed for the purpose of specifying ISAs. Its tooling can generate emulators (by translation to C or OCaml) and definitions for theorem provers (\eg Rocq and Lem) to reason about the ISA.
 
-Sail specifications are tipically interpreters of the target architecture's machine code. The main function runs a fetch-decode-execute cycle that mirrors that of the hardware:
+Sail specifications are typically interpreters of the target architecture's machine code. The main function runs a fetch-decode-execute cycle that mirrors that of the hardware:
 \begin{labeling}[~--]{execute}
 \item[fetch] read from memory the word pointed to by the \reg{PC} register;
 \item[decode] parse the result of fetch (a bitvector) into a structured representation;
@@ -257,7 +253,7 @@ For an example relevant to the \msp, we could wish to express the property that 
 
 \subsection{Contracts on the Sail specification}
 
-In the above contract, \(p\) is a \msp machine program. A proof of such contract would be conducted on the semantics of the \msp ISA, which we derive from its Sail specification: the semantics of a machine code instruction is the result of evaluating the \sail{decode} and \sail{execute} functions on that instruction. We can make this explicit in our contracts:
+In the above contract \(p\) is a \msp machine program. Its proof would be conducted on the semantics of the \msp ISA, which we derive from its Sail specification: the semantics of a machine code instruction is the result of evaluating the \sail{decode} and \sail{execute} functions on that instruction. We can make this explicit in our contracts:
 \[ \hoarem
   {\begin{aligned}
     &\text{memory contains \(p\) starting from PC} \\

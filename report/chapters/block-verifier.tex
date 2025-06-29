@@ -5,13 +5,13 @@ In the previous chapter we seeked assurance that the ISA specification upholds i
 
 Katamaran's infrastructure for semi-automatic verification of \usail code can be repurposed to prove properties about known assembly programs. Essentially this amounts to running the symbolic executor on the \sail{execute} function, with its argument constrained to a concrete instruction. One after another, each of the program's instructions is executed under a precondition derived from the previous postcondition.
 
-In this chapter we illustrate this process on the bootcode that is shipped with the \msp microcontrollers, showing that it configures the IPE registers correctly.
+In this and the next chapter we illustrate this process on a reverse engineered version \cite{Bognar2025} of the bootcode that is shipped with the \msp microcontrollers, showing that it configures the IPE registers correctly.
 
 \section{\texorpdfstring{\msp}{MSP430} bootcode}
 
 The purpose of the bootcode was already explained in \cref{sec:bootcode}. As a reminder, its main job is to read the IPE configuration from persistent memory, perform an integrity check, and either update the IPE registers or erase the memory in case it detects corruption.
 
-The source code of the bootcode is proprietary, but was recently reverse-engineered as part of the openIPE project \cite{Bognar2025}; most of it can be seen in \cref{lst:bootcode}.
+The source code of the bootcode is proprietary, but was recently reverse engineered as part of the openIPE project \cite{Bognar2025}; most of it can be seen in \cref{lst:bootcode}.
 % We will discuss the various parts as we state the properties we want to prove on them.
 
 \begin{lstlisting}[
@@ -349,7 +349,7 @@ This property will hold for arbitrary values of some variables, notably the conf
 \subsection{Bootcode start}
 
 \begin{minted}{coq}
-  Definition contract_start_bootcode : BlockVerifierContract :=
+  Definition scontract_start_bootcode : BlockVerifierContract :=
     {{
           asn_init_pc start_bootcode_start
         ∗ asn_ipe_registers_init
@@ -385,7 +385,7 @@ This block can be verified automatically and without relying on any supporting c
 \subsection{Saving the ISP}
 
 \begin{minted}{coq}
-  Definition contract_transfer_if_valid_struct : BlockVerifierContract :=
+  Definition scontract_transfer_if_valid_struct : BlockVerifierContract :=
     {{
           asn_init_pc transfer_if_valid_struct_start
 
@@ -444,7 +444,7 @@ Automatic, with the help of a contract for the \sail{xor_inst} function that imp
 \subsection{Writing the IPE registers}
 
 \begin{minted}{coq}
-  Definition contract_evaluate_struct : BlockVerifierContract :=
+  Definition scontract_evaluate_struct : BlockVerifierContract :=
     {{
          asn_init_pc evaluate_struct_start
 
@@ -490,7 +490,7 @@ The contract is straightforward. We assume ownership of register \reg{R6} with t
 Katamaran leaves a verification condition that essentially amounts to proving that \coq{v = bv.app (bv.take 8 v) (bv.drop 8 v)}\footnote{\coq{bv.app} is bitvector concatenation, \coq{drop} discards the first 8 (least significant) bits and \coq{take} all but the first 8.}, which is achieved with the following proof script:
 
 \begin{minted}{coq}
-  Lemma valid_evaluate_struct : ValidBlockVerifierContract contract_evaluate_struct.
+  Lemma valid_evaluate_struct : ValidBlockVerifierContract scontract_evaluate_struct.
   Proof.
     symbolic_simpl.
     intuition;
@@ -504,5 +504,7 @@ Incidentally, initially the verification was failing because of a mistake in the
 This bug would have gone unnoticed if we limited ourself to testing, as the high byte of \reg{MPUIPC0} is reserved for future extensions---meaning that the bug is not observable now but could have caused problems in the future.
 
 \section{Summary}
-TODO
-% scaffolding
+
+In this chapter we examined how Katamaran's symbolic executor can be applied to the verification of contracts on linear assembly code. The challenge may appear trivial considering the size and simplicity of the basic blocks, but it is worth reminding that we are proving properties of thousands of lines of \usail code, and not on an abstract model of the assembly language semantics.
+
+The basic block contracts are not finished results by themselves, but rather basic ingredients of proofs that certain properties hold after boot; the next chapter shows how to apply them.

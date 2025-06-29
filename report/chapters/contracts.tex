@@ -143,7 +143,7 @@ IPE as designed and implemented is susceptible to code reuse attacks (\cref{sec:
 
 An advantage of the entry point not being the first protected address is that it's not possible to accidentally ``fall through'' to the IPE region when executing the instruction immediatly preceding the lower boundary.
 
-Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:dispatch}, where an identifier for the trusted function to call is written to \reg{R4}.
+Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:dispatch}, where an identifier for the trusted function to call is written to \reg{R4}.\footnote{A more fleshed out implementation can be found at \url{https://github.com/martonbognar/ipe-exposure/blob/main/05_framework/framework/libipe/stubs/ipe-protected.s\#L84}}
 
 \begin{lstlisting}[
   language=asm,
@@ -162,7 +162,7 @@ Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:di
       ...
 \end{lstlisting}
 
-To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \sail{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. The base model has no function that is called sistematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
+To implement this check, whenever the PC is modified we call \sail{check_ipe_access} with the \sail{jump} parameter set to \sail{true} (\cref{lst:check_ipe_access}). The check then passes only if the code performing the jump has access to the target address \circref{cia-enabled}\circref{cia-unprotected}\circref{cia-trusted}, or if the target is the IPE entry point \circref{cia-jump}. The base model has no function that is called systematically to modify registers (unlike \sail{writeMem} for memory), and Sail doesn't support implicit setters, so we need to carefully cover every change of PC. This includes direct assignments to the \sail{PC_reg} \sail{register} and the \sail{writeReg} function, that writes to a register given its symbolic name (a variant of the enum \sail{Register}).
 
 \subsubsection{Ensuring proper PC modification order}
 \label{sec:pc-mod-order}
@@ -189,7 +189,7 @@ The most significant omission is interrupt handling, which is an essential compo
 
 Katamaran works with \usail, a subset of Sail embedded in Rocq. We were able to generate a \usail version of the specification using the conversion tool provided by Katamaran,\footnote{\url{https://github.com/katamaran-project/sail-backend/}} after removing uses of features not supported by the core calculus.
 
-In particolar, we needed to:
+In particular, we needed to:
 \begin{itemize}
 \item Remove uses of the vector type and bitfields. Vectors are homogeneous static arrays; they were used to represent the MPU register file (instead of a number of different \sail{register}s) to simplify the implementation of unaligned word accesses. Bitfields are a convenience feature that allows naming certain bits and ranges in a bitvector for ease of reference.
 
@@ -240,7 +240,7 @@ but more complex representations could be used to model features such as memory-
   \label{lst:coq-ast}
 \end{listing}
 
-In \file{Machine.v} we find the \usail specification proper. See \cref{lst:translation-example} for an example of a \usail function definition contained in \file{Machine.v}. Here we also declare the foreign functions and lemmas used in the specification. % TODO maybe put them here?
+In \file{Machine.v} we find the \usail specification proper. See \cref{lst:translation-example} for an example of a \usail function definition contained in \file{Machine.v}. Here we also declare the foreign functions and lemmas used in the specification.
 
 \begin{listing}
   \begin{lstlisting}[language=sail]
@@ -600,7 +600,7 @@ The utility of \coq{ptstomem} is established by the foreign function contracts f
 
 In our initial presentation of the universal contract, \sail{execute} received ownership of a subset of memory via \pred{accessible\_addresses} (\cref{fig:aux-preds}), defined by a separating conjunction over the set of untrusted addresses. Providing the symbolic executor with tens of thousands of \coq{ptstomem} chunks is unreasonable; an implicit representation of said separating conjunction is called for here.
 
-The idea is to have a spatial predicate, \coq{accessible_addresses}, represent the whole untrusted memory. When we need to access a location, we extract the corresponding \coq{ptstomem} chunk from \coq{accessible_addresses}, transforming the latter into an \linebreak \coq{accessible_addresses_without} predicate. This is necessary to avoid extracting the same \coq{ptstomem} multiple times, which would be unsound.\footnote{Remember that \coq{ptstomem} represents \emph{exclusive} ownership; in separation logic \(\ell \ptom v \ast \ell \ptom v\) entails falsehood.} \coq{accessible_addresses_without} can later be recombined with the extracted chunk to regain full ownership of untrusted memory.
+The idea is to have a spatial predicate, \coq{accessible_addresses}, represent the whole untrusted memory. When we need to access a location, we extract the corresponding \coq{ptstomem} chunk from \coq{accessible_addresses}, transforming the latter into an \linebreak \coq{accessible_addresses_without} predicate. This is necessary to avoid extracting the same \coq{ptstomem} multiple times, which would be unsound.\footnote{Recall that \coq{ptstomem} represents \emph{exclusive} ownership; in separation logic \(\ell \ptom v \ast \ell \ptom v\) entails false.} \coq{accessible_addresses_without} can later be recombined with the extracted chunk to regain full ownership of untrusted memory.
 
 \Cref{lst:accessible_addresses} shows the definition of the two predicates in Katamaran. \coq{accessible_addresses} takes two parameters, the IPE boundaries; it will grant access to addresses outside of them. \coq{accessible_addresses_without} takes an additional parameter, the address that has been extracted. % TODO precise with no outputs?
 
@@ -881,8 +881,6 @@ The contracts for \sail{read_indexed}, \sail{read_indirect} and \sail{read_autoi
 \Cref{lst:read_indexed} shows the contract for \sail{read_indexed}. Proving it guarantees that indexed-mode reads from untrusted code cannot access protected memory, since we only give access to unprotected addresses in the precondition. The PC is incremented by the fetch, so the postcondition returns its chunk with an unknown value. We could assert that it is the original PC plus two, but this information is not needed in the proof of the universal contract. On the other hand we need to know that the new PC still belongs to the untrusted region; this is instrumental in composing contracts when multiple auxiliary functions are called to execute a single instruction. For example, a move with indexed-mode source and register-mode destination will first invoke \sail{read_indexed} and then \sail{write_register}, the latter requiring that the PC be untrusted.
 
 It is not obvious that the update performed by \sail{read_indexed} actually keeps the PC in the untrusted region, since the checks admit setting it to the entry point as well. This is true by a combination of our approximation of \coq{asn_untrusted}, that treats the first 8 bytes of the IPE region as trusted (see \cref{sec:target-properties}), and the fact that the 9th byte is the only allowed entry point.\footnote{Meaning that an exception is thrown if the PC enters the IPE region at any other address, and the postcondition is required to hold only for normally terminating programs, so the contract is satisfied in those cases.} It is then impossible to get to the entry point \(\reg{MPUIPSEGB1} \ll 4 + 8\) by adding 2 to the PC, which is either less than \(\reg{MPUIPSEGB1} \ll 4\) or at least \(\reg{MPUIPSEGB2} \ll 4\) with \(\reg{MPUIPSEGB1} < \reg{MPUIPSEGB2}\). Without the approximation it would be possible to start execution from \(\reg{MPUIPSEGB1} \ll 4 + 6\) and reach the entry point after the indexed read, forcing us to extend \sail{write_register}'s contract to cover the case of execution from trusted code as well. This would be a significant complication that doesn't net us any gain as far as the security property we prove is concerned.
-
-% TODO figure?
 
 It should be noted that \sail{write_register}'s postcondition does not guarantee that the PC is untrusted---it can't, since the user can set it to an arbitrary value, including the IPE entry point. This is not problematic: within the execution of a single instruction, \sail{write_register} is always the last auxiliary function with a contract to be called, so we don't need to satisfy any other precondition involving PC being untrusted after that.
 

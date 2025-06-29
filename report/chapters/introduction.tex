@@ -19,10 +19,11 @@ Verification of these specifications is generally performed with the aid of a th
 % Such proofs, if developed manually, require a large time investment and are not robust to changes to the ISA. Fortunately, (semi-)automated verification is feasible in this space, as demostrated by tools like \intro{Katamaran} \cite{Huyghebaert2023}.
 
 
-The objective of this thesis is to apply Katamaran to a real-world architecture, namely Texas Instruments' \msp, proving that its ISA properly ensures integrity and confidentiality of data in the presence of a simple memory protection mechanism.
+The objective of this thesis is to apply Katamaran to a real-world architecture, namely Texas Instruments' \msp, proving that its ISA properly ensures integrity and confidentiality of code data in the presence of a simple memory protection mechanism.
 
-\paragraph{Contributions}
-We claim the following contributions:
+% \paragraph{Contributions}
+\noindent
+We claim the following original contributions:
 \begin{itemize}
 \item a model of the \msp's security features in the Sail specification language;
 \item a formal statement of the security guarantees of the ISA as a universal contract;
@@ -31,10 +32,8 @@ We claim the following contributions:
 \end{itemize}
 
 \paragraph{Structure of the thesis}
-
 % The rest of the thesis is structured as follows.
-\Cref{ch:background} introduces the \msp microcontrollers, universal contracts as a means of specifying security properties of ISAs, and Katamaran. Chapters \ref{ch:contracts} and \ref{ch:block-verifier} contain our original contributions: the definition and verification of a universal contract for the \msp in the former, and verification of the \msp's bootcode in the latter. \Cref{ch:evaluation} reports on the experience of using Katamaran. \Cref{ch:related-work} surveys other approaches to ISA verification and compares them against ours. Finally, \cref{ch:conclusions} highlights the limitations of our result and sketches future directions toward a full security guarantee.
+\Cref{ch:background} introduces the \msp microcontrollers, universal contracts as a means of specifying security properties of ISAs, and Katamaran. The subsequent three chapters contain our original contributions: the definition and verification of a universal contract for the \msp in \cref{ch:contracts}, verification of the \msp's bootcode in \cref{ch:block-verifier}, and an end-to-end result for the whole system in \cref{ch:end-to-end}. \Cref{ch:evaluation} reports on the experience of using Katamaran. \Cref{ch:related-work} surveys other approaches to ISA verification and compares them against ours. Finally, \cref{ch:conclusions} highlights the limitations of our result and sketches future directions toward a full security guarantee.
 
 \paragraph{Acknowledgements}
-
 The present work was conducted under the supervision of \prof Dominique Devriese, \dr Steven Keuchel, \dr Marton Bognar and Sander Huyghebaert, in the DistriNet research group at KU Leuven.
