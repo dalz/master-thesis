@@ -49,7 +49,7 @@ Untrusted code can disable the protections by causing a BOR and unsetting \regbi
 
 The bootcode shipped with the \msp microcontrollers can read an IPE configuration from memory and apply it before any user code is executed.  It proceeds as follows:
 \begin{enumerate}
-\item Checks whether the user enabled this feauture by writing \hex{AAAA} to location \addr{FF88} (\intro{IPE Signature 1}). If not, skips the following steps.
+\item Checks whether the user enabled this feature by writing \hex{AAAA} to location \addr{FF88} (\intro{IPE Signature 1}). If not, skips the following steps.
 \item Reads the \intro{IPE structure pointer}[ISP] from location \addr{FF8A} (\intro{IPE Signature 2}). The user should have written the IPE configuration to the memory pointed to by the ISP, in the following format: three words for the values of \reg{MPUIPC0}, \reg{MPUIPSEGB2}, \reg{MPUIPSEGB1}; a word-size check code (odd bit-interleaved parity).
 \item Stores the ISP in protected non-volatile memory.
 \item Computes parity of the IPE structure to detect corruption. Initiates a full erase of memory if the computed parity isn't consistent with the check code, minimizing the likelihood of memory corruption causing exposure of protected data.
@@ -58,7 +58,7 @@ The bootcode shipped with the \msp microcontrollers can read an IPE configuratio
 
 Since the IPE Signature may not be protected by IPE, reading it at each boot lets the attacker change the IPE settings by overwriting the signature and rebooting. Therefore, on subsequent execution (recognized by the fact that the saved ISP is not null) the IPE Signature is not read. Regardless of its value, the structure pointed to by the saved ISP is checked for parity and used to initialize the registers.  To revert to the first-boot behavior, a special full-erase sequence must be performed through the JTAG interface.
 
-The user can freely choose the location of the IPE structure, but is expected to place it within the IPE boundaries---particularly in the first 8 bytes, that are protected but not considered trusted code---to prevent it from being overwritten by attacker code. Overall, this affords trusted code the flexibility to change the protected range across reboots (which would not be possible if locking was truly permanent) in a secure manner.
+The user can freely choose the location of the IPE structure, but is expected to place it within the IPE boundaries---particularly in the first 8 bytes, that are protected but not considered trusted code---to prevent it from being overwritten by attacker code. Overall, this affords trusted code the flexibility to change the protected range across reboots (which would not be possible if locking was truly permanent) securely.
 
 \subsection{Security}
 \label{sec:ipe-attacks}
@@ -70,8 +70,7 @@ Given our verification goal, of particular interest to us are the architectural 
 \subsubsection{Controlled call corruption}
 \label{sec:call-corruption}
 
-The \msp architecture provides a \asm{call} \emph{dst} instruction that saves the current \intro{program counter}[PC] to the stack, whose top element is pointed to by the \reg{SP} register, and jumps to \emph{dst}. IPE's permission checks are implemented erroneusly for this instruction, opening the way for an attack (\cref{lst:call-corruption}):
-
+The \msp architecture provides a \asm{call} \emph{dst} instruction that saves the current \intro{program counter}[PC] to the stack, whose top element is pointed to by the \reg{SP} register, and jumps to \emph{dst}. IPE's permission checks are implemented erroneously for this instruction, opening the way for an attack (\cref{lst:call-corruption}):
 \begin{lstlisting}[
   language=asm,
   float=htb, label=lst:call-corruption,
@@ -80,7 +79,6 @@ The \msp architecture provides a \asm{call} \emph{dst} instruction that saves th
   mov #protected, SP
   call #ipefunc
 \end{lstlisting}
-
 \begin{enumerate}
 \item an address (\asm{protected}) contained in the IPE region is written to \reg{SP}, which can be manipulated like a general purpose register;
 \item a \asm{call} is performed to a trusted function (\ie to an address \asm{ipefunc} within the IPE boundaries).
@@ -182,7 +180,7 @@ As an example, a function that repeats a bitvector some number of times could ha
 \end{description}
 So the return type of \sail{replicate_bits(4, 0b0101)} is \sail{bits(16)}.
 
-Dependent types can be elimininated through monomorphization when exporting to a target that doesn't support them, such as Lem and Isabelle/HOL.
+Dependent types can be eliminated through monomorphization when exporting to a target that doesn't support them, such as Lem and Isabelle/HOL.
 
 % type variables can be used in expressions but non freca
 
@@ -328,7 +326,7 @@ Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verificat
   \label{fig:katamaran}
 \end{figure}
 
-\Cref{fig:katamaran} shows the components of a mechanized proof based on Katamaran. First of all, the user needs to provide a \usail (a subset of Sail embedded in Rocq) model of the ISA and the contracts they want to prove. Katamaran's symbolic executor then runs the object code of the contracts under the given preconditions and checks that the postconditions match. If it cannot prove that they do or don't, it leaves some \intro{verification conditions}[VCs] that the user can inspect and verify manually using Rocq's tactic language.
+\Cref{fig:katamaran} shows the components of a mechanized proof based on Katamaran. Firstly, the user needs to provide a \usail (a subset of Sail embedded in Rocq) model of the ISA and the contracts they want to prove. Katamaran's symbolic executor then runs the object code of the contracts under the given preconditions and checks that the postconditions match. If it cannot prove that they do or don't, it leaves some \intro{verification conditions}[VCs] that the user can inspect and verify manually using Rocq's tactic language.
 
 The symbolic executor can only reason about \usail code. For all foreign functions used in the model a specification must be provided. Whenever the foreign function is called, its contract will be applied to determine the effects of the call.
 

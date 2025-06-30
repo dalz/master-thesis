@@ -9,7 +9,7 @@ The first contribution of this thesis is a mechanized proof of the security prop
 \item proving them with the help of Katamaran's symbolic executor.
 \end{enumerate}
 
-Due to the vulnerabilities covered in \cref{sec:ipe-attacks}, it would be impossible to successfully verify IPE's security on a faithful model of the \msp; the inteded security guarantees do not hold there. Rather, we will work on a specification that fixes the faults in IPE's design that are exploited in the attacks. Our work should then tell us that there are no additional undiscovered vulnerabilities.
+Due to the vulnerabilities covered in \cref{sec:ipe-attacks}, it would be impossible to successfully verify IPE's security on a faithful model of the \msp; the intended security guarantees do not hold there. Rather, we will work on a specification that fixes the faults in IPE's design that are exploited in the attacks. Our work should then tell us that there are no additional undiscovered vulnerabilities.
 
 The code discussed in this and the next chapter is available at \url{https://github.com/dalz/master-thesis/}.
 
@@ -141,7 +141,7 @@ We again hook into \sail{readMem} and \sail{writeMem} to call \sail{check_ipe_ac
 
 IPE as designed and implemented is susceptible to code reuse attacks (\cref{sec:code-reuse}). In our model we instead define a single entry point, the ninth byte in the IPE region---just after the space dedicated to the IPE configuration structure (\cref{sec:bootcode}). Changing the PC to point to a protected address constitutes an IPE violation if the code performing the change is untrusted (\ie the previous value of PC was outside the protected region).
 
-An advantage of the entry point not being the first protected address is that it's not possible to accidentally ``fall through'' to the IPE region when executing the instruction immediatly preceding the lower boundary.
+An advantage of the entry point not being the first protected address is that it's not possible to accidentally ``fall through'' to the IPE region when executing the instruction immediately preceding the lower boundary.
 
 Multiple entry points can be emulated with a dispatcher as shown in \cref{lst:dispatch}, where an identifier for the trusted function to call is written to \reg{R4}.\footnote{A more fleshed out implementation can be found at \url{https://github.com/martonbognar/ipe-exposure/blob/main/05_framework/framework/libipe/stubs/ipe-protected.s\#L84}}
 
@@ -533,7 +533,7 @@ In our formalization we make use of a number of spatial predicates. We will disc
 
 \subsubsection{Memory location ownership with \coq{ptstomem}}
 
-A predicate definition is comprised of name, argument types, \emph{duplicability} and \emph{preciseness}. \Cref{lst:ptstomem} shows the resource of memory locations, \coq{ptstomem}. We also define a notation \coq{l m↦ v} for easier use of the predicate and resemblance to the built-in points-to for registers.
+A predicate definition consists of name, argument types, \emph{duplicability} and \emph{preciseness}. \Cref{lst:ptstomem} shows the resource of memory locations, \coq{ptstomem}. We also define a notation \coq{l m↦ v} for easier use of the predicate and resemblance to the built-in points-to for registers.
 
 The \msp's memory is byte addressable, so the argument \coq{l} is an address (16 bits in our model) and \coq{v} a bitvector of length 8. Predicates that represent exclusive ownership of a resource, including \coq{ptstomem}, are not duplicable. This means that if a contract specifies a \coq{ptstomem} in its precondition, it \emph{consumes} the resource when it is invoked: the location will not be usable anymore unless it is returned in the postcondition.
 
@@ -721,7 +721,7 @@ In practice, we defined three different contracts, each a copy of \cref{lst:univ
           term_var "dest_am"]);
 \end{minted}
 
-Moreover since most of the 16 registers of the \msp are general purpose registers with no special behavior, we restrict the choice of \coq{src_reg} and \coq{dest_reg} to a few representative cases:
+Moreover, since most of the 16 registers of the \msp are general purpose registers with no special behavior, we restrict the choice of \coq{src_reg} and \coq{dest_reg} to a few representative cases:
 \begin{minted}{coq}
   ∗ asn_is_sample_reg (term_var "src_reg")
   ∗ asn_is_sample_reg (term_var "dest_reg")

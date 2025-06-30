@@ -1,7 +1,7 @@
 \chapter{Verification of the \texorpdfstring{\msp}{MSP430} bootcode}
 \label{ch:block-verifier}
 
-In the previous chapter we seeked assurance that the ISA specification upholds its intended security properties. In this regard the universal contract (UC) is a broad statement, applicable to all code that could possibly be executed by the \msp. As such, the guarantees we are able to prove are necessarily coarse: they enable some level of reasoning about unknown and attacker-provided code, but don't come close to capturing the security characteristics of a trusted program running on the microcontroller.
+In the previous chapter we sought assurance that the ISA specification upholds its intended security properties. In this regard the universal contract (UC) is a broad statement, applicable to all code that could possibly be executed by the \msp. As such, the guarantees we are able to prove are necessarily coarse: they enable some level of reasoning about unknown and attacker-provided code, but don't come close to capturing the security characteristics of a trusted program running on the microcontroller.
 
 Katamaran's infrastructure for semi-automatic verification of \usail code can be repurposed to prove properties about known assembly programs. Essentially this amounts to running the symbolic executor on the \sail{execute} function, with its argument constrained to a concrete instruction. One after another, each of the program's instructions is executed under a precondition derived from the previous postcondition.
 
@@ -54,9 +54,9 @@ with a distinct contract set from the one used in the UC verification, and some 
 \subsection{Program representation}
 \label{sec:program-representation}
 
-The first step is to define an encoding for the assembly program taken as input by the block verifier. We could provide it with a chunk of memory containing the corresponding machine code, to be accessed with the usual \sail{fetch} and \sail{encdec} (decode) functions, and write a simple assembler to perfom the translation from a human-readable form. However, we can improve the block verifier's performance if we skip these steps and work directly with the decoded representation.
+The first step is to define an encoding for the assembly program taken as input by the block verifier. We could provide it with a chunk of memory containing the corresponding machine code, to be accessed with the usual \sail{fetch} and \sail{encdec} (decode) functions, and write a simple assembler to perform the translation from a human-readable form. However, we can improve the block verifier's performance if we skip these steps and work directly with the decoded representation.
 
-\msp instructions may be from one to three words long. For example a move with indexed-mode source and destination is encoded as three words, the former identifying the instruction and registers and the latter two being the indices. It is convenient for us to keep these packed in a single Rocq value, so we define the following datatype:
+\msp instructions may be from one to three words long. For example a move with indexed-mode source and destination is encoded as three words, the former identifying the instruction and registers and the latter two being the indices. It is convenient for us to keep these packed in a single Rocq value, so we define the following data type:
 \begin{minted}{coq}
   Inductive ast_with_args :=
   | I0 (i : ast)
@@ -105,7 +105,7 @@ This way, the list is traversed until the end, at which point the final \coq{apc
   \label{lst:sexec-block}
 \end{listing}
 
-The assertion at \circref{sexec-block-1} ensures that there are no jumps within the basic block: it fails if an instruction sets the PC to a value different than the address of the next instruction. The check is not performed for the last instruction, allowing it to branch freely.
+The assertion at \circref{sexec-block-1} ensures that there are no jumps within the basic block: it fails if an instruction sets the PC to a value different from the address of the next instruction. The check is not performed for the last instruction, allowing it to branch freely.
 
 % say something about instr_size?
 
@@ -266,7 +266,7 @@ Since the pre- and postconditions get the value of the PC, they can constrain it
 
 \section{Function contracts}
 
-In addition to the already discussed contract for \coq{decode}, we have to specify the other foreign functions---namely \coq{read_ram} and \coq{write_ram}. For them it is sufficient to reuse the specifications defined for the UC verification, see \cref{lst:read-write-foreign-contracts} for \coq{read_ram}.
+In addition to the already discussed contract for \coq{decode}, we have to specify the other foreign functions---namely \coq{read_ram} and \coq{write_ram}. For them it is sufficient to reuse the specifications defined for the UC verification; see \cref{lst:read-write-foreign-contracts} for \coq{read_ram}'s.
 
 In \cref{sec:uc-verification} we presented a number of supporting contracts that we had to introduce to aid the automated verification of the UC. There is less of a requirement for that here, since the block verifier works with known code and to some extent concrete values, with consequently reduced branching in the symbolic executor.
 
@@ -423,7 +423,7 @@ The precondition asserts ownership of the two locations between which the transf
 
 The postcondition guarantees that the transfer has been performed (\coq{saved_ptr} now contains the sample configuration address \coq{isp}) and that the PC is that of the next block, corresponding to the label \asm{check_struct}.
 
-We treat these instruction as a basic block even if they include a jump because the jump is only taken if the flag is not set, \ie never under our assumptions.
+We treat these instructions as a basic block even if they include a jump because the jump is only taken if the flag is not set, \ie never under our assumptions.
 
 \subsubsection{Proof}
 
@@ -431,7 +431,7 @@ This triple too is proved automatically and without supporting contracts.
 
 \subsection{Computing the checksum}
 
-The block starting at the \asm{check_struct} label computes the XOR of the first three words of the IPE configuration stucture and compares the result to the last word (the checksum). If the checksum matches the bootcode proceeds to the next block, otherwise a mass erase is initiated.
+The block starting at the \asm{check_struct} label computes the XOR of the first three words of the IPE configuration structure and compares the result to the last word (the checksum). If the checksum matches the bootcode proceeds to the next block, otherwise a mass erase is initiated.
 
 Our contract (not included here) simply asserts that after executing this block execution proceeds at either the \asm{evaluate_struct} or \asm{mass_erase_init} label, without specifying when each branch is taken.
 
@@ -501,7 +501,7 @@ Katamaran leaves a verification condition that essentially amounts to proving th
 
 Incidentally, initially the verification was failing because of a mistake in the Sail model. When a word was written to an IPE register, \sail{write_mpu_reg_byte} would be called on the low byte first. If the target was \reg{MPUIPC0}, whose low byte contains the \reg{MPUIPLOCK} flag, the write of the high byte would have no effect if the first write enabled locking. Since our contract for \sail{write_mpu_reg_byte} requires the IPE registers to be unlocked we weren't able to satisfy its precondition.
 
-This bug would have gone unnoticed if we limited ourself to testing, as the high byte of \reg{MPUIPC0} is reserved for future extensions---meaning that the bug is not observable now but could have caused problems in the future.
+This bug would have gone unnoticed if we limited ourselves to testing, as the high byte of \reg{MPUIPC0} is reserved for future extensions---meaning that the bug is not observable now but could have caused problems in the future.
 
 \section{Summary}
 

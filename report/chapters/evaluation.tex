@@ -13,7 +13,7 @@ Other times the security property doesn't hold in some edge cases (\eg in the pr
 
 It may happen that a contract \emph{would} be provable by pure symbolic execution (assuming no time constraints), but isn't if the executor takes advantage of other contracts we specified instead of unfolding function calls. In other words, the user's specification of an auxiliary function isn't sufficiently precise to carry out the caller's verification. In our case we had to go back and update \sail{write_register}'s contract to support the verification of \sail{read_autoincrement}. This was already discussed in \cref{sec:read-autoincrement-proof}, but in short \sail{write_register}'s original postcondition abstracted away some information about the PC that was later found to be necessary. Similar situations are bound to happen as the user tries to strike a balance between the strength of the properties (pushing \eg toward more complex and precise postconditions) and amenability to automated reasoning (simpler, more vague postconditions).
 
-Another key requirement for a sucessful verification is simplicity of the target code. Symbolic execution of complex functions runs into combinatorial explosion of the state space, leading to unreasonable verification times and out-of-memory errors. The needed reduction in complexity is usually achieved by means of supporting contracts that replace the unfolding of functions; there are many examples of this in \cref{sec:uc-verification}. Sometimes a change to the model is called for, particularly when a function:
+Another key requirement for a successful verification is simplicity of the target code. Symbolic execution of complex functions runs into combinatorial explosion of the state space, leading to unreasonable verification times and out-of-memory errors. The needed reduction in complexity is usually achieved by means of supporting contracts that replace the unfolding of functions; there are many examples of this in \cref{sec:uc-verification}. Sometimes a change to the model is called for, particularly when a function:
 \begin{itemize}
 \item Has a \usail translation so complex that Rocq has a hard time type-checking it. This is a consequence of the approach employed by \usail to ensure that a well-typed (according to Rocq's type system) \usail term represents a well-typed piece of Sail code, which is very slow with large typing contexts.
 \item Performs a large number of operations itself, without delegating via function calls. Such monolithic functions lack opportunities of easing the executor's workload via supporting contracts, and must either be split up into simpler procedures or possibly enhanced with some lemma invocations that implement the less trivial reasoning steps.
@@ -78,9 +78,7 @@ Katamaran's executor is itself verified to be correct, so naturally we didn't ru
 
 \section{Code size and compilation time}
 
-\Cref{tab:cloc} counts the number of significant lines of code of the main parts of the \msp verification.
-
-\begin{table}[tb]
+\begin{table}[t]
   \centering
   \begin{minipage}{\linewidth}
   \renewcommand\footnoterule{}
@@ -110,20 +108,20 @@ Katamaran's executor is itself verified to be correct, so naturally we didn't ru
   \label{tab:cloc}
 \end{table}
 
-Some observations:
+\Cref{tab:cloc} counts the number of significant lines of code of the main parts of the \msp verification. Some observations:
 \begin{itemize}
 \item Most of \texttt{Base.v} and \texttt{Machine.v} were initially generated and then updated as needed. Counting with \texttt{diff -y -{}-suppress-common-lines <file-1> <file-2> | wc -l}, the current version of \file{Base.v} differs by 85 lines from one generated from the current version of the Sail specification, and the number rises to \(3\,228\) for \file{Machine.v}; note though that the latter includes changes in generated identifiers and comment.
 
-\item A direct comparison with the size of the previous Katamaran case studies is difficult, as both the MinimalCaps and RISC-V PMP used handwritten \usail specifications, respectively \(1\,096\) and \(2\,025\) lines long. MinimalCaps also has a Sail model which is 571 lines long; from all this we could extrapolate that \msp's ISA is 0.5--2× \(\times\) the size of the simplified version of RISC-V PMP.
+\item A direct comparison with the size of the previous Katamaran case studies is difficult, as both the MinimalCaps and RISC-V PMP used handwritten \usail specifications, respectively \(1\,096\) and \(2\,025\) lines long. MinimalCaps also has a Sail model which is 571 lines long; from all this we could extrapolate that \msp's ISA is 0.5--2× the size of the simplified version of RISC-V PMP.
 
-\item There are only 9 lines of non-trivial proofs in \file{Contracts.v} (with 2-3 tactics per line) and 3 in \file{BlockVer/}. More manual proofs were initially needed, but were then deleted after Katamaran was updated to solve the corresponding verification conditions automatically.
+\item There are only 9 lines of non-trivial proofs in \file{Contracts.v} (with 2--3 tactics per line) and 3 in \file{BlockVer/}. More manual proofs were initially needed, but were then deleted after Katamaran was updated to solve the corresponding verification conditions automatically.
 
 \item The core of the IPE implementation has 139 significant lines of code, plus around a dozen of changes to the rest of the specification.
 \end{itemize}
 
 Finally, \cref{tab:times} reports on the compilation/verification times.
 
-\begin{table}[tbh]
+\begin{table}[b]
   \centering
   \begin{tabular}{lr}
     \toprule

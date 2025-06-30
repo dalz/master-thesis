@@ -87,7 +87,7 @@ We define a helper function \coq{ptsto_instrs} that given an address and a list 
 
 So far we have dealt with pieces of code with a definite end point: Sail functions that perform side effects and then return a value in \cref{ch:contracts} and finite sequences of assembly instructions in \cref{ch:block-verifier}.
 
-However that is very much \emph{not} the nature of CPUs and machine code: the Sail model specifies a fetch-decode-execute cycle that runs forever or until an exception is thrown. As such any Hoare triple on this cycle will either not be derivable, \ie because of missing ownership of required resources, or trivially true, as both non-termination and exceptions immediatly validate the triple. Either way the postcondition is not taken into account, so having it as anything other than \(\top\) is meaningless. We can refer to these degenerate triples as \intro{Hoare doubles} and use the notation \(\hoared{P}{c}\) for \(\hoare{P}{c}{\top}\).
+However, that is very much \emph{not} the nature of CPUs and machine code: the Sail model specifies a fetch-decode-execute cycle that runs forever or until an exception is thrown. As such any Hoare triple on this cycle will either not be derivable, \ie because of missing ownership of required resources, or trivially true, as both non-termination and exceptions immediately validate the triple. Either way the postcondition is not taken into account, so having it as anything other than \(\top\) is meaningless. We can refer to these degenerate triples as \intro{Hoare doubles} and use the notation \(\hoared{P}{c}\) for \(\hoare{P}{c}{\top}\).
 
 Hoare doubles are entirely suitable for the properties we are interested in. Back in \cref{sec:sep-logic-permissions} we introduced the idea---which we applied in the subsequent chapters---of verifying that a piece of code doesn't access a location by \emph{not} asserting ownership of that location in the precondition; a trivial postcondition suffices. For another example, we can prove that a readable location is never modified by using a resource that doesn't allow changing its value, the obvious choice being the usual points-to chunk wrapped in an Iris invariant.
 
@@ -357,7 +357,7 @@ The proof, which we don't include in full here, hinges on four lemmas:
       )%I -> φ.
   \end{minted}
 
-  Intuitively this tells us that any information we can derive about the final memory using the logic is true independently from it. So \texttt{\small φ} is some property of \coq{μ'} that we are able to prove in Iris. In our case \texttt{\small φ} will be \coq{μ' data_addr = [bv 0x2a]} and we will have as an hypothesis that \coq{data_addr m↦ [bv 0x2a]}; we derive the latter from the former via \coq{interp_ptsto_valid}. Then \coq{adequacy_gen} tells us that \coq{μ' data_addr = [bv 0x2a]}---a property of the pure function \coq{μ'}---is true independently of the ownership of the resource \coq{data_addr m↦ [bv 0x2a]}.
+  Intuitively this tells us that any information we can derive about the final memory using the logic is true independently of it. So \texttt{\small φ} is some property of \coq{μ'} that we are able to prove in Iris. In our case \texttt{\small φ} will be \coq{μ' data_addr = [bv 0x2a]} and we will have as an hypothesis that \coq{data_addr m↦ [bv 0x2a]}; we derive the latter from the former via \coq{interp_ptsto_valid}. Then \coq{adequacy_gen} tells us that \coq{μ' data_addr = [bv 0x2a]}---a property of the pure function \coq{μ'}---is true independently of the ownership of the resource \coq{data_addr m↦ [bv 0x2a]}.
 \end{itemize}
 The proof is structured as follows:
 \begin{minted}{coq}
@@ -393,6 +393,6 @@ Another special case is \coq{evaluate_struct}, being the last block of the bootc
 
 In this chapter we illustrated the process of proving a security property about the complete system, combining reasoning on known code via the block verifier and attacker-controlled code via the universal contract.
 
-Our proof is of a simple property---a protected location is not modified---and only covers code executed until the first jump to the IPE region. It provides the basis for the verification of more complex programs with a known trusted component: the block verifier can be applied to the IPE code too to verify that it mantains the desired invariant, and the resulting contract can be plugged into the proof in the same way as the other \coq{*_safe} lemmas.
+Our proof is of a simple property---a protected location is not modified---and only covers code executed until the first jump to the IPE region. It provides the basis for the verification of more complex programs with a known trusted component: the block verifier can be applied to the IPE code too to verify that it maintains the desired invariant, and the resulting contract can be plugged into the proof in the same way as the other \coq{*_safe} lemmas.
 
 Obtaining full assurance via a complete verification of the symbolic executor's soundness---which would involve filling in the two admitted proofs---is left as future work.
