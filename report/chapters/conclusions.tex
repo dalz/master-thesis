@@ -11,6 +11,8 @@ The contributions of this thesis, as presented in the previous chapters, are:
 \item a minimal end-to-end result about the capabilities of attacker code after boot.
 \end{itemize}
 
+We also reflected on the process of developing the proofs via Katamaran, identifying the areas in which its usability falls short and that would necessitate improvements before the tool can be more widely adopted.
+
 The universal contract guarantees that our model is not susceptible to the controlled call corruption and code reuse attacks from \cref{sec:ipe-attacks}, that are instead effective against commercially available \msp models. This suggests that formal verification can be used to \emph{in practice} improve the security of ISAs compared to industry-standard testing methodologies. % In addition, a number of bugs in our Sail model were the discovered during the verification process.
 
 We will now elaborate on the limitations of our result and outline the next steps toward a more comprehensive verification of the \msp.
@@ -25,9 +27,13 @@ The first disconnection could be easily removed if the ISA designers provided fo
 
 The latter is a matter of certifying that the physical design of the microcontroller implements the ISA faithfully. There are again multiple abstraction levels separating the two; a successful approach in obtaining a correctness guarantee would combine several tools, each specialized for a specific verification task. To start, Sail supports generation of a Verilog model from the ISA. Even if it may not be desirable to use this directly, the official (hand-designed) model of the microarchitecture could be verified against the generated one via equivalence checking \cite{Reid2016a}.
 
-Nevertheless, there is value in verifying the ISA even without rigorous results about the rest of the chain: hardware that implements a correct specification may have vulnerabilities, but hardware implementing a flawed specification will have them almost surely.
+Nevertheless, there is value in verifying the ISA even without rigorous results about the rest of the chain: hardware that implements a correct specification may have vulnerabilities,
+but if the specification is flawed it will have them almost surely.
+% but hardware implementing a flawed specification will have them almost surely.
 
-Side-channel attacks represent another significant blind spot of our work. They cannot be identified by reasoning purely about the ISA, which is by nature microarchitecture-agnostic. The notion of \intro{augmented ISA}[aISA] proposed by \cite{Ge2018} extends the architectural specification with a highly-abstracted model of the microarchitecture, and could conceivably be integrated in Sail and Katamaran or similar tools. However as of now no practical (semi-)automated verification tool supports reasoning about aISAs, and even if they did, developing a microarchitectural model of the \msp would require significant reverse-engineering effort. This puts side-channel attacks firmly out of the scope of this thesis.
+Side-channel attacks represent another significant blind spot of our work. They cannot be identified by reasoning purely about the ISA, which is by nature micro\-ar\-chi\-tec\-ture-agnostic. The notion of \intro{augmented ISA}[aISA] proposed by \cite{Ge2018} extends the architectural specification with a highly-abstracted model of the microarchitecture, and could conceivably be integrated in Sail and Katamaran or similar tools. However as of now no practical (semi-)automated verification tool supports reasoning about aISAs, and even if they did, developing a microarchitectural model of the \msp would require significant reverse-engineering effort. This puts side-channel attacks firmly out of the scope of this thesis.
+
+We also note that our universal contract ensures integrity and confidentiality of the protected region only while untrusted code is executing, and guarantees nothing once it jumps to the IPE region. End-to-end verification can fix this shortcoming for known trusted code; it is of course impossible to get the same result with arbitrary trusted code, as it has full privileges. The approach works well for most kind of integrity properties, but is harder to apply to confidentiality, as the latter requires reasoning about the influence of private data on registers and untrusted locations. In \cref{ch:end-to-end} we only stated integrity of a specific location; adapting the process to proving confidentiality with Katamaran is subject of ongoing research.
 
 \section{Future work}
 
@@ -52,4 +58,6 @@ Finally, we could focus on a concrete program running on the microcontroller and
 
 
 
-% TODO update offsets in block verifier
+% aggiungere expreience report (magari cambiare nome) ai contributi,
+% figure/table bold
+% :=

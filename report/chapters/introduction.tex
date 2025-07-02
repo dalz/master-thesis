@@ -19,7 +19,7 @@ Verification of these specifications is generally performed with the aid of a th
 % Such proofs, if developed manually, require a large time investment and are not robust to changes to the ISA. Fortunately, (semi-)automated verification is feasible in this space, as demostrated by tools like \intro{Katamaran} \cite{Huyghebaert2023}.
 
 
-The objective of this thesis is to apply Katamaran to a real-world architecture, namely Texas Instruments' \msp, proving that its ISA properly ensures integrity and confidentiality of code and data in the presence of a simple memory protection mechanism.
+The objective of this thesis is to apply Katamaran to a real-world ISA, namely Texas Instruments' \msp, proving that it properly ensures integrity and (to a lesser extent) confidentiality of data in the presence of a simple memory protection mechanism.
 
 \paragraph{Contributions}
 
@@ -27,7 +27,7 @@ Our first original contribution is the extension (around 13\% in size) of an exi
 
 We then formalize the security guarantees of the ISA as a \intro{universal contract}[UC]---a contract that applies arbitrary code---in the style of \cite{Huyghebaert2023}.
 
-We apply Katamaran to provide mechanized proofs of the UC and of the \msp bootcode's correctness. The proofs are almost entirely automated, but require breaking down the problem, finding a sufficiently abstract characterization of the security property, and employing a number of optimizations. Additionally we obtain an end-to-end result about the capabilities of an attacker after boot by combining bootcode correctness and the UC; this proofs is carried out manually in the Iris Proof Mode. The whole process follows closely the approach of \cite{Huyghebaert2023}, but has to be adapted to \msp's peculiarities.
+We apply Katamaran to provide mechanized proofs of the UC and correctness of \msp's bootcode. The proofs are almost entirely automated, but require breaking down the problem, finding a sufficiently abstract characterization of the security property, and employing a number of optimizations. Additionally we obtain an end-to-end result about the capabilities of an attacker after boot by combining UC and bootcode correctness; this proof is carried out manually in the Iris Proof Mode. The whole process follows closely the approach of \cite{Huyghebaert2023}, but is adapted to \msp's peculiarities.
 
 We also note that we identified some bugs and missing capabilities in Katamaran, which we reported and are now fixed, though this is not part of the present work.
 

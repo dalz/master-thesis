@@ -1,10 +1,12 @@
 \DocumentMetadata{
     pdfversion=2.0,
     pdfstandard=A-4,
+    pdfstandard=UA-2,
+    lang=en,
 }
 
 \documentclass[
-  % draft,
+  overfullrule,
   fontsize=12,
 ]{scrbook}
 
@@ -23,21 +25,21 @@
 
 \setmainfont{TeX Gyre Pagella}
 \setsansfont{TeX Gyre Heros}
-% \setmonofont[Instance=Regular]{Fira Code}
 % ~/.cache/texlive/texmf-var/luatex-cache/generic/names/luaotfload-names.lua.gz
 \directlua{luaotfload.add_fallback("monofb", {
+    % "firacode:mode=node",
+    % "notosansmono:mode=node;"
+    "freemono:mode=node;",
     "texgyrepagellamath:mode=node;",
-    "notosansmono:mode=node;"
-    % "firacode:mode=node;",
-    % "freemono:mode=node;",
     % "unifont:mode=node;"
 })}
-\setmonofont[RawFeature={fallback=monofb}]{Inconsolata}
+\setmonofont[RawFeature={fallback=monofb},Scale=MatchLowercase,Ligatures=TeXOff]{Inconsolata LGC}
 \setmathfont{Tex Gyre Pagella Math}
 
 % \setmainfont{Libertinus Serif}
 % \setsansfont{Libertinus Sans}
 % \setmonofont{Libertinus Mono}
+% \setmonofont[Instance=Regular]{Fira Code}
 
 \usepackage{microtype}
 % \frenchspacing
@@ -54,12 +56,9 @@
 ]{biblatex}
 \addbibresource{bibliography.bib}
 
-% TODO straight double quotes in listings
-% TODO replace some \texttt with \texttt{\small}
-
 \usepackage{listings}
 \lstset{
-  basicstyle=\small\ttfamily,
+  basicstyle=\ttfamily\lst@ifdisplaystyle\small\fi,
   columns=fullflexible,
   keepspaces=true,
   captionpos=b,
@@ -67,7 +66,7 @@
 \lstdefinelanguage{sail}{
   morekeywords={
     val,function,let,in,match,if,then,else,register,enum,mapping,bitfield,
-    union,clause,
+    union,clause,scattered,
     bool,int,bits,range,vector,
     unsigned
   },
@@ -76,9 +75,29 @@
   morestring=[b]",
 }
 \lstdefinelanguage{asm}{}
+
+\makeatletter
+\newcommand{\currentfontsize}{\fontsize{\f@size}{\f@baselineskip}\selectfont}
+\makeatother
+
 \usepackage[newfloat]{minted}
 \setminted{fontsize=\small}
+\setmintedinline{fontsize=\currentfontsize}
 \removefromtoclist[float]{lol} % https://github.com/gpoore/minted/issues/390
+
+\usepackage{float,caption}
+\floatstyle{ruled}
+\restylefloat{listing}
+\captionsetup[listing]{font=small}
+
+% adjust space around rules in ruled floats by redefining \fs@ruled from float.sty
+\makeatletter
+\renewcommand\fs@ruled{\def\@fs@cfont{\bfseries}\let\@fs@capt\floatc@ruled
+  \def\@fs@pre{\hrule height.8pt depth0pt \kern2pt\vskip0.1\baselineskip}%
+  \def\@fs@post{\vskip-0.7\baselineskip\kern2pt\hrule\relax}%
+  \def\@fs@mid{\kern2pt\hrule\kern2pt\vskip0.2\baselineskip}%
+  \let\@fs@iftopcapt\iftrue}
+\makeatother
 
 \usepackage{graphicx}
 \graphicspath{{img/}}

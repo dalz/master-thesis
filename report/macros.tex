@@ -12,7 +12,7 @@
 \newcommand*{\file}[1]{\texttt{#1}}
 \newcommand*{\reg}[1]{\texttt{\MakeUppercase{#1}}}
 \newcommand*{\regbit}[1]{\reg{#1}}
-\newcommand*{\hex}[1]{\texttt{0x#1}}
+\newcommand*{\hex}[1]{\texttt{0x\MakeUppercase{#1}}}
 \newcommand*{\addr}[1]{\hex{#1}}
 \DeclareRobustCommand{\pred}[1]{\ifmmode\mathrm{#1}\else\emph{#1}\fi}
 
@@ -41,12 +41,13 @@
 \newcommand*{\wand}{\mathrel{-\!\!\ast}}
 \DeclareMathOperator*{\bigast}{\scalerel*{\ast}{\sum}}
 
-% FIXME every (n) ref links to the first (n) def
 \usepackage{circledsteps}
+\newcounter{mycstepcnt}[cstepcnt]
+\renewcommand{\startcstep}{\stepcounter{cstepcnt}}
 \makeatletter
 \newcommand*{\circdef}[1]{
-  \refstepcounter{cstepcnt}%
-  \Circled{\arabic{cstepcnt}}%
+  \refstepcounter{mycstepcnt}%
+  \Circled{\arabic{mycstepcnt}}%
   \ltx@label{{circ:#1}}}
 \makeatother
 \newcommand{\circref}[1]{\CircledText{\small\ref{circ:#1}}}

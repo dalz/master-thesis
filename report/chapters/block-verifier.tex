@@ -5,7 +5,7 @@ In the previous chapter we sought assurance that the ISA specification upholds i
 
 Katamaran's infrastructure for semi-automatic verification of \usail code can be repurposed to prove properties about known assembly programs. Essentially this amounts to running the symbolic executor on the \sail{execute} function, with its argument constrained to a concrete instruction. One after another, each of the program's instructions is executed under a precondition derived from the previous postcondition.
 
-In this and the next chapter we illustrate this process on a reverse engineered version \cite{Bognar2025} of the bootcode that is shipped with the \msp microcontrollers, showing that it configures the IPE registers correctly.
+In this and the next chapter we illustrate this process on a reverse engineered version of the bootcode that is shipped with the \msp microcontrollers, showing that it configures the IPE registers correctly.
 
 \section{\texorpdfstring{\msp}{MSP430} bootcode}
 
@@ -14,39 +14,43 @@ The purpose of the bootcode was already explained in \cref{sec:bootcode}. As a r
 The source code of the bootcode is proprietary, but was recently reverse engineered as part of the openIPE project \cite{Bognar2025}; most of it can be seen in \cref{lst:bootcode}.
 % We will discuss the various parts as we state the properties we want to prove on them.
 
-\begin{lstlisting}[
-  language=asm,
-  float=htb, label=lst:bootcode,
-  caption={\msp bootcode from openIPE, some details omitted.}
-]
-start_bootcode:
-    tst &saved_ptr
-    jnz check_struct
+\begin{listing}[t]
+  \begin{lstlisting}[
+    language=asm,
+    aboveskip=-0.25\baselineskip,
+    belowskip=-0.25\baselineskip
+  ]
+     start_bootcode:
+         tst &saved_ptr
+         jnz check_struct
 
-transfer_if_valid_struct:
-    cmp #VALID_FLAG, &IPE_SIG_VALID_SRC
-    jnz end
-    mov &IPE_STRUCT_POINTER_SRC, &saved_ptr
+     transfer_if_valid_struct:
+         cmp #VALID_FLAG, &IPE_SIG_VALID_SRC
+         jnz end
+         mov &IPE_STRUCT_POINTER_SRC, &saved_ptr
 
-check_struct:
-    mov &saved_ptr, r6
-    mov #0xFFFF, r14
-    xor @r6+, r14
-    xor @r6+, r14
-    xor @r6+, r14
-    cmp @r6, r14
-    jnz mass_erase_init
+     check_struct:
+         mov &saved_ptr, r6
+         mov #0xFFFF, r14
+         xor @r6+, r14
+         xor @r6+, r14
+         xor @r6+, r14
+         cmp @r6, r14
+         jnz mass_erase_init
 
-evaluate_struct:
-    mov -2(r6), &MPUIPSEGB1
-    mov -4(r6), &MPUIPSEGB2
-    mov -6(r6), &MPUIPC0
-    jmp end
-\end{lstlisting}
+     evaluate_struct:
+         mov -2(r6), &MPUIPSEGB1
+         mov -4(r6), &MPUIPSEGB2
+         mov -6(r6), &MPUIPC0
+         jmp end
+  \end{lstlisting}
+  \caption{\msp bootcode from openIPE, some details omitted.}
+  \label{lst:bootcode}
+\end{listing}
 
 \section{Instantiation of the block verifier}
 
-Katamaran's component for the verification of assembly code is called the \intro{block verifier}. As the name suggests it can only be applied to basic blocks: sequences of instructions that don't contain branching but at the very end, and that don't include jump targets except to the first instruction. The contracts proved by the block verifier can then be combined with a proof in the underlying Iris model to obtain an end-to-end correctness result.
+Katamaran's component for the verification of assembly code is called the \intro{block verifier}. As the name suggests it can only be applied to basic blocks: sequences of instructions that don't contain branching but at the very end, and that don't include jump targets except to the first instruction. The contracts proved by the block verifier can then be combined with a proof in the Iris model, as will be shown in \cref{ch:end-to-end}.
 
 The block verifier is set up by providing an instance of the symbolic executor,
 with a distinct contract set from the one used in the UC verification, and some code to glue the repeated calls to \sail{execute}.
@@ -58,18 +62,21 @@ The first step is to define an encoding for the assembly program taken as input 
 
 \msp instructions may be from one to three words long. For example a move with indexed-mode source and destination is encoded as three words, the former identifying the instruction and registers and the latter two being the indices. It is convenient for us to keep these packed in a single Rocq value, so we define the following data type:
 \begin{minted}{coq}
-  Inductive ast_with_args :=
-  | I0 (i : ast)
-  | I1 (i : ast) (a : bv 16)
-  | I2 (i : ast) (a : bv 16) (b : bv 16).
+    Inductive ast_with_args :=
+    | I0 (i : ast)
+    | I1 (i : ast) (a : bv 16)
+    | I2 (i : ast) (a : bv 16) (b : bv 16).
 \end{minted}
-where \coq{ast} is the union type of decoded instructions from the Sail specification. We define shorthands such as:
+where \coq{ast} is the union type of decoded instructions from the Sail specification.
+
+\pagebreak\noindent
+We also define shorthands such as:
 \begin{minted}{coq}
-  Definition mov_ir rs i rd :=
-    I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd REGISTER_MODE) i.
+    Definition mov_ir rs i rd :=
+      I1 (DOUBLEOP MOV WORD_INSTRUCTION rs INDEXED_MODE rd REGISTER_MODE) i.
 \end{minted}
 
-We can now translate the bootcode into a list of \coq{ast_with_args} values. For example, the \asm{start_bootcode} block in \cref{lst:bootcode} is written as \coq{[tst_m R10; jnz [bv 0x4]]}. Since we lack a proper assembler, we have to compute the jump offsets by hand. Moreover the Sail model doesn't support immediate and absolute addressing modes. In the original assembly, the \asm{tst &saved_ptr} instruction uses absolute addressing to test the value stored at memory location \asm{saved_ptr} (a constant). We get the same effect with an indirect-mode read of \reg{R10}, which we assume contains \asm{saved_ptr}.
+We can now translate the bootcode into a list of \coq{ast_with_args} values. For example, the \asm{start_bootcode} block in \cref{lst:bootcode} is written as \coq{[tst_m R10; jnz [bv 0x4]]}. Since we lack a proper assembler, we have to compute the jump offsets by hand. Moreover the Sail model doesn't support immediate and absolute addressing modes. In the original assembly, the \asm{tst &saved_ptr} instruction uses absolute addressing to test the value stored at memory location \asm{saved_ptr} (a constant). We get the same effect with an indirect-mode read of \reg{R10}, which we assume to contain \asm{saved_ptr}.
 
 \subsection{Fetch-decode-execute cycle}
 
@@ -77,12 +84,11 @@ Basic blocks are executed symbolically by the \coq{sexec_block_addr} function sh
 \begin{labeling}{\circref{sexec-block-1}}
 \item[\circref{sexec-block-1}] We assert that \coq{ainstr = apc}, \ie the PC points to the first instruction of the block.
 \item[\circref{sexec-block-2}] We execute the first instruction via \coq{sexec_instruction}. After this the PC has a new value (due to jumps or the usual increment), which is bound to \coq{apc'}.
-\item[\circref{sexec-block-3}] Finally, we apply \coq{sexec_block_addr} recursively to the tail of the list, updating \coq{ainstr} to point to the second instruction (by adding the size of the first) and passing \coq{apc'} as the PC.
+\item[\circref{sexec-block-3}] Finally, we recur on % apply \coq{sexec_block_addr} recursively to
+  the tail of the list, updating \coq{ainstr} to point to the second instruction (by adding the size of the first) and passing \coq{apc'} as the PC.
 \end{labeling}
 
-This way, the list is traversed until the end, at which point the final \coq{apc} is returned. The whole computation runs within the Dijkstra monad \coq{SHeapSpec} \cite{Keuchel2022}, meaning that the result also carries information about the effect of the instructions on the heap.\footnote{More precisely, a value of type \coq{SHeapSpec A} is a function that takes a continuation and a starting heap. \coq{A} is the return type of the computation encapsulated in the \coq{SHeapSpec}. The continuation must accept a value of type \coq{A} and the heap produced by said computation; it must then return a separation logic proposition \(Q\). Given this, the \coq{HeapSpec} produces the weakest precondition of \(Q\), \ie the most general proposition \(P\) such that if \(P\) holds then \(Q\) holds after the computation is executed.} This explains the use of \coq{pure} and the bind notation \coq{⟨ _ ⟩ _  <- _}. The \texttt{θ}\(n\) are substitutions produced by the symbolic execution steps, that can be applied with \coq{persist__term} and composed with \coq{∘}.
-
-\begin{listing}[htb]
+\begin{listing}[h]
   \startcstep
   \begin{minted}[escapeinside=??]{coq}
     Fixpoint sexec_block_addr (b : list ast_with_args) :
@@ -105,13 +111,15 @@ This way, the list is traversed until the end, at which point the final \coq{apc
   \label{lst:sexec-block}
 \end{listing}
 
+This way, the list is traversed until the end, at which point the final \coq{apc} is returned. The whole computation runs within the Dijkstra monad \coq{SHeapSpec} \cite{Keuchel2022}, meaning that the result also carries information about the effect of the instructions on the heap.\footnote{More precisely, a value of type \coq{SHeapSpec A} is a function that takes a continuation and a starting heap. \coq{A} is the return type of the computation encapsulated in the \coq{SHeapSpec}. The continuation must accept a value of type \coq{A} and the heap produced by said computation; it must then return a separation logic proposition \(Q\). Given this, the \coq{HeapSpec} produces the weakest precondition of \(Q\), \ie the most general proposition \(P\) such that if \(P\) holds then \(Q\) holds after the computation is executed.} This explains the use of \coq{pure} and the bind notation \coq{⟨ _ ⟩ _  <- _}. The \texttt{θ}\(n\) are substitutions produced by the symbolic execution steps, that can be applied with \coq{persist__term} and composed with \coq{∘}.
+
 The assertion at \circref{sexec-block-1} ensures that there are no jumps within the basic block: it fails if an instruction sets the PC to a value different from the address of the next instruction. The check is not performed for the last instruction, allowing it to branch freely.
 
 % say something about instr_size?
 
 \Cref{lst:sexec-instr} shows the \coq{sexec_istruction} function called from \coq{sexec_block_addr}. It implements a fetch \circref{sexec-instr-fetch} decode \circref{sexec-instr-decode} execute \circref{sexec-instr-execute} step for a specific instruction \coq{i}. The calls to the three functions are delimited by a prologue and epilogue \circref{sexec-instr-logue} that respectively assume (\coq{produce}) and assert (\coq{consume}) ownership of the PC register and of a \coq{ptstoinstr} chunk that will soon be discussed. The prologue assumes \coq{PC ↦ a} (the address of the current instruction, as provided by \coq{sexec_block_addr}), the epilogue asserts \coq{PC ↦ an}, with \coq{an} angelically (existentially) quantified: this binds \coq{an} to the value of \reg{PC} at the end of the execution; it will differ from its initial value \coq{a}, having been incremented by \sail{fetch} and possibly updated by \sail{execute}. Finally \coq{an} is returned.
 
-\begin{listing}[htb]
+\begin{listing}[h]
   \startcstep
   \begin{minted}[escapeinside=??]{coq}
     Definition sexec_instruction (i : ast_with_args) :
@@ -121,23 +129,19 @@ The assertion at \circref{sexec-block-1} ensures that there are no jumps within 
         ⟨ θ1 ⟩ _ <- produce
                       (exec_instruction_prologue i)
                       [env].["a" ∷ _ ↦ a] ;; ?$\circdef{sexec-instr-logue}$?
-
         ⟨ θ2 ⟩ w <- evalStoreSpec
                       (sexec config inline_fuel (FunDef fetch) _)
                       [env].["unit" ∷ _ ↦ term_val ty.unit tt] ;; ?$\circdef{sexec-instr-fetch}$?
-
         ⟨ θ3 ⟩ d <- sexec_call_foreign decode
                       [env].["w" ∷ _ ↦ w] ;; ?$\circdef{sexec-instr-decode}$?
-
         ⟨ θ4 ⟩ _ <- evalStoreSpec
                       (sexec config inline_fuel (FunDef execute) _)
                       [env].["instr" ∷ _ ↦ d] ;; ?$\circdef{sexec-instr-execute}$?
-
         ⟨ θ5 ⟩ an <- angelic None _ ;;
         let a5 := persist__term a (θ1 ∘ θ2 ∘ θ3 ∘ θ4 ∘ θ5) in
         ⟨ θ6 ⟩ _ <- consume
                        (exec_instruction_epilogue i)
-                       [env].["a" ∷ _ ↦ a5].["an" ∷ _ ↦ an] ;; ?$\circref{sexec-instr-logue}$?
+                       [env].["a" ∷ _ ↦ a5].["an" ∷ _ ↦ an] ;; ?$\CircledText{\ref{circ:sexec-instr-logue}}$?
         pure (persist__term an θ6).
   \end{minted}
   \caption{Symbolic execution of a single instruction.}
@@ -146,68 +150,70 @@ The assertion at \circref{sexec-block-1} ensures that there are no jumps within 
 
 \subsection{Fetching}
 
-Even though we don't set up memory with the program we are verifying, \coq{sexec_instruction} still calls the Sail model's \sail{fetch} function to obtain the instructions to be executed. We need a way to bridge our \coq{ast_with_args list} representation of assembly code with the \sail{read_ram}-based \sail{fetch}. The solution consists in introducing a set of new resources and a couple of lemmas.
+Even though we don't set up memory with the program we are verifying, \texttt{sexec\_in\-struc\-tion} still calls the Sail model's \sail{fetch} function to obtain the instructions to be executed. We need a way to bridge our \coq{ast_with_args list} representation of assembly code with the \sail{read_ram}-based \sail{fetch}. The solution consists in introducing a set of new resources and a couple of lemmas.
 
-The first resource is \coq{ptstoinstr}, written in the notation \coq{a 'i↦' id}, where \coq{a} is an address and \coq{id} a union, which is either an instruction \coq{i} (of type \coq{ast}, union key \coq{I}) or an instruction argument \coq{d} (a word-size bitvector, union key \coq{D}). The meaning of the resource is that the location \coq{a} stores either \coq{d} or the binary encoding of \coq{i}.
+The first resource is \coq{ptstoinstr}, written in the notation \coq{a i↦ id}, where \coq{a} is an address and \coq{id} a union, which is either an instruction \coq{i} (of type \coq{ast}, union key \coq{I}) or an instruction argument \coq{d} (a word-size bitvector, union key \coq{D}). The meaning of the resource is that the location \coq{a} stores either \coq{d} or the binary encoding of \coq{i}.
 
-The instruction prologue assumed in \coq{sexec_instruction} (\cref{lst:sexec-instr}, \circref{sexec-instr-logue}) introduces a \coq{ptstoinstr} chunk for the instruction and one for each of its additional arguments, via the \coq{ptstoinstr_with_args} function shown in \cref{lst:ptstoinstr_with_args}.
-
-\begin{listing}[htb]
+\begin{listing}[t]
   \begin{minted}{coq}
-    Definition ptstoinstr_with_args {Σ} addr (i : ast_with_args) : Assertion Σ :=
-      addr i↦ term_val (ty.union Uinstr_or_data) (I (instr_without_args i))
-      ∗ match i with
-        | I0 _     => ⊤
-        | I1 _ a   => addr +' 2 i↦ term_val (ty.union Uinstr_or_data) (D a)
-        | I2 _ a b =>
-              addr +' 2 i↦ term_val (ty.union Uinstr_or_data) (D a)
-            ∗ addr +' 4 i↦ term_val (ty.union Uinstr_or_data) (D b)
-        end.
+  Definition ptstoinstr_with_args {Σ} addr (i : ast_with_args) : Assertion Σ :=
+    addr i↦ term_val (ty.union Uinstr_or_data) (I (instr_without_args i))
+    * match i with
+      | I0 _     => ⊤
+      | I1 _ a   => addr +' 2 i↦ term_val (ty.union Uinstr_or_data) (D a)
+      | I2 _ a b =>
+            addr +' 2 i↦ term_val (ty.union Uinstr_or_data) (D a)
+          * addr +' 4 i↦ term_val (ty.union Uinstr_or_data) (D b)
+      end.
   \end{minted}
   \caption{Generation of \coq{ptstoinstr} chunks from an \coq{ast_with_args}.}
   \label{lst:ptstoinstr_with_args}
 \end{listing}
 
-The next necessary step is to turn these \coq{ptstointr} chunks into \coq{ptstomem} chunks that can be used by \sail{fetch}. We do that via the \coq{open_ptsto_instr} lemma defined in \ref{lst:open_ptsto_instr}. The lemma consumes the \coq{ptstoinstr} and returns:
-\begin{itemize}
-\item two \coq{ptstomem} chunks, for the low and high byte of the instruction/argument;
-\item in case of an instruction, an \coq{encodes_instr} chunk (notation: \coq{w '≡' i}) that records the fact that the concatenation of the two bytes is the binary encoding of the instruction;
-\item in case of an argument, an \coq{instr_arg} chunk.
-\end{itemize}
+The instruction prologue assumed in \coq{sexec_instruction} (\cref{lst:sexec-instr}, \circref{sexec-instr-logue}) introduces a \coq{ptstoinstr} chunk for the instruction and one for each of its additional arguments, via the \coq{ptstoinstr_with_args} function shown in \cref{lst:ptstoinstr_with_args}.
+The next necessary step is to turn these \coq{ptstointr} chunks into \coq{ptstomem} chunks that can be used by \sail{fetch}. We do that via the \coq{open_ptsto_instr} lemma defined in \cref{lst:open_ptsto_instr}.
 
-\begin{listing}[htb]
+\begin{listing}[h]
   \begin{minted}{coq}
-    Definition lemma_open_ptsto_instr : SepLemma open_ptsto_instr :=
-      {|
-        lemma_logic_variables := [ ... ];
-        lemma_patterns        := [term_var "addr"];
-        lemma_precondition    := term_var "addr" i↦ term_var "id";
-        lemma_postcondition   :=
-          ∃ "bl", ∃ "bh",
-          ( asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
-          ∗ ( ∃ "i", (term_var "id" = term_union Uinstr_or_data Ki (term_var "i")
-                      ∗ term_var "bl" @ term_var "bh" ≡ term_var "i")
-            ∨ ∃ "d", (term_var "id" = term_union Uinstr_or_data Kd (term_var "d")
-                      ∗ term_var "bl" @ term_var "bh" = term_var "d"
-                      ∗ asn_instr_arg (term_var "d"))))
-      |}.
+   Definition lemma_open_ptsto_instr : SepLemma open_ptsto_instr :=
+     {|
+       lemma_logic_variables := [ ... ];
+       lemma_patterns        := [term_var "addr"];
+       lemma_precondition    := term_var "addr" i↦ term_var "id";
+       lemma_postcondition   :=
+         ∃ "bl", ∃ "bh",
+         ( asn_ptsto_word (term_var "addr") (term_var "bl") (term_var "bh")
+         * ( ∃ "i", (term_var "id" = term_union Uinstr_or_data Ki (term_var "i")
+                     * term_var "bl" @ term_var "bh" ≡ term_var "i")
+           ∨ ∃ "d", (term_var "id" = term_union Uinstr_or_data Kd (term_var "d")
+                     * term_var "bl" @ term_var "bh" = term_var "d"
+                     * asn_instr_arg (term_var "d"))))
+     |}.
   \end{minted}
-  \caption{Lemma to turn a \coq{ptstoinstr} into \coq{ptstomem} chunks. \coq{asn_ptsto_word a l h} is shorthand for ``\coq{a} is word-aligned and \coq{a m↦ l ∗ a +' 1 m↦ h}''.}
+  \caption{Lemma to turn a \coq{ptstoinstr} into \coq{ptstomem} chunks. \coq{asn_ptsto_word a l h} is shorthand for ``\coq{a} is word-aligned and \coq{(a m↦ l) * (a +' 1 m↦ h)}''.}
   \label{lst:open_ptsto_instr}
 \end{listing}
 
+\noindent
+The lemma consumes the \coq{ptstoinstr} and returns:
+\begin{itemize}
+\item two \coq{ptstomem} chunks, for the low and high byte of the instruction/argument;
+\item in case of an instruction, an \coq{encodes_instr} chunk (notation: \coq{w ≡ i}) that records the fact that the concatenation of the two bytes is the binary encoding of the instruction;
+\item in case of an argument, an \coq{instr_arg} chunk.
+\end{itemize}
+
 The \usail implementation of \sail{fetch} must be modified to invoke the lemma before calling \sail{readMem}, so that when \sail{read_ram} is called, the appropriate \coq{ptstomem} is on the heap. After \sail{readMem}, \sail{fetch} invokes the \coq{close_ptsto_instr} lemma, which is the same as \coq{open_ptsto_instr} but with the pre- and postcondition swapped. By doing so we go back to having a single \coq{ptstoinstr} chunk, which aids performance.
 
-The \coq{encodes_instr} resource is declared to be \emph{duplicable} so it is not consumed by \coq{close_ptsto_instr}; it stays on the heap and is used later to decode the instruction. On the other hand, \coq{instr_arg}'s only purpose is to be able to select the right branch of the disjunction in \coq{close_ptsto_instr}'s precondition. If it wasn't there, opening and then closing \coq{a i↦ I i} could yield both \coq{a i↦ I i} itself and \coq{a i↦ D w} with \coq{w ≡ i}. \coq{encodes_instr} and \coq{instr_arg} serve as tokens to ensure the choice in \coq{close_ptsto_instr} is bound to that of the previous \coq{open_ptsto_instr}.
+The \coq{encodes_instr} resource is declared to be \emph{duplicable} so it is not consumed by \coq{close_ptsto_instr}; it stays on the heap and is used later to decode the instruction. On the other hand, \coq{instr_arg}'s only purpose is to be able to select the right branch of the disjunction in \coq{close_ptsto_instr}'s precondition. If it wasn't there, opening and then closing \coq{a i↦ I i} could yield both \coq{a i↦ I i} itself and \coq{a i↦ D w * w ≡ i}. Therefore \coq{encodes_instr} and \coq{instr_arg} serve as tokens to ensure that the choice in \coq{close_ptsto_instr} is bound to that of the previous \coq{open_ptsto_instr}.
 
 \subsection{Decoding}
 \label{sec:block-verifier-decode}
 
-There are significant performance issues with trying to parse the binary representation of an instruction into the \sail{ast} union via the model's \sail{encdec} function. The way to do that would be to compute the encoding of \coq{i} in \coq{open_ptsto_instr}, and return \coq{ptstomem} chunks pointing to that instead of the existentially quantified variables \coq{bl} and \coq{bh}. The symbolic executor would then have enough information to perform the decoding with \sail{encdec}.
+There are significant performance issues with trying to parse the binary representation of an instruction
+% into the \sail{ast} union
+via the model's \sail{encdec} function. The way to do that would be to compute the encoding of \coq{i} in \coq{open_ptsto_instr}, and return \coq{ptstomem} chunks pointing to that instead of the existentially quantified variables \coq{bl} and \coq{bh}. The symbolic executor would then have enough information to perform the decoding with \sail{encdec}.
 
-This amounts to forgetting what the original instruction was and doing some work to recover this information. Performance-wise, a better approach is to remember that the word returned by \sail{fetch} is supposed to be the encoding of \coq{i}, and use this knowledge to skip the computation of \sail{encdec} if it is applied to that word. The \coq{encodes_instr} resource is meant to maintain this association. As for the decoding, it is performed by an invocation of a foreign function \sail{decode} (\cref{lst:sexec-instr}, \circref{sexec-instr-decode}) in place of \sail{encdec}. \sail{decode}'s behavior is determined by the contract shown in \cref{lst:decode}: \sail{decode(w)} returns \coq{i} if \coq{w ≡ i}.
-
-\begin{listing}[htb]
+\begin{listing}[b]
   \begin{minted}{coq}
     Definition sep_contract_decode : SepContractFunX decode :=
       {|
@@ -216,23 +222,25 @@ This amounts to forgetting what the original instruction was and doing some work
 
         sep_contract_precondition :=
             term_var "wb" = term_union Uwordbyte Kword (term_var "w")
-          ∗ term_var "w" ≡ term_var "i";
+          * term_var "w" ≡ term_var "i";
 
         sep_contract_result        := "r";
         sep_contract_postcondition := term_var "r" = term_var "i";
       |}.
   \end{minted}
-  \caption{Contract for the foreign function \coq{decode}.}
+  \caption{Contract for the foreign function \coq{decode}, which replaces \sail{encdec}.}
   \label{lst:decode}
 \end{listing}
 
-It is worth emphasizing that \sail{decode} belongs only to the block verifier's glue code, and is unused in the model itself. The downside of working around \sail{encdec} is that we cannot catch errors in the decoding logic of the ISA, but that can be verified separately if desired.
+This amounts to forgetting what the original instruction was and doing some work to recover this information. Performance-wise, a better approach is to remember that the word returned by \sail{fetch} is supposed to be the encoding of \coq{i}, and use this knowledge to skip the computation of \sail{encdec} if it is applied to that word. The \coq{encodes_instr} resource is meant to maintain this association. As for the decoding, it is performed by an invocation of a foreign function \sail{decode} (\cref{lst:sexec-instr}, \circref{sexec-instr-decode}) in place of \sail{encdec}. \sail{decode}'s behavior is determined by the contract from \cref{lst:decode}: \sail{decode(w)} returns \coq{i} if \coq{w ≡ i}.
+
+It is worth emphasizing that \coq{decode} belongs only to the block verifier's glue code, and is unused in the model itself. The downside of working around \sail{encdec} is that we cannot catch errors in the decoding logic of the ISA, but it is possible to verify its correctess separately by proving that \coq{decode} and \sail{encdec} agree.
 
 \subsection{Memory ownership}
 
-In the preconditions of the basic block contracts we will pass exactly the \coq{ptstomem} chunks that are needed for the execution of the object code. Consequently we have no need of assuming ownership of all (untrusted) memory locations with \coq{asn_accessible_addresses}, which was necessary in the UC as we were dealing with unknown programs.
+In the preconditions of the basic block contracts we will pass exactly the \coq{ptstomem} chunks that are needed for the execution of the object code. Consequently we have no need of assuming ownership of all untrusted memory locations with \texttt{asn\_ac\-ces\-si\-ble\_ad\-dresses}, which was necessary in the UC to deal with unknown programs.
 
-The \coq{extract_accessible_ptsto} and \coq{return_accessible_ptsto} are still invoked in the \usail model---it is shared between the UC verification and the block verifier---but we can give them trivial (true) preconditions and postconditions to turn them into no-ops.
+The \coq{extract_accessible_ptsto} and \coq{return_accessible_ptsto} lemmas are still invoked in the \usail model---it is shared between the UC verification and the block verifier---but we can give them \(\top\) as pre- and postconditions to turn them into no-ops.
 
 Incidentally, the same must be done for \coq{open_ptsto_instr} and \coq{close_ptsto_instr} in the UC verification, which doesn't use the \coq{ptstoinstr} resource.
 
@@ -240,27 +248,25 @@ Incidentally, the same must be done for \coq{open_ptsto_instr} and \coq{close_pt
 
 The last missing piece is a way to execute a basic block via \coq{cexec_block_addr} under a contract's precondition and to check that its postcondition holds at the end. The function \coq{cexec_triple_addr} in \cref{lst:cexec-triple} is responsible for this.
 
-% TODO fix triangles
-\begin{listing}[htb]
+The computation reads as: for all addresses of the PC/first instruction \circref{cexec-triple-a}, if the precondition holds for that address \circref{cexec-triple-pre}, then after execution of the block \circref{cexec-triple-block} the postcondition (which is given the original and new PC) holds \circref{cexec-triple-post}.
+
+\begin{listing}[H]
   \startcstep
   \begin{minted}[escapeinside=??]{coq}
     Definition cexec_triple_addr {Σ : LCtx}
-      (req : Assertion (Σ ?\(\triangleright\)? "a" ∷ ty.Address))
+      (req : Assertion (Σ ▷ "a" ∷ ty.Address))
       (b : list ast_with_args)
-      (ens : Assertion (Σ ?\(\triangleright\)? "a" ∷ ty.Address ?\(\triangleright\)? "an" ∷ ty.Address)) :
-      CHeapSpec unit
-    :=
+      (ens : Assertion (Σ ▷ "a" ∷ ty.Address ▷ "an" ∷ ty.Address))
+    : CHeapSpec unit :=
       lenv <- demonic_ctx Σ ;;
       a    <- demonic _ ;; ?$\circdef{cexec-triple-a}$?
       _    <- produce req lenv.["a" ∷ ty.Address ↦ a]  ;; ?$\circdef{cexec-triple-pre}$?
       an   <- cexec_block_addr b a a ;; ?$\circdef{cexec-triple-block}$?
       consume ens lenv.["a" ∷ ty.Address ↦ a].["an" ∷ ty.Address ↦ an]. ?$\circdef{cexec-triple-post}$?
   \end{minted}
-  \caption{Symbolic execution of a block under some precondition and verification of a postcondition.}
+  \caption{Asserting that \coq{ens} holds after symbolically executing \coq{b} under the assumption \coq{req}.}
   \label{lst:cexec-triple}
 \end{listing}
-
-The computation reads as: for all addresses of the PC/first instruction \circref{cexec-triple-a}, if the precondition holds for that address \circref{cexec-triple-pre}, then after execution of the block \circref{cexec-triple-block} the postcondition (which is given the original and new PC) holds \circref{cexec-triple-post}.
 
 Since the pre- and postconditions get the value of the PC, they can constrain it to a specific value: to the starting location of the basic block in the precondition, and to a disjunction of the possible branch targets in the postcondition. This must be done by an equality on the \coq{a} and \coq{an} variables, and not a points-to chunk: the latter would clash with the one introduced in the prologue and epilogue, always falsifying the precondition and making all postconditions provable.
 
@@ -283,39 +289,43 @@ In the end we only needed three contracts, for \sail{read_indexed}, \sail{write_
             ( term_var "pc_old" = term_val ty.wordBits [bv 0x22]
             ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x28]
             ∨ term_var "pc_old" = term_val ty.wordBits [bv 0x2E])
-          ∗ term_var "bw" = term_enum Ebw WORD_INSTRUCTION
-          ∗ term_var "reg" = term_enum Eregister R6
-          ∗ term_var "addr" = term_val ty.wordBits [bv 0x4208] (* isp + 6 *)
-          ∗ ( term_var "off" = term_val ty.wordBits (bv.of_Z (-2)%Z)
+          * term_var "bw"   = term_enum Ebw WORD_INSTRUCTION
+          * term_var "reg"  = term_enum Eregister R6
+          * term_var "addr" = term_val ty.wordBits [bv 0x4208] (* isp + 6 *)
+          * ( term_var "off" = term_val ty.wordBits (bv.of_Z (-2)%Z)
             ∨ term_var "off" = term_val ty.wordBits (bv.of_Z (-4)%Z)
             ∨ term_var "off" = term_val ty.wordBits (bv.of_Z (-6)%Z))
 
-          ∗ PC_reg         ↦ term_var "pc_old"
-          ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ ∃ "lif", LastInstructionFetch ↦ term_var "lif"
-          ∗ R6_reg ↦ term_var "addr"
+          * PC_reg         ↦ term_var "pc_old"
+          * MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+          * MPUIPSEGB1_reg ↦ term_var "segb1"
+          * MPUIPSEGB2_reg ↦ term_var "segb2"
+          * ∃ "lif", LastInstructionFetch ↦ term_var "lif"
+          * R6_reg ↦ term_var "addr"
 
-          ∗ term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
-          ∗ asn_ptsto_word (term_binop bop.bvadd (term_var "addr") (term_var "off"))
+          * term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
+          * asn_ptsto_word
+              (term_binop bop.bvadd (term_var "addr") (term_var "off"))
               (term_var "vl") (term_var "vh")
 
-          ∗ asn_not_mpu_reg_addr (term_binop bop.bvadd (term_var "addr") (term_var "off"));
+          * asn_not_mpu_reg_addr
+              (term_binop bop.bvadd (term_var "addr") (term_var "off"));
 
         sep_contract_result          := "v";
         sep_contract_postcondition   :=
-            term_var "v" = term_union Uwordbyte Kword (term_var "vl" @ term_var "vh")
+            term_var "v" = term_union Uwordbyte Kword
+                             (term_var "vl" @ term_var "vh")
 
-          ∗ PC_reg ↦ term_var "pc_old" +' 2
-          ∗ MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
-          ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-          ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
-          ∗ ∃ "lif", LastInstructionFetch ↦ term_var "lif"
-          ∗ R6_reg ↦ term_var "addr"
+          * PC_reg ↦ term_var "pc_old" +' 2
+          * MPUIPC0_reg    ↦ term_val ty.wordBits [bv 0]
+          * MPUIPSEGB1_reg ↦ term_var "segb1"
+          * MPUIPSEGB2_reg ↦ term_var "segb2"
+          * ∃ "lif", LastInstructionFetch ↦ term_var "lif"
+          * R6_reg ↦ term_var "addr"
 
-          ∗ term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
-          ∗ asn_ptsto_word (term_binop bop.bvadd (term_var "addr") (term_var "off"))
+          * term_var "pc_old" i↦ term_union Uinstr_or_data Kd (term_var "off")
+          * asn_ptsto_word
+              (term_binop bop.bvadd (term_var "addr") (term_var "off"))
               (term_var "vl") (term_var "vh");
       |}.
   \end{minted}
@@ -330,15 +340,15 @@ For example \sail{read_indexed}'s contract can assume that the address, offset, 
 
 \section{Verification of the basic blocks}
 
-We are ready to verify the bootcode's basic blocks. We will assume specific fixed values for the:
+We are ready to verify the bootcode's basic blocks. To avoid slowing down verifier excessively, we will assume specific fixed values for the:
 \begin{itemize}
 \item flag that enables copying of the IPE structure (valid),
 \item location of the IPE configuration structure (ISP, IPE Structure Pointer), and
 \item initial value of the IPE control register \reg{MPUIPC0} (zero, \ie disabled and unlocked, the latter being always the case at startup),
 \end{itemize}
-as leaving them generic slows down the verifier excessively.
 
-The guarantee we target is that executing the bootcode with these values we either end up with the configuration structure written to the IPE registers, with an IPE violation, or at the start of the mass erase routine.
+
+The guarantee we target is that after executing the bootcode with these values we either end up with the configuration structure written to the IPE registers, with an IPE violation, or at the start of the mass erase routine.
 
 This property will hold for arbitrary values of some variables, notably the configuration structure, so the confidence we gain about the bootcode's correctness is hard to replicate by testing alone.
 
@@ -348,82 +358,109 @@ This property will hold for arbitrary values of some variables, notably the conf
 
 \subsection{Bootcode start}
 
-\begin{minted}{coq}
-  Definition scontract_start_bootcode : BlockVerifierContract :=
-    {{
-          asn_init_pc start_bootcode_start
-        ∗ asn_ipe_registers_init
+The first operation performed by the bootcode is to check whether there is a saved configuration structure pointer (at \coq{saved_ptr}, a location not specified in TI's manuals, \addr{4200} in our model) from a previous boot. If that is the case, the structure is read directly from there instead of finding its location at \asm{IPE_STRUCT_POINTER_SRC} (\addr{FF8A}).
 
-        ∗ R10_reg ↦ saved_ptr
-        ∗ (asn_ptsto_word saved_ptr byte_zero byte_zero
-           ∨ asn_ptsto_word saved_ptr (low isp) (high isp))
-    }}
-      [ tst_m R10
-      ; jnz [bv 4] (* check_struct *)]
-    {{
-          R10_reg ↦ saved_ptr
-        ∗ asn_ipe_registers_init
-        ∗ (asn_ptsto_word saved_ptr byte_zero byte_zero
-             ∗ asn_fin_pc transfer_if_valid_struct_start
-           ∨ asn_ptsto_word saved_ptr (low isp) (high isp)
-             ∗ asn_fin_pc check_struct_start)
-    }}.
-\end{minted}
-
-The first operation performed by the bootcode is to check whether there is a saved configuration structure pointer (at \coq{saved_ptr}, a location not better specified in TI's manuals, \addr{4200} in our model) from a previous boot. If that is the case, the structure is read directly from there instead of finding its location at address \asm{IPE_STRUCT_POINTER_SRC} (\addr{FF8A}).
-
-Here we assume that there is either no saved pointer (\coq{saved_ptr} points to zero), or the concrete sample value \coq{isp} (which we defined to be \addr{4202}). As anticipated in \cref{sec:program-representation}, we replace the unsupported (by the model) absolute-mode addressing with indirect-mode, assuming that the location to read is stored in register \reg{R10} in this case. \coq{asn_init_pc pc} is defined as \coq{term_var "a" = pc}, where \coq{a} is \coq{sexec_instruction}'s address of the current instruction.
+In our contract for this first block (\cref{lst:start_bootcode}) we assume that there is either no saved pointer (\coq{saved_ptr} points to zero), or the concrete sample value \coq{isp} (which we defined to be \addr{4202}). As anticipated in \cref{sec:program-representation}, we replace the unsupported (by the model) absolute-mode addressing with indirect-mode, assuming that the location to read is stored in register \reg{R10} in this case. \coq{asn_init_pc pc} is defined as \coq{term_var "a" = pc}, where \coq{a} is \coq{sexec_instruction}'s address of the current instruction.
 
 Additionally, a minimal precondition is implicitly added to all contracts; it asserts ownership of some registers that are frequently used and don't need to be referred to in the contracts, for example the status register \reg{SRCG1}.
+
+\begin{listing}[h]
+  \begin{minted}{coq}
+    Definition scontract_start_bootcode : BlockVerifierContract :=
+      {{
+          asn_init_pc start_bootcode_start
+          * asn_ipe_registers_init
+
+          * R10_reg ↦ saved_ptr
+          * (asn_ptsto_word saved_ptr byte_zero byte_zero
+          ∨ asn_ptsto_word saved_ptr (low isp) (high isp))
+      }}
+        [ tst_m R10
+        ; jnz [bv 4] (* check_struct *)]
+      {{
+            R10_reg ↦ saved_ptr
+          * asn_ipe_registers_init
+          * ( asn_ptsto_word saved_ptr byte_zero byte_zero
+              * asn_fin_pc transfer_if_valid_struct_start
+            ∨ asn_ptsto_word saved_ptr (low isp) (high isp)
+              * asn_fin_pc check_struct_start)
+      }}.
+  \end{minted}
+  \caption{Contract for the \asm{start_bootcode} basic block.}
+  \label{lst:start_bootcode}
+\end{listing}
+
+\pagebreak
 
 The postcondition states that there are two possible continuations of this basic block: falling through to the \asm{transfer_if_valid_struct} label if there was no  saved pointer, or jumping to \asm{check_struct} otherwise.
 
 \subsubsection{Proof}
 
-This block can be verified automatically and without relying on any supporting contracts.
+This block can be verified automatically and without % relying on
+any \usail function contract.
 
 \subsection{Saving the ISP}
 
-\begin{minted}{coq}
-  Definition scontract_transfer_if_valid_struct : BlockVerifierContract :=
-    {{
-          asn_init_pc transfer_if_valid_struct_start
-
-        ∗ asn_ipe_registers_init
-        ∗ R10_reg ↦ saved_ptr
-        ∗ R11_reg ↦ valid_flag
-        ∗ R12_reg ↦ ipe_sig_valid_src
-        ∗ R13_reg ↦ ipe_struct_pointer_src
-
-        ∗ asn_flag_valid
-        ∗ asn_ptsto_word ipe_struct_pointer_src (low isp) (high isp)
-        ∗ asn_ptsto_word saved_ptr byte_zero byte_zero
-    }}
-      [ cmp_rm R11 R12
-      ; jnz [bv 0x7B] (* end *)
-      ; mov_mm R13 R10 ]
-    {{
-          asn_fin_pc check_struct_start
-
-        ∗ asn_ipe_registers_init
-        ∗ R10_reg ↦ saved_ptr
-        ∗ R11_reg ↦ valid_flag
-        ∗ R12_reg ↦ ipe_sig_valid_src
-        ∗ R13_reg ↦ ipe_struct_pointer_src
-
-        ∗ asn_flag_valid
-        ∗ asn_ptsto_word ipe_struct_pointer_src (low isp) (high isp)
-        ∗ asn_ptsto_word saved_ptr (low isp) (high isp)
-    }}.
-\end{minted}
-
-This block transfers the configuration structure address from \coq{ipe_struct_pointer_src} to \coq{saved_ptr}, \ie a secured location that is supposed to be safe from later modification. It is executed only when the block shown in the previous section doesn't find a saved pointer.
+This block, which can be found together with its contract on the next page (\cref{lst:transfer}), transfers the configuration structure address from \coq{ipe_struct_pointer_src} to \coq{saved_ptr}. % , \ie a secured location that is supposed to be safe from later modification.
+It is executed only when the block shown in the previous section doesn't find a saved pointer.
 
 The precondition asserts ownership of the two locations between which the transfer is performed, and also that a flag that enables the initialization of the IPE registers by the bootcode is set (\coq{asn_flag_valid}, \ie \hex{AAAA} at address \addr{FF88}).
 
 The postcondition guarantees that the transfer has been performed (\coq{saved_ptr} now contains the sample configuration address \coq{isp}) and that the PC is that of the next block, corresponding to the label \asm{check_struct}.
 
 We treat these instructions as a basic block even if they include a jump because the jump is only taken if the flag is not set, \ie never under our assumptions.
+
+\begin{listing}[htbp]
+  \begin{minted}{coq}
+    Definition scontract_transfer_if_valid_struct : BlockVerifierContract :=
+      {{
+          asn_init_pc transfer_if_valid_struct_start
+
+          * asn_ipe_registers_init
+          * R10_reg ↦ saved_ptr
+          * R11_reg ↦ valid_flag
+          * R12_reg ↦ ipe_sig_valid_src
+          * R13_reg ↦ ipe_struct_pointer_src
+
+          * asn_flag_valid
+          * asn_ptsto_word ipe_struct_pointer_src (low isp) (high isp)
+          * asn_ptsto_word saved_ptr byte_zero byte_zero
+      }}
+        [ cmp_rm R11 R12
+        ; jnz [bv 0x18] (* end *)
+        ; mov_mm R13 R10 ]
+      {{
+          asn_fin_pc check_struct_start
+
+          * asn_ipe_registers_init
+          * R10_reg ↦ saved_ptr
+          * R11_reg ↦ valid_flag
+          * R12_reg ↦ ipe_sig_valid_src
+          * R13_reg ↦ ipe_struct_pointer_src
+
+          * asn_flag_valid
+          * asn_ptsto_word ipe_struct_pointer_src (low isp) (high isp)
+          * asn_ptsto_word saved_ptr (low isp) (high isp)
+      }}.
+  \end{minted}
+  \caption{Contract for the \asm{transfer_if_valid_struct} basic block.}
+  \label{lst:transfer}
+\end{listing}
+
+\begin{listing}[p]
+  \begin{minted}{coq}
+    Lemma valid_evaluate_struct :
+      ValidBlockVerifierContract scontract_evaluate_struct.
+    Proof.
+      symbolic_simpl.
+      intuition;
+        unfold bv.app; unfold bv.take; unfold bv.drop;
+        destruct bv.appView; reflexivity.
+    Qed.
+  \end{minted}
+  \caption{Proof of the contract for the \coq{evaluate_struct} basic block.}
+  \label{lst:evaluate_struct-proof}
+\end{listing}
 
 \subsubsection{Proof}
 
@@ -440,64 +477,66 @@ This means that a bootcode implementation that ignores the checksum would also p
 \subsubsection{Proof}
 
 Automatic, with the help of a contract for the \sail{xor_inst} function that implements the \asm{xor} instruction.
+The contract is specialized for these particular uses of \asm{xor}, \eg requiring that the first argument use indexed mode.
 
 \subsection{Writing the IPE registers}
 
-\begin{minted}{coq}
-  Definition scontract_evaluate_struct : BlockVerifierContract :=
-    {{
-         asn_init_pc evaluate_struct_start
+\begin{listing}
+  \begin{minted}{coq}
+    Definition scontract_evaluate_struct : BlockVerifierContract :=
+      {{
+           asn_init_pc evaluate_struct_start
 
-       ∗ asn_ipe_registers_init
-       ∗ R6_reg ↦ isp +' 6
-       ∗ R7_reg ↦ MPUIPC0_addr
-       ∗ R8_reg ↦ MPUIPSEGB2_addr
-       ∗ R9_reg ↦ MPUIPSEGB1_addr
+         * asn_ipe_registers_init
+         * R6_reg ↦ isp +' 6
+         * R7_reg ↦ MPUIPC0_addr
+         * R8_reg ↦ MPUIPSEGB2_addr
+         * R9_reg ↦ MPUIPSEGB1_addr
 
-       ∗ asn_ptsto_word (isp +' 4) (low (term_var "segb1")) (high (term_var "segb1"))
-       ∗ asn_ptsto_word (isp +' 2) (low (term_var "segb2")) (high (term_var "segb2"))
-       ∗ asn_ptsto_word isp (low (term_var "ipectl")) (high (term_var "ipectl"))
-    }}
-      [ mov_im R6 (bv.of_Z (-2)%Z) R9
-      ; mov_im R6 (bv.of_Z (-4)%Z) R8
-      ; mov_im R6 (bv.of_Z (-6)%Z) R7
-      ; jump JMP [bv 0x69] (* end *) ]
-    {{
-         asn_fin_pc end_addr
+         * asn_ptsto_word (isp +' 4)
+             (low (term_var "segb1")) (high (term_var "segb1"))
+         * asn_ptsto_word (isp +' 2)
+             (low (term_var "segb2")) (high (term_var "segb2"))
+         * asn_ptsto_word isp
+             (low (term_var "ipectl")) (high (term_var "ipectl"))
+      }}
+        [ mov_im R6 (bv.of_Z (-2)%Z) R9
+        ; mov_im R6 (bv.of_Z (-4)%Z) R8
+        ; mov_im R6 (bv.of_Z (-6)%Z) R7
+        ; jump JMP [bv 0x6] (* end *) ]
+      {{
+           asn_fin_pc end_addr
 
-       ∗ MPUIPC0_reg    ↦ term_var "ipectl"
-       ∗ MPUIPSEGB1_reg ↦ term_var "segb1"
-       ∗ MPUIPSEGB2_reg ↦ term_var "segb2"
+         * MPUIPC0_reg    ↦ term_var "ipectl"
+         * MPUIPSEGB1_reg ↦ term_var "segb1"
+         * MPUIPSEGB2_reg ↦ term_var "segb2"
 
-       ∗ R6_reg ↦ isp +' 6
-       ∗ R7_reg ↦ MPUIPC0_addr
-       ∗ R8_reg ↦ MPUIPSEGB2_addr
-       ∗ R9_reg ↦ MPUIPSEGB1_addr
+         * R6_reg ↦ isp +' 6
+         * R7_reg ↦ MPUIPC0_addr
+         * R8_reg ↦ MPUIPSEGB2_addr
+         * R9_reg ↦ MPUIPSEGB1_addr
 
-       ∗ asn_ptsto_word (isp +' 4) (low (term_var "segb1")) (high (term_var "segb1"))
-       ∗ asn_ptsto_word (isp +' 2) (low (term_var "segb2")) (high (term_var "segb2"))
-       ∗ asn_ptsto_word isp (low (term_var "ipectl")) (high (term_var "ipectl"))
-    }} with [ ... ].
-\end{minted}
+
+         * asn_ptsto_word (isp +' 4)
+             (low (term_var "segb1")) (high (term_var "segb1"))
+         * asn_ptsto_word (isp +' 2)
+             (low (term_var "segb2")) (high (term_var "segb2"))
+         * asn_ptsto_word isp
+             (low (term_var "ipectl")) (high (term_var "ipectl"))
+      }} with [ ... ].
+  \end{minted}
+  \caption{Contract for the \asm{evaluate_struct} basic block.}
+  \label{lst:evaluate_struct}
+\end{listing}
 
 As a last step the bootcode copies the first three words at the ISP to the \reg{MPUIPC0}, \reg{MPUIPSEGB2} and \reg{MPUIPSEGB1} registers respectively, starting from the last so that the writes are performed entirely before locking is enabled by setting \reg{MPUIPC0}.
 
-The contract is straightforward. We assume ownership of register \reg{R6} with the value left by the previous block (\coq{isp + 6}), of the memory locations we are going to read (with arbitrary values), of the IPE registers, and of a few other registers storing the addresses the IPE registers are mapped to. In the postcondition the IPE registers are returned with the values read from memory.
+The contract (\cref{lst:evaluate_struct} on the back of this page) is straightforward. We assume ownership of register \reg{R6} with the value left by the previous block (\coq{isp + 6}), of the memory locations we are going to read (with arbitrary values), of the IPE registers, and of a few other registers storing the addresses the IPE registers are mapped to. In the postcondition the IPE registers are returned with the values read from memory.
 
 \subsubsection{Proof}
 \label{sec:valid_evaluate_struct}
 
-Katamaran leaves a verification condition that essentially amounts to proving that \coq{v = bv.app (bv.take 8 v) (bv.drop 8 v)}\footnote{\coq{bv.app} is bitvector concatenation, \coq{drop} discards the first 8 (least significant) bits and \coq{take} all but the first 8.}, which is achieved with the following proof script:
-
-\begin{minted}{coq}
-  Lemma valid_evaluate_struct : ValidBlockVerifierContract scontract_evaluate_struct.
-  Proof.
-    symbolic_simpl.
-    intuition;
-      unfold bv.app; unfold bv.take; unfold bv.drop;
-      destruct bv.appView; reflexivity.
-  Qed.
-\end{minted}
+Katamaran leaves a verification condition that essentially amounts to proving that \coq{v = bv.app (bv.take 8 v) (bv.drop 8 v)}\footnote{\coq{bv.app} is bitvector concatenation, \coq{drop} discards the first 8 (least significant) bits and \coq{take} all but the first 8.}, which is achieved with the proof script shown in \cref{lst:evaluate_struct-proof}.
 
 Incidentally, initially the verification was failing because of a mistake in the Sail model. When a word was written to an IPE register, \sail{write_mpu_reg_byte} would be called on the low byte first. If the target was \reg{MPUIPC0}, whose low byte contains the \reg{MPUIPLOCK} flag, the write of the high byte would have no effect if the first write enabled locking. Since our contract for \sail{write_mpu_reg_byte} requires the IPE registers to be unlocked we weren't able to satisfy its precondition.
 

@@ -18,20 +18,18 @@ In short, IPE protects a user-defined memory region from being accessed by untru
 
 The \msp has a 16-bit architecture, with some models supporting a 20-bit address space via an extended instruction set.
 
-The ISA doesn't have dedicated load and store operations, but includes a rich set of addressing modes that allow access to memory and can be used with almost all instructions. For example, \texttt{add @r4+, 2(r5)} adds the word stored at the address contained in register \reg{r4} to the word stored at the address contained in \reg{R5} plus two, stores the result in the latter location, and increments \reg{R4} by two; the indirect autoincrement mode is used for the source, the indexed mode for the destination.
+The ISA doesn't have dedicated load and store operations, but includes a rich set of addressing modes that allow access to memory and can be used with almost all instructions. For example, \texttt{add @R4+, 2(R5)} adds the word stored at the address contained in register \reg{r4} to the word stored at the address contained in \reg{R5} plus two, stores the result in the latter location, and increments \reg{R4} by two; the indirect autoincrement mode is used for the source, the indexed mode for the destination.
 
 A peculiarity of the \msp is the adoption of FRAM \cite{slaa628b} to support most of the address space, with limited use of SRAM. FRAM is non-volatile, meaning that writes persist across reboots and losses of power.
 
-\subsection{IPE}
+\subsection{Intellectual Property Encapsulation}
 \label{sec:ipe}
 
 We will now discuss the workings of IPE in more detail.
 
 To protect a region of FRAM, the user writes the start and end addresses without the 4 least significant bits\footnote{To allow the use of IPE on models with a 20-bit address space (and 16-bit registers, as usual). These bits must also be dropped in 16-bit address space models for portability.} to two memory-mapped registers, \reg{MPUIPSEGB1} and \reg{MPUIPSEGB2}. Then, IPE must be enabled by setting bit 6 (\regbit{MPUIPENA}) of the \reg{MPUIPC0} control register.
 
-As long as \regbit{MPUIPENA} is set, read and write accesses to addresses contained in the protected region are only allowed if the program counter is also within the region, \ie the IPE range determines both the protected data and the trusted/privileged code.
-
-There are some exceptions to this rule:
+As long as \regbit{MPUIPENA} is set, read and write accesses to addresses contained in the protected region are only allowed if the program counter is also within the region, \ie the IPE range determines both the protected data and the trusted/privileged code. There are a couple of exceptions to this rule:
 \begin{itemize}
 \item the \intro{Interrupt Vector Table}[IVT] is always readable and writable, even if it overlaps with the IPE region; % actually depends on MPU too, also IVT under IPE is not executable (the IVT contains only pointers to interrupt routines anyway)
 \item code executed from the first 8 bytes of the IPE range does \emph{not} have permission to access the protected region---the motivation will be explained in the next section.
@@ -71,18 +69,24 @@ Given our verification goal, of particular interest to us are the architectural 
 \label{sec:call-corruption}
 
 The \msp architecture provides a \asm{call} \emph{dst} instruction that saves the current \intro{program counter}[PC] to the stack, whose top element is pointed to by the \reg{SP} register, and jumps to \emph{dst}. IPE's permission checks are implemented erroneously for this instruction, opening the way for an attack (\cref{lst:call-corruption}):
-\begin{lstlisting}[
-  language=asm,
-  float=htb, label=lst:call-corruption,
-  caption={Attacker code for controlled call corruption.}
-]
-  mov #protected, SP
-  call #ipefunc
-\end{lstlisting}
 \begin{enumerate}
 \item an address (\asm{protected}) contained in the IPE region is written to \reg{SP}, which can be manipulated like a general purpose register;
 \item a \asm{call} is performed to a trusted function (\ie to an address \asm{ipefunc} within the IPE boundaries).
 \end{enumerate}
+
+\begin{listing}[b]
+  \begin{lstlisting}[
+    language=asm,
+    aboveskip=-0.25\baselineskip,
+    belowskip=-0.25\baselineskip
+  ]
+    mov #protected, SP
+    call #ipefunc
+  \end{lstlisting}
+  \caption{Attacker code for controlled call corruption.}
+  \label{lst:call-corruption}
+\end{listing}
+
 
 The \asm{call} instruction then attempts to write the return address (current PC) to the stack. The operation should fail, since the \reg{SP} is now in the IPE region and the \asm{call} is performed from untrusted code. Instead, on current models the write goes through successfully; it seems that the program counter is updated \emph{before} performing the access permission check.
 
@@ -93,17 +97,22 @@ This attack grants untrusted code the ability to corrupt protected memory. The v
 
 The IPE region doesn't have well-defined entry points; jumping to arbitrary protected locations is always allowed. This opens the door to code reuse attacks. As an example, \cref{lst:read-gadget} shows a piece of trusted code that copies a word from memory location \asm{src}  to \asm{dst}. For the attacker, it easily becomes a universal read and write gadget: it is sufficient to write the desired source and destination addresses to \reg{r4} and \reg{r5}, and then jump directly to the third line.
 
-\begin{lstlisting}[
-  language=asm,
-  float=htb, label=lst:read-gadget,
-  caption={An innocuous copy can become a universal read gadget.}
-]
-  mov #src, r4
-  mov #dst, r5
-  mov 0(r4), 0(r5)
-\end{lstlisting}
+\begin{listing}[htb]
+  \begin{lstlisting}[
+    language=asm,
+    aboveskip=-0.25\baselineskip,
+    belowskip=-0.25\baselineskip
+  ]
+    mov #src, R4
+    mov #dst, R5
+    mov 0(R4), 0(R5)
+  \end{lstlisting}
+  \caption{An innocuous copy can become a universal read gadget.}
+  \label{lst:read-gadget}
+\end{listing}
 
-In isolation, performing this attack is not trivial, since the IPE code is confidential; identifying suitable gadgets may require a lot of trial and error. Other attacks (including side-channel attacks) may be used to aid this search, and finding a universal write gadget turns a vulnerability that breaks confidentiality into one that also breaks integrity.
+
+In isolation, performing this attack is not trivial, since the IPE code is confidential; identifying suitable gadgets may require a lot of trial and error. Other attacks (including side-channel attacks) may be used to aid this search. Consequently, if the trusted code contains a universal write gadget then every vulnerability that breaks confidentiality turns into one that also breaks integrity via code reuse.
 
 \subsubsection{Interrupting IPE code}
 \label{sec:interrupts}
@@ -145,9 +154,7 @@ Sail code doesn't usually concern itself with the details of memory. Instead, it
 
 \subsection{The Sail language}
 
-At its core, Sail is a first-order imperative language that integrates a number of features commonly found in vendor-specific pseudocode and specification languages. The result is an expressive set of primitives that ease both manual development of new specifications and automated translations from the pseudocode languages that inspired Sail.
-
-This section outlines some of Sail's distinctive features.
+At its core, Sail is a first-order imperative language that integrates a number of features commonly found in vendor-specific pseudocode and specification languages. The result is an expressive set of primitives that ease both manual development of new specifications and automated translations from the pseudocode languages that inspired Sail. This section outlines some distinctive features of the language.
 
 \begin{figure}
   \centering
@@ -162,17 +169,13 @@ Sail's type system supports user-defined structs, enums and unions (sum types).
 
 The built-in types include arbitrary-precision integers (\sail{nat} and \sail{int}), bounded integers (\eg \sail{range(0, 15)}) and bitvectors of a given length (\eg \sail{bits(8)}).
 
-A limited form of dependent types is available, primarily to rule out the possibility of out-of-bounds accesses to bitvectors. In Sail, types can be of three kinds: \sail{Type}, the kind of enums, structs, \sail{nat}, \sail{bvec(n)}, etc.; \sail{Int}, the kind of integers; \sail{Bool}, of \sail{true} and \sail{false}.
+A limited form of dependent types is available, primarily to rule out the possibility of out-of-bounds accesses to bitvectors. In Sail, types can be of three kinds: \sail{Type}, the kind of enums, structs, \sail{nat}, \sail{bvec(n)}, etc.; \sail{Int}, of integers; \sail{Bool}, of \sail{true} and \sail{false}.
 
-Consequently, integers can be used in types (as seen in \eg \sail{bits(8)}), and polymorphic type variables can range over integers, as they are themselves types.
-
-As an example, a function that repeats a bitvector some number of times could have the following signature:
-
+Consequently, integers can be used in types (as seen in \eg \sail{bits(8)}), and polymorphic type variables can range over integers, as they are themselves types. As an example, a function that repeats a bitvector some number of times could have the following signature:
 \begin{lstlisting}[language=sail]
-  val replicate_bits : forall 'n 'm, 'm >= 1 & 'n >= 1.
-      (int('n), bits('m)) -> bits('n * 'm)
+    val replicate_bits : forall 'n 'm, 'm >= 1 & 'n >= 1.
+        (int('n), bits('m)) -> bits('n * 'm)
 \end{lstlisting}
-
 \sail{replicate_bits}'s type is parameterized over two type variables \sail{n} and \sail{m}, which are inferred to be of kind \sail{Int}; at each usage site they will be instantiated with some integer. Next we set two constraints for the integer type variables: they must be at least 1. Finally, we state that \sail{replicate_bits} is a function with:
 \begin{description}
 \item[Inputs] an integer and a bitvector. At each call site, the type variable \sail{n} will be instantiated with the integer, and \sail{m} with the size of the bitvector.
@@ -190,23 +193,23 @@ Pattern matching is a pervasive operation in all kind of interpreters, and machi
 
 Bitvector patterns are a distinctive feature that comes from existing pseudocode conventions. For instance, the following pattern matches the encoding of the RISC-V \texttt{ADDI} instruction:
 \begin{lstlisting}[language=sail]
-  imm : bits(12) @ rs1 : bits(5) @ 0b000 @ rd : bits(5) @ 0b0010011
+    imm : bits(12) @ rs1 : bits(5) @ 0b000 @ rd : bits(5) @ 0b0010011
 \end{lstlisting}
 it will bind the first 12 bits to \sail{imm}, the following 5 to \sail{rs1}, then expect 3 zeroes, followed by 5 bits bound to \sail{rd}, and then the sequence \texttt{0010011}.
 
 \subsubsection{Scattered definitions}
 
-A single union, enum or function can have its definition split between multiple locations, possibly in different files. A common use case is to partition decoding and execution by instruction.
-
+A single union, enum or function can have its definition split between multiple locations, possibly in different files. A common use case is to partition decoding and execution by instruction. For example, we may have in one file:
 \begin{lstlisting}[language=sail]
-  union clause ast = ADDI : (bits(12), regbits, regbits)
-
-  function clause decode(imm : bits(12)
-                         @ rs1 : regbits @ 0b000
-                         @ rd : regbits @ 0b0010011)
-    = ADDI(imm, rs1, rd)
-
-  function clause execute (ADDI(imm, rs1, rd)) = ...
+  scattered union ast; scattered function decode; scattered function execute
+\end{lstlisting}
+and then, in \file{instructions/add.sail}:
+\begin{lstlisting}[language=sail]
+    union clause ast = ADDI : (bits(12), regbits, regbits)
+    function clause decode(
+        imm : bits(12) @ rs1 : regbits @ 0b000 @ rd : regbits @ 0b0010011)
+      = ADDI(imm, rs1, rd)
+    function clause execute (ADDI(imm, rs1, rd)) = ...
 \end{lstlisting}
 
 \subsubsection{Overloading}
@@ -236,7 +239,7 @@ Note that we are not saying anything about what \texttt{unlock-door} \emph{does}
 Knowing \texttt{unlock-door}'s implementation, we can prove that the above contract holds. We could verify similar security properties for all functions in a program. This technique is applicable whenever:
 \begin{itemize}
 \item we are only dealing with known (trusted) code, or
-\item the attacker can only interact with our program/machine by calling known functions.
+\item the attacker can only interact with our system by calling known functions.
 \end{itemize}
 
 Given our threat model, neither of the above assumptions holds true. We want to ensure that the guarantees hold when executing attacker code, which cannot be known a priori. We deal with this by proving the security property for \emph{all} programs, encompassing all possible attacker behaviors:
@@ -260,7 +263,7 @@ In the above contract \(p\) is a \msp machine program. Its proof would be conduc
   {\texttt{fdeCycle()}}
   {c = \text{current IPE config}} \]
 
-ISAs' security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged.\footnote{This kind of reasoning is sound when the postcondition of every instruction in the sequence implies the precondition of the next, which is true here: if the configuration is locked at the beginning of \sail{execute} and it unchanged at the end, it is also locked at the end, so we can apply again the contract to the next instruction.} We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
+ISA security guarantees can be usually reduced to properties that hold after executing single instructions. Here, if after executing any single instruction the IPE registers are unchanged, it follows that any sequence of instructions (\ie arbitrary program) also leaves them unchanged.\footnote{This kind of reasoning is sound when the postcondition of every instruction in the sequence implies the precondition of the next, which is true here: if the configuration is locked at the beginning of \sail{execute} and it unchanged at the end, it is also locked at the end, so we can apply again the contract to the next instruction.} We can thus give a simpler (to express and verify) contract on just the execute step of the fetch-decode-execute cycle:
 \[ \hoare
   {c = \text{current IPE config} \wedge c.\mathrm{locked}}
   {\texttt{execute(\(\mathit{instr}\))}}
@@ -274,11 +277,11 @@ The shift in viewpoint from assembly to Sail code is consequential for machine-a
 
 \subsection{Separation logic}
 
-So far we have been stating the pre- and postconditions informally. To make them more precise we need a language that can express properties involving memory, registers and access permissions, while being simple enough to facilitate (semi-)automated reasoning. The obvious choice here is a basic separation logic.
+So far we have been stating the pre- and postconditions informally. To make them more rigorous we need a language that can express properties involving memory, registers and access permissions, while being simple enough to facilitate (semi-)automated reasoning. The obvious choice here is a basic separation logic.
 
 Generally speaking, separation logic is a kind of Hoare logic extended with predicates that state ownership of \emph{resources}, such as memory locations and registers. For example, \(\ell \ptom v\) (pronounced \(\ell\) points to \(v\)) asserts that we own the location \(\ell\) and that the value stored at that location is \(v\).
 
-Separation logic introduces a new connective, the \intro{separating conjunction}. \(P \ast Q\) (\(P\) and separately \(Q\)) is true when \(P\) and \(Q\) both hold and have exclusive ownership of the resources they assert. For example, while \(\ell \ptom v \wedge \ell \ptom v\) is true for a memory where location \(\ell\) stores \(v\), \(\ell \ptom v \ast \ell \ptom v\) is always false, as the two conjuncts don't have exclusive ownership of \(\ell\). So from the validity of \(\ell_1 \ptom v \ast \ell_2 \ptom v\) we can derive that \(\ell_1 \neq \ell_2\).
+Separation logic introduces a new connective, the \intro{separating conjunction}. The formula \(P \ast Q\) (\(P\) and separately \(Q\)) is true when \(P\) and \(Q\) both hold and have exclusive ownership of the resources they assert. For example, while \(\ell \ptom v \wedge \ell \ptom v\) is true for a memory where location \(\ell\) stores \(v\), \(\ell \ptom v \ast \ell \ptom v\) is always false, as the two conjuncts don't have exclusive ownership of \(\ell\). So from the validity of \(\ell_1 \ptom v \ast \ell_2 \ptom v\) we can derive that \(\ell_1 \neq \ell_2\).
 
 The point of this is to enable modular reasoning in the presence of mutable state. Separation logic's proof system has a key rule in this regard:
 \[ \frac{\hoare{P}{e}{Q}}{\hoare{P \ast R}{e}{Q \ast R}}[\textsc{Frame}] \]
@@ -301,23 +304,23 @@ For that, we assume the following specifications for \texttt{read\_ram} and \tex
 we are only ``allowed'' to access a location if we own the corresponding chunk of memory. Concretely, we cannot prove any triple\footnote{Excluding those with an inconsistent precondition.} for a program that reads or writes to memory unless we assume the appropriate points-to predicates in the precondition.
 
 So if we want to state that the \coq{store} instruction doesn't let the attacker write to protected memory, we do that with the triple:
-\[ \hoare{\bigast_{\smash{\mathrm{unprotected}~\ell}} \exists v.\; \ell \ptom v}{\texttt{execute\_store($l$, $u$)}}{\top}\]
+\[ \hoare{\bigast_{\smash{\mathrm{unprotected}~\ell}}\hspace{-1.25em} \exists v.\; \ell \ptom v}{\texttt{execute\_store($l$, $u$)}}{\top}\]
 Since the precondition doesn't include points-to chunks for protected locations, the contract is provable only if \texttt{execute\_store} never attempts to access them, regardless of whether its argument \(l\) is protected.
 
 Thus the implementation \texttt{execute\_store(\(l\), \(u\)) = write\_ram(\(l\), \(u\))} wouldn't satisfy the contract: there is no way to prove any postcondition, not even the trivial one, because \texttt{write\_ram}'s specification requires ownership of \(l\), which we don't have in general.
 
 On the other hand,
 \begin{lstlisting}[language=sail, mathescape]
-  function execute_store($l$, $u$) =
-    if protected $l$ then throw error()
-    else write_ram($l$, $u$)
+    function execute_store($l$, $u$) =
+      if protected $l$ then throw error()
+      else write_ram($l$, $u$)
 \end{lstlisting}
-only invokes \texttt{write\_ram} when we know that \(l\) is unprotected, and thus can prove that we own its chunk. We are able to apply \texttt{write\_ram}'s specification and derive a postcondition about \texttt{execute\_store}, therefore proving the contract. Provability coincides with the implementation being safe, \ie not allowing forbidden accesses at runtime.
+only invokes \texttt{write\_ram} when we know that \(l\) is unprotected, and thus can prove that we own its chunk. We are able to apply \texttt{write\_ram}'s specification and derive a postcondition about \texttt{execute\_store}, therefore proving the contract. Provability implies that the implementation is safe, \ie it doesn't allow accesses to forbidden resources at runtime.
 
 \section{Katamaran}
 \label{sec:katamaran}
 
-Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verification of ISAs. It is built on top of the Rocq\footnote{Until recently known as Coq.} theorem prover and the Iris separation logic framework.
+Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verification of ISAs. It is built on top of the Rocq\footnote{Until recently known as Coq.} theorem prover and the Iris \cite{Jung2018} separation logic framework.
 
 \begin{figure}[htb]
   \centering
@@ -326,11 +329,11 @@ Katamaran \cite{Huyghebaert2023} is a framework for the semi-automated verificat
   \label{fig:katamaran}
 \end{figure}
 
-\Cref{fig:katamaran} shows the components of a mechanized proof based on Katamaran. Firstly, the user needs to provide a \usail (a subset of Sail embedded in Rocq) model of the ISA and the contracts they want to prove. Katamaran's symbolic executor then runs the object code of the contracts under the given preconditions and checks that the postconditions match. If it cannot prove that they do or don't, it leaves some \intro{verification conditions}[VCs] that the user can inspect and verify manually using Rocq's tactic language.
+\Cref{fig:katamaran} shows the components of a mechanized proof based on Katamaran. Firstly, the user needs to provide a \usail (a subset of Sail embedded in Rocq) model of the ISA and the contracts to be proved. Katamaran's symbolic executor then runs the object code of the contracts under the given preconditions and checks that the postconditions match. If it cannot prove that they do or don't, it leaves some \intro{verification conditions}[VCs] that the user can inspect and verify manually using Rocq's tactic language.
 
 The symbolic executor can only reason about \usail code. For all foreign functions used in the model a specification must be provided. Whenever the foreign function is called, its contract will be applied to determine the effects of the call.
 
-Pre- and postconditions are specified in a simple separation logic that can be extended with user-defined resources. These resources are opaque to the solvers and must be manipulated explicitly by invoking user-provided lemmas, which are essentially contracts that apply to the empty program.
+Pre- and postconditions are specified in a simple separation logic that can be extended with user-defined resources. These resources are opaque to the solver and must be manipulated explicitly by invoking user-provided lemmas, which are essentially contracts that apply to the empty program.
 
 The result of this process is the guarantee that the verified contracts hold up to the validity of the foreign function contracts and lemmas. Lemma correctness can be then proved by instantiating Katamaran's Iris model with a definition of the custom resources in terms of Iris propositions, and carrying out the proof via Iris' tactics. Likewise, foreign function contracts can be verified against a Rocq implementation of those functions. After that we have full assurance that the ISA satisfies the desired properties, as Katamaran itself is also proved correct.
 

@@ -1,7 +1,7 @@
 \chapter{Related work}
 \label{ch:related-work}
 
-To the best of our knowledge there is no previous work on formal verification of the \msp, neither its ISA nor machine programs. On the other hand there is a vast amount of existing work in this area targeting other architectures. Here we discuss some of it, restricting the scope to those dealing with concrete machine-readable ISA specification, taking advantage of symbolic execution and aiming to build reusable frameworks.
+To the best of our knowledge there is no previous attempt at formally verifying the \msp, neither its ISA nor machine programs. On the other hand there is a vast amount of existing work targeting other architectures. Here we discuss some of it, restricting the scope to those dealing with concrete machine-readable ISA specifications, taking advantage of symbolic execution and aiming to build reusable frameworks.
 
 \section{Katamaran case studies}
 
@@ -15,13 +15,13 @@ The security property we proved is similar to the one for RISC-V PMP, but there 
 
 \section{Other verification frameworks}
 
-Many before us have tackled the verification of various properties of ISAs and assembly programs. Until recently most designed their own abstract model (\eg as operational semantics) of the subset of the architecture that was relevant for their specific objective---see for example \cite{Georges2021}\cite{Jensen2013}\cite{Guanciale2016}. However, the availability of formal specifications for Armv8-A and RISC-V \cite{Armstrong2019} has in the last few years sparked the development of verification tools that work with Sail or other specification languages. In addition to being architecture-agnostic and reducing the effort required by the verification, these tools provide better guarantees than previous approaches by virtue of using complete and authoritative specifications in place of ad-hoc models. We focus on the latter class of tools which includes Katamaran.
+Many before us have tackled the verification of various properties of ISAs and assembly programs. Until recently most designed their own abstract model (usually as operational semantics) of the subset of the architecture that was relevant for their specific objective---see for example \cite{Georges2021}\cite{Jensen2013}\cite{Guanciale2016}. However, the availability of formal specifications for Armv8-A and RISC-V \cite{Armstrong2019} has in the last few years sparked the development of verification tools that work with Sail or other specification languages. In addition to being architecture-agnostic and reducing the effort required by the verification, these tools provide better guarantees than previous approaches by virtue of using complete and authoritative specifications in place of ad-hoc models. We focus on the latter class of tools which includes Katamaran.
 
 In \cite{Simner2020} multithreaded Sail programs are translated to SMT problems that have the possible execution outcomes (in terms of register and memory values) as solutions. These were then used to validate a proposed microarchitectural model of instruction fetch in Armv8-A against its ISA.
 
 According to \cite{Armstrong2021} this approach does not scale to full-fledged Sail specifications. They instead develop \intro{Isla}, a symbolic executor for Sail code, which integrates with the Z3 SMT solver to prune unreachable branches. The performance boost from this hybrid approach allows Isla to work directly on the entire Armv8-A Sail specification. The tool was designed to explore the outcomes of executing parallel assembly code under user-defined memory models, but the authors remark that the symbolic executor is general-purpose and could be applied to other verification tasks.
 
-\intro{Islaris} \cite{Sammler2022} builds on top of Isla to verify properties of assembly programs. The idea is to use Isla to produce a trace of register and memory accesses via symbolic execution, then turn the trace into a Rocq value. The user can express the desired property (on the event trace or final state) in a separation logic based on Iris and prove it in Rocq. Islaris also provides proof automation supported by the use of a restricted fragment of separation logic based on Lithium \cite{Sammler2021}.
+\intro{Islaris} \cite{Sammler2022} builds on top of Isla to verify properties of assembly programs. The idea is to use Isla to produce a trace of register and memory accesses via symbolic execution, then turn the trace into a Rocq value. The user can express the desired property (on the trace or final state) in a separation logic based on Iris and prove it in Rocq. Islaris also provides proof automation supported by the use of a restricted fragment of separation logic based on Lithium \cite{Sammler2021}.
 
 There is some overlap in functionality between Katamaran and Islaris. The latter focuses solely on verification of concrete machine code, \ie is comparable in scope to Katamaran's block verifier. The intended workflow of the two tools is similar: Islaris' proof automation and Katamaran's solver try to reduce the goal as much as possible, and the residual verification conditions are left for the user to prove. Islaris is better in some aspects:
 \begin{itemize}
@@ -51,4 +51,4 @@ Katamaran differs fundamentally from this approach by working with a deeply embe
 
 It is worth nothing that recently a stronger capability safety property on Arm Morello was proved in \cite{Hammond2025}. The proof extends the aforementioned verification in Isabelle, and the result is then manually translated to Rocq to verify known code with Islaris. In addition to the considerations we already noted on those two project, a limitation of using two different provers is that the result obtained in Isabelle must be admitted in Rocq, and mistakes could be made in the translation.
 
-% TODO seL4?
+% seL4? cambridge armv7

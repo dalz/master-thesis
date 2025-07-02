@@ -1,5 +1,11 @@
 \input{preamble.tex}
 
+\hypersetup{
+  pdftitle={Formal Verification of Security Properties in the MSP430 Microcontroller},
+  pdfsubject={Master's thesis on applying Katamaran to formally verify some security properties of the MSP430.},
+  pdfauthor={Alessio Duè},
+}
+
 \includeonly{
   chapters/introduction,
   chapters/background,
@@ -47,7 +53,7 @@
 % \lowertitleback{}
 % \dedication{}
 
-% \frontmatter
+\frontmatter
 \maketitle %[-1] % frontespizio
 \tableofcontents
 
@@ -62,6 +68,7 @@
 \include{chapters/conclusions}
 
 \backmatter
+\setcounter{biburlnumpenalty}{9000}
 \printbibliography[heading=bibintoc]
 
 \end{document}

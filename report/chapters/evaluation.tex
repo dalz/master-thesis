@@ -46,20 +46,20 @@ Unfortunately, useful debugging information is lost in the process. Variables lo
 
 \usail generation is a recent addition to Katamaran and still has some rough edges. One aspect that could be easily improved is the quality of the formatting: the backend builds \usail statements directly via their constructors instead of taking advantage of Rocq's custom notations feature. For example, the \msp \usail specification contains:
 \begin{minted}{coq}
-  stm_let "x"
-        (ty.int)
-        (stm_call signedWb (env.snoc (env.nil)
-                                     (_::_)
-                                     ((exp_var "w"))%exp))
-        (stm_exp (((exp_var "x"))<((exp_int 0%Z))))
+    stm_let "x"
+          (ty.int)
+          (stm_call signedWb (env.snoc (env.nil)
+                                       (_::_)
+                                       ((exp_var "w"))%exp))
+          (stm_exp (((exp_var "x"))<((exp_int 0%Z))))
 \end{minted}
 which could be rewritten, using notations, to:
 \begin{minted}{coq}
-  let: "x" := call signedWb [w] in
-  x < 0
+    let: "x" := call signedWb [w] in
+    x < 0
 \end{minted}
 
-The backend also tends to produce long lines (the longest being 408 characters, most of which indentation and 50 closing parentheses) that are hard to work with in a text editor.
+The backend also tends to produce long lines (the longest being 408 characters, mostly indentation and 50 closing parentheses) that are hard to work with in an editor.
 
 Due to a combination of factors, mainly expressive blind spots in \usail and suboptimal translation, the generated model tends to be quite large. As was already remarked single excessively complex functions may cause Rocq's type checker to hang.
 % , but even if that is not the case compilation time is affected negatively.
@@ -80,38 +80,42 @@ Katamaran's executor is itself verified to be correct, so naturally we didn't ru
 
 \begin{table}[t]
   \centering
-  \begin{minipage}{\linewidth}
   \renewcommand\footnoterule{}
   \begin{tabular}{llr}
     \toprule
     Component                         & Files                           & Lines       \\
     \midrule
-    Sail model (without tests)      & \file{msp430-ipe-sail/}         & \(1\,187\)  \\
+    Sail model {\small (without tests)}      & \file{msp430-ipe-sail/}         & \(1\,187\)  \\
     \usail model                    & \file{Base.v}, \file{Machine.v} & \(11\,236\) \\
     \midrule
     universal contract verification & \file{Contracts.v}              & 753         \\
     bootcode blocks verification    & \file{BlockVer/}                & 844         \\
     custom predicates               & \file{Sig.v}                    & 95          \\
     \midrule
-    Iris model\footnote{Including soundness statements of the universal contract and symbolic executor.}
+    {\small
+    \begin{tabular}{@{}l@{}}
+      \normalsize Iris model \\
+      \; (incl. soundness statements \\
+      \quad of UC and symbolic executor)
+    \end{tabular}}
     &
-      \begin{tabular}{l}
-        \file{IrisModel.v}, \file{IrisInstance.v}, \file{Model.v},\\
-        \file{LoopVerification.v}, \file{BlockVer/Verifier.v}
+      \begin{tabular}{@{}l@{}}
+        \file{IrisModel.v}, \file{IrisInstance.v}, \\
+        \file{Model.v}, \file{LoopVerification.v}, \\
+        \file{BlockVer/Verifier.v}
       \end{tabular}
-    & 336 \\
-    End-to-end result & \file{Bootcode.v} & 1011 \\
+    & 336 \\[2.75ex]
+    end-to-end result & \file{Bootcode.v} & \(1\,011\) \\
     \bottomrule
   \end{tabular}
-  \end{minipage}
   \caption{Lines of code of various parts of the project, excluding whitespace and comments, as computed by the \texttt{cloc} utility.}
   \label{tab:cloc}
 \end{table}
 
 \Cref{tab:cloc} counts the number of significant lines of code of the main parts of the \msp verification. Some observations:
 \begin{itemize}
-\item Most of \texttt{Base.v} and \texttt{Machine.v} were initially generated and then updated as needed. Counting with \texttt{diff -y -{}-suppress-common-lines <file-1> <file-2> | wc -l}, the current version of \file{Base.v} differs by 85 lines from one generated from the current version of the Sail specification, and the number rises to \(3\,228\) for \file{Machine.v}; note though that the latter includes changes in generated identifiers and comment.
-
+\item Most of \texttt{Base.v} and \texttt{Machine.v} were initially generated and then updated as needed. The current version of \file{Base.v} differs\footnote{Counting with \texttt{diff -y -{}-suppress-common-lines <file-1> <file-2> | wc -l}.}
+by 85 lines from one generated from the current version of the Sail specification, and the number rises to \(3\,228\) for \file{Machine.v}; note though that the latter includes changes in generated identifiers and comments.
 \item A direct comparison with the size of the previous Katamaran case studies is difficult, as both the MinimalCaps and RISC-V PMP used handwritten \usail specifications, respectively \(1\,096\) and \(2\,025\) lines long. MinimalCaps also has a Sail model which is 571 lines long; from all this we could extrapolate that \msp's ISA is 0.5--2× the size of the simplified version of RISC-V PMP.
 
 \item There are only 9 lines of non-trivial proofs in \file{Contracts.v} (with 2--3 tactics per line) and 3 in \file{BlockVer/}. More manual proofs were initially needed, but were then deleted after Katamaran was updated to solve the corresponding verification conditions automatically.
@@ -121,7 +125,7 @@ Katamaran's executor is itself verified to be correct, so naturally we didn't ru
 
 Finally, \cref{tab:times} reports on the compilation/verification times.
 
-\begin{table}[b]
+\begin{table}[H]
   \centering
   \begin{tabular}{lr}
     \toprule
