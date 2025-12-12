@@ -8,7 +8,11 @@
 \documentclass[
   overfullrule,
   fontsize=12,
+  areasetadvanced,
 ]{scrbook}
+
+% should have used BCOR...
+\areaset[1cm]{\textwidth}{\textheight}
 
 \usepackage[l2tabu,orthodox]{nag}
 
@@ -99,7 +103,7 @@
   \let\@fs@iftopcapt\iftrue}
 \makeatother
 
-\usepackage{graphicx}
+\usepackage{graphicx,pdfpages}
 \graphicspath{{img/}}
 
 \usepackage{booktabs}
